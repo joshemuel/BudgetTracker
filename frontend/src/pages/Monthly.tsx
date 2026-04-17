@@ -61,7 +61,7 @@ export default function MonthlyPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6 border-t border-ink pt-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 border-t border-ink pt-4">
         <div>
           <p className="smallcaps text-ink-mute">YTD In</p>
           <p className="num text-2xl text-gain">{fmtIDR(totals.income)}</p>
@@ -114,32 +114,34 @@ export default function MonthlyPage() {
         </ResponsiveContainer>
       </div>
 
-      <table className="ledger-table mt-10">
-        <thead>
-          <tr>
-            <th>Month</th>
-            <th className="text-right">Income</th>
-            <th className="text-right">Expense</th>
-            <th className="text-right">Net</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data?.months.map((m) => (
-            <tr key={m.month}>
-              <td className="font-[450]">{monthName(m.month)}</td>
-              <td className="text-right num text-gain">{fmtIDR(m.income)}</td>
-              <td className="text-right num text-accent">{fmtIDR(m.expense)}</td>
-              <td
-                className={`text-right num ${
-                  toNumber(m.net) >= 0 ? "text-gain" : "text-accent"
-                }`}
-              >
-                {fmtIDR(m.net)}
-              </td>
+      <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+        <table className="ledger-table mt-10 min-w-[640px]">
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th className="text-right">Income</th>
+              <th className="text-right">Expense</th>
+              <th className="text-right">Net</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {data?.months.map((m) => (
+              <tr key={m.month}>
+                <td className="font-[450]">{monthName(m.month)}</td>
+                <td className="text-right num text-gain">{fmtIDR(m.income)}</td>
+                <td className="text-right num text-accent">{fmtIDR(m.expense)}</td>
+                <td
+                  className={`text-right num ${
+                    toNumber(m.net) >= 0 ? "text-gain" : "text-accent"
+                  }`}
+                >
+                  {fmtIDR(m.net)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

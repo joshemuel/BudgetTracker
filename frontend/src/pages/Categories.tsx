@@ -53,7 +53,7 @@ export default function CategoriesPage() {
     <div>
       <SectionTitle kicker="Where the rupiah went">By Category</SectionTitle>
 
-      <div className="grid grid-cols-2 gap-4 max-w-md">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
         <label className="block">
           <span className="smallcaps text-ink-mute">From</span>
           <input
@@ -105,47 +105,49 @@ export default function CategoriesPage() {
         </div>
 
         <div className="col-span-12 md:col-span-7">
-          <table className="ledger-table">
-            <thead>
-              <tr>
-                <th>Category</th>
-                <th className="text-right">Spent</th>
-                <th className="text-right">Share</th>
-                <th className="text-right">#</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => {
-                const share = total ? toNumber(r.expense) / total : 0;
-                return (
-                  <tr key={r.category_id}>
-                    <td className="font-[450] flex items-center gap-2">
-                      <span
-                        className="inline-block w-2 h-2"
-                        style={{ background: PALETTE[i % PALETTE.length] }}
-                      />
-                      {r.category_name}
-                    </td>
-                    <td className="text-right num text-accent">
-                      {fmtIDR(r.expense)}
-                    </td>
-                    <td className="text-right num text-ink-mute">
-                      {fmtPct(share)}
-                    </td>
-                    <td className="text-right num text-ink-mute">
-                      {r.transactions}
-                    </td>
-                  </tr>
-                );
-              })}
-              <tr className="font-[500]">
-                <td className="smallcaps">Total</td>
-                <td className="text-right num">{fmtIDR(total)}</td>
-                <td></td>
-                <td></td>
-              </tr>
-            </tbody>
-          </table>
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+            <table className="ledger-table min-w-[640px]">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th className="text-right">Spent</th>
+                  <th className="text-right">Share</th>
+                  <th className="text-right">#</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => {
+                  const share = total ? toNumber(r.expense) / total : 0;
+                  return (
+                    <tr key={r.category_id}>
+                      <td className="font-[450] flex items-center gap-2">
+                        <span
+                          className="inline-block w-2 h-2"
+                          style={{ background: PALETTE[i % PALETTE.length] }}
+                        />
+                        {r.category_name}
+                      </td>
+                      <td className="text-right num text-accent">
+                        {fmtIDR(r.expense)}
+                      </td>
+                      <td className="text-right num text-ink-mute">
+                        {fmtPct(share)}
+                      </td>
+                      <td className="text-right num text-ink-mute">
+                        {r.transactions}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr className="font-[500]">
+                  <td className="smallcaps">Total</td>
+                  <td className="text-right num">{fmtIDR(total)}</td>
+                  <td></td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

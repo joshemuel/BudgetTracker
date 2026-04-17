@@ -184,3 +184,21 @@ hr {
     linear-gradient(transparent 31px, rgba(135, 126, 106, 0.07) 32px);
   background-size: 100% 32px;
 }
+
+@media (max-width: 640px) {
+  .smallcaps {
+    letter-spacing: 0.12em;
+    font-size: 10px;
+  }
+
+  .ledger-table th,
+  .ledger-table td {
+    padding: 8px 10px;
+  }
+
+  .modal-card {
+    border-radius: 0;
+    min-height: 100dvh;
+    max-height: 100dvh;
+  }
+}

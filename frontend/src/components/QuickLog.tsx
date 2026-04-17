@@ -198,21 +198,21 @@ export default function QuickLog({ open, onClose }: Props) {
         }`}
         aria-hidden={!open}
       >
-        <div className="modal-card w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col">
-          <div className="p-6 pb-4 border-b border-paper-rule">
+        <div className="modal-card w-full max-w-xl max-h-[100dvh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="p-4 sm:p-6 sm:pb-4 border-b border-paper-rule">
             <div className="flex items-baseline justify-between smallcaps text-ink-mute">
               <span>New entry</span>
               <button onClick={onClose} className="hover:text-accent">
                 close · esc
               </button>
             </div>
-            <h3 className="display text-4xl mt-2 leading-none">
+            <h3 className="display text-3xl sm:text-4xl mt-2 leading-none">
               What should we <span className="display-italic text-accent">log</span> today?
             </h3>
           </div>
 
           <form
-            className="flex-1 overflow-y-auto px-6 py-5 space-y-5"
+            className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5"
             onSubmit={(e) => {
               e.preventDefault();
               if (isTransfer) {
@@ -224,11 +224,11 @@ export default function QuickLog({ open, onClose }: Props) {
           >
             <div>
               <span className="smallcaps text-ink-mute block mb-2">Kind</span>
-              <div className="grid grid-cols-3 border border-ink">
+              <div className="grid grid-cols-1 sm:grid-cols-3 border border-ink">
                 <button
                   type="button"
                   onClick={() => setKind("expense")}
-                  className={`py-2 smallcaps border-r border-ink ${
+                  className={`py-2 smallcaps border-b sm:border-b-0 sm:border-r border-ink ${
                     kind === "expense" ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
                   }`}
                 >
@@ -237,7 +237,7 @@ export default function QuickLog({ open, onClose }: Props) {
                 <button
                   type="button"
                   onClick={() => setKind("income")}
-                  className={`py-2 smallcaps border-r border-ink ${
+                  className={`py-2 smallcaps border-b sm:border-b-0 sm:border-r border-ink ${
                     kind === "income" ? "bg-gain text-paper" : "text-ink-soft hover:text-ink"
                   }`}
                 >
@@ -277,7 +277,7 @@ export default function QuickLog({ open, onClose }: Props) {
             </label>
 
             {!isTransfer ? (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <label className="block">
                   <span className="smallcaps text-ink-mute">Category</span>
                   <select
@@ -321,7 +321,7 @@ export default function QuickLog({ open, onClose }: Props) {
                 </label>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <label className="block">
                   <span className="smallcaps text-ink-mute">From source</span>
                   <select
@@ -394,11 +394,11 @@ export default function QuickLog({ open, onClose }: Props) {
             )}
           </form>
 
-          <div className="p-6 pt-4 border-t border-paper-rule flex items-center justify-end gap-4">
+          <div className="p-4 sm:p-6 sm:pt-4 border-t border-paper-rule flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3 sm:gap-4">
             <button
               type="button"
               onClick={onClose}
-              className="smallcaps text-ink-mute hover:text-ink"
+              className="smallcaps text-ink-mute hover:text-ink w-full sm:w-auto"
             >
               Cancel
             </button>
@@ -412,7 +412,7 @@ export default function QuickLog({ open, onClose }: Props) {
                 }
               }}
               disabled={isTransfer ? !canSubmitTransfer : !canSubmitSingle}
-              className="smallcaps px-5 py-2 bg-ink text-paper disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent transition-colors"
+              className="smallcaps px-5 py-2 bg-ink text-paper disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent transition-colors w-full sm:w-auto"
             >
               {isTransfer
                 ? transfer.isPending

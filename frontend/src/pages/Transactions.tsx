@@ -58,7 +58,7 @@ export default function TransactionsPage() {
     <div>
       <SectionTitle kicker="The running register">Transactions</SectionTitle>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 border-b border-paper-rule pb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 border-b border-paper-rule pb-4">
         <label className="block">
           <span className="smallcaps text-ink-mute">Search</span>
           <input
@@ -119,58 +119,60 @@ export default function TransactionsPage() {
         </label>
       </div>
 
-      <table className="ledger-table">
-        <thead>
-          <tr>
-            <th>When</th>
-            <th>Description</th>
-            <th>Category</th>
-            <th>Source</th>
-            <th className="text-right">Amount</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {txs?.map((t) => (
-            <tr key={t.id}>
-              <td className="num text-ink-soft text-sm">{fmtDateTime(t.occurred_at)}</td>
-              <td className="font-[450]">
-                {t.description || <span className="text-ink-mute italic">—</span>}
-                {t.transfer_group_id && (
-                  <span className="ml-2 smallcaps text-ink-mute">transfer</span>
-                )}
-              </td>
-              <td>{t.category_name}</td>
-              <td className="text-ink-soft">{t.source_name}</td>
-              <td
-                className={`text-right num ${
-                  t.type === "expense" ? "text-accent" : "text-gain"
-                }`}
-              >
-                {t.type === "expense" ? "−" : "+"}
-                {fmtMoney(toNumber(t.amount), currencyBySource[t.source_id] ?? "IDR")}
-              </td>
-              <td className="text-right">
-                <button
-                  onClick={() => {
-                    if (confirm(`Delete this ${t.type}?`)) del.mutate(t.id);
-                  }}
-                  className="smallcaps text-ink-mute hover:text-accent"
-                >
-                  delete
-                </button>
-              </td>
-            </tr>
-          ))}
-          {txs && txs.length === 0 && (
+      <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+        <table className="ledger-table min-w-[860px]">
+          <thead>
             <tr>
-              <td colSpan={6} className="text-center text-ink-mute py-8">
-                Nothing to report.
-              </td>
+              <th>When</th>
+              <th>Description</th>
+              <th>Category</th>
+              <th>Source</th>
+              <th className="text-right">Amount</th>
+              <th />
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {txs?.map((t) => (
+              <tr key={t.id}>
+                <td className="num text-ink-soft text-sm">{fmtDateTime(t.occurred_at)}</td>
+                <td className="font-[450]">
+                  {t.description || <span className="text-ink-mute italic">—</span>}
+                  {t.transfer_group_id && (
+                    <span className="ml-2 smallcaps text-ink-mute">transfer</span>
+                  )}
+                </td>
+                <td>{t.category_name}</td>
+                <td className="text-ink-soft">{t.source_name}</td>
+                <td
+                  className={`text-right num ${
+                    t.type === "expense" ? "text-accent" : "text-gain"
+                  }`}
+                >
+                  {t.type === "expense" ? "−" : "+"}
+                  {fmtMoney(toNumber(t.amount), currencyBySource[t.source_id] ?? "IDR")}
+                </td>
+                <td className="text-right">
+                  <button
+                    onClick={() => {
+                      if (confirm(`Delete this ${t.type}?`)) del.mutate(t.id);
+                    }}
+                    className="smallcaps text-ink-mute hover:text-accent"
+                  >
+                    delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {txs && txs.length === 0 && (
+              <tr>
+                <td colSpan={6} className="text-center text-ink-mute py-8">
+                  Nothing to report.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

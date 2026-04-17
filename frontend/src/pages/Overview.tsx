@@ -56,13 +56,13 @@ export default function OverviewPage() {
   const paceRatio = ov.today_day / ov.days_in_month;
 
   return (
-    <div className="grid grid-cols-12 gap-8">
+    <div className="grid grid-cols-12 gap-5 sm:gap-6 lg:gap-8">
       {/* LEAD: a three-column editorial spread */}
       <section className="col-span-12">
         <p className="smallcaps text-ink-mute">
           {monthName(ov.month)} MMXXVI · Day {ov.today_day} of {ov.days_in_month}
         </p>
-        <h2 className="display text-5xl md:text-7xl mt-2">
+        <h2 className="display text-4xl sm:text-5xl md:text-7xl mt-2">
           <span className="display-italic">A month</span>, in figures.
         </h2>
       </section>
@@ -93,7 +93,7 @@ export default function OverviewPage() {
       </section>
 
       {/* Budget ledger */}
-      <section className="col-span-12 lg:col-span-8 mt-6">
+      <section className="col-span-12 lg:col-span-8 mt-4 sm:mt-6">
         <SectionTitle kicker="The running totals">By Category</SectionTitle>
         {ov.budgets.length === 0 ? (
           <p className="text-ink-soft">
@@ -104,9 +104,10 @@ export default function OverviewPage() {
             to draw your first limit.
           </p>
         ) : (
-          <table className="ledger-table">
-            <thead>
-              <tr>
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+            <table className="ledger-table min-w-[760px]">
+              <thead>
+                <tr>
                 <th>Category</th>
                 <th className="text-right">Spent</th>
                 <th className="text-right">Limit</th>
@@ -137,7 +138,8 @@ export default function OverviewPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
       </section>
 

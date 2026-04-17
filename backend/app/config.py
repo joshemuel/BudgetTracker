@@ -28,6 +28,8 @@ class Settings(BaseSettings):
 
     telegram_polling: bool = Field(default=False, alias="TELEGRAM_POLLING")
 
+    session_cookie_secure: bool = Field(default=False, alias="SESSION_COOKIE_SECURE")
+
 
 @lru_cache
 def get_settings() -> Settings:

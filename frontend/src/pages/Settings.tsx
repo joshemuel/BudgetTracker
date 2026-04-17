@@ -92,51 +92,53 @@ function SourcesBlock() {
   return (
     <section>
       <SectionTitle kicker="The wallets">Sources</SectionTitle>
-      <table className="ledger-table mb-4">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th className="text-right">Current Funds</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {data?.map((s) => (
-            <tr key={s.id}>
-              <td className="font-[450]">
-                {s.name}
-                {s.is_credit_card && (
-                  <span className="ml-2 smallcaps text-accent">credit</span>
-                )}
-              </td>
-              <td className={`text-right num ${s.is_credit_card ? "text-accent" : ""}`}>
-                {fmtMoney(s.current_balance, s.currency)}
-              </td>
-              <td className="text-right">
-                <button
-                  onClick={() => {
-                    setEditing(s);
-                    setEditName(s.name);
-                    setEditCurrentFundsInput(normalizeInput(String(s.current_balance), s.currency));
-                    setEditCurrency(s.currency);
-                  }}
-                  className="smallcaps text-ink-mute hover:text-accent mr-3"
-                >
-                  edit
-                </button>
-                <button
-                  onClick={() => {
-                    if (confirm(`Delete ${s.name}?`)) del.mutate(s.id);
-                  }}
-                  className="smallcaps text-ink-mute hover:text-accent"
-                >
-                  delete
-                </button>
-              </td>
+      <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+        <table className="ledger-table mb-4 min-w-[760px]">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th className="text-right">Current Funds</th>
+              <th />
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {data?.map((s) => (
+              <tr key={s.id}>
+                <td className="font-[450]">
+                  {s.name}
+                  {s.is_credit_card && (
+                    <span className="ml-2 smallcaps text-accent">credit</span>
+                  )}
+                </td>
+                <td className={`text-right num ${s.is_credit_card ? "text-accent" : ""}`}>
+                  {fmtMoney(s.current_balance, s.currency)}
+                </td>
+                <td className="text-right">
+                  <button
+                    onClick={() => {
+                      setEditing(s);
+                      setEditName(s.name);
+                      setEditCurrentFundsInput(normalizeInput(String(s.current_balance), s.currency));
+                      setEditCurrency(s.currency);
+                    }}
+                    className="smallcaps text-ink-mute hover:text-accent mr-3"
+                  >
+                    edit
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm(`Delete ${s.name}?`)) del.mutate(s.id);
+                    }}
+                    className="smallcaps text-ink-mute hover:text-accent"
+                  >
+                    delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {editing && (
         <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="modal-card w-full max-w-md p-6">
@@ -221,7 +223,7 @@ function SourcesBlock() {
         </div>
       )}
       <form
-        className="flex flex-wrap items-end gap-3"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end"
         onSubmit={(e) => {
           e.preventDefault();
           if (name.trim()) create.mutate();
@@ -270,7 +272,7 @@ function SourcesBlock() {
           <input type="checkbox" checked={isCc} onChange={(e) => setIsCc(e.target.checked)} />
           <span className="smallcaps text-ink-mute">Credit card</span>
         </label>
-        <button type="submit" className="smallcaps px-3 py-1 bg-ink text-paper">
+        <button type="submit" className="smallcaps px-3 py-1 bg-ink text-paper w-full sm:w-auto">
           Add source
         </button>
       </form>
@@ -305,7 +307,7 @@ function CategoriesBlock() {
         ))}
       </ul>
       <form
-        className="flex items-end gap-3"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end"
         onSubmit={(e) => {
           e.preventDefault();
           if (name.trim()) create.mutate();
@@ -319,7 +321,7 @@ function CategoriesBlock() {
             className="bg-transparent border-b border-ink py-1"
           />
         </label>
-        <button type="submit" className="smallcaps px-3 py-1 bg-ink text-paper">
+        <button type="submit" className="smallcaps px-3 py-1 bg-ink text-paper w-full sm:w-auto">
           Add
         </button>
       </form>
@@ -364,33 +366,35 @@ function BudgetsBlock() {
   return (
     <section className="mt-12">
       <SectionTitle kicker="The fences">Budgets</SectionTitle>
-      <table className="ledger-table mb-4">
-        <thead>
-          <tr>
-            <th>Category</th>
-            <th className="text-right">Monthly Limit</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {budgets?.map((b) => (
-            <tr key={b.id}>
-              <td className="font-[450]">{b.category_name}</td>
-              <td className="text-right num">{fmtIDR(b.monthly_limit)}</td>
-              <td className="text-right">
-                <button
-                  onClick={() => del.mutate(b.id)}
-                  className="smallcaps text-ink-mute hover:text-accent"
-                >
-                  delete
-                </button>
-              </td>
+      <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+        <table className="ledger-table mb-4 min-w-[620px]">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th className="text-right">Monthly Limit</th>
+              <th />
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {budgets?.map((b) => (
+              <tr key={b.id}>
+                <td className="font-[450]">{b.category_name}</td>
+                <td className="text-right num">{fmtIDR(b.monthly_limit)}</td>
+                <td className="text-right">
+                  <button
+                    onClick={() => del.mutate(b.id)}
+                    className="smallcaps text-ink-mute hover:text-accent"
+                  >
+                    delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <form
-        className="flex items-end gap-3"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end"
         onSubmit={(e) => {
           e.preventDefault();
           if (categoryId && limit) save.mutate();
@@ -422,7 +426,7 @@ function BudgetsBlock() {
             className="bg-transparent border-b border-ink py-1 w-40 num"
           />
         </label>
-        <button type="submit" className="smallcaps px-3 py-1 bg-ink text-paper">
+        <button type="submit" className="smallcaps px-3 py-1 bg-ink text-paper w-full sm:w-auto">
           Save
         </button>
       </form>

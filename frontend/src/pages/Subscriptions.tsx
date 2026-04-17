@@ -69,13 +69,13 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
 
   return (
     <form
-      className="grid grid-cols-2 md:grid-cols-3 gap-4 p-5 border border-paper-rule bg-paper-deep/30"
+      className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-4 sm:p-5 border border-paper-rule bg-paper-deep/30"
       onSubmit={(e) => {
         e.preventDefault();
         if (name && amount && categoryId && sourceId) create.mutate();
       }}
     >
-      <label className="col-span-2">
+      <label className="sm:col-span-2">
         <span className="smallcaps text-ink-mute block">Name</span>
         <input
           value={name}
@@ -154,7 +154,7 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
           className="bg-transparent border-b border-ink py-1 w-full"
         />
       </label>
-      <div className="col-span-2 md:col-span-3 flex justify-end gap-3 pt-2">
+      <div className="sm:col-span-2 md:col-span-3 flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-2">
         <button type="button" onClick={onDone} className="smallcaps text-ink-mute">
           Cancel
         </button>
@@ -269,50 +269,52 @@ export default function SubscriptionsPage() {
           </div>
         )}
 
-        <table className="ledger-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Source</th>
-              <th>Category</th>
-              <th className="text-right">Amount</th>
-              <th>Cadence</th>
-              <th>Next</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {(subs ?? []).map((s) => (
-              <tr key={s.id} className={s.active ? "" : "opacity-50"}>
-                <td className="font-[500]">{s.name}</td>
-                <td className="text-ink-soft">{s.source_name}</td>
-                <td>{s.category_name}</td>
-                <td className="text-right num text-accent">
-                  {fmtMoney(s.amount, (s.currency as CurrencyCode) || "IDR")}
-                </td>
-                <td className="smallcaps text-ink-mute">{s.frequency}</td>
-                <td className="num text-ink-soft">{s.next_billing_date}</td>
-                <td className="text-right">
-                  <button
-                    onClick={() => {
-                      if (window.confirm(`Delete ${s.name}?`)) del.mutate(s.id);
-                    }}
-                    className="smallcaps text-ink-mute hover:text-accent"
-                  >
-                    delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {subs && subs.length === 0 && (
+        <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+          <table className="ledger-table min-w-[860px]">
+            <thead>
               <tr>
-                <td colSpan={7} className="text-center text-ink-mute py-8">
-                  No subscriptions yet.
-                </td>
+                <th>Name</th>
+                <th>Source</th>
+                <th>Category</th>
+                <th className="text-right">Amount</th>
+                <th>Cadence</th>
+                <th>Next</th>
+                <th />
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {(subs ?? []).map((s) => (
+                <tr key={s.id} className={s.active ? "" : "opacity-50"}>
+                  <td className="font-[500]">{s.name}</td>
+                  <td className="text-ink-soft">{s.source_name}</td>
+                  <td>{s.category_name}</td>
+                  <td className="text-right num text-accent">
+                    {fmtMoney(s.amount, (s.currency as CurrencyCode) || "IDR")}
+                  </td>
+                  <td className="smallcaps text-ink-mute">{s.frequency}</td>
+                  <td className="num text-ink-soft">{s.next_billing_date}</td>
+                  <td className="text-right">
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Delete ${s.name}?`)) del.mutate(s.id);
+                      }}
+                      className="smallcaps text-ink-mute hover:text-accent"
+                    >
+                      delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {subs && subs.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="text-center text-ink-mute py-8">
+                    No subscriptions yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );

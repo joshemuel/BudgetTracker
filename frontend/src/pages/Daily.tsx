@@ -42,7 +42,7 @@ export default function DailyPage() {
         <SectionTitle kicker="Day by day, as written">
           {monthName(month)} {year}
         </SectionTitle>
-        <div className="flex gap-3 items-center">
+        <div className="flex gap-3 items-center w-full sm:w-auto justify-between sm:justify-start">
           <button
             className="smallcaps text-ink-mute hover:text-accent"
             onClick={() => {
@@ -108,7 +108,7 @@ export default function DailyPage() {
       </div>
 
       <SectionTitle kicker="Daily density">Heat of the month</SectionTitle>
-      <div className="grid grid-cols-7 gap-[3px]">
+      <div className="grid grid-cols-4 sm:grid-cols-7 gap-[3px]">
         {days.map((d) => {
           const ratio = toNumber(d.expense) / maxExp;
           const bg =

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import SESSION_COOKIE, get_current_user, get_db
+from app.config import get_settings
 from app.db.models import SessionToken, User
 from app.schemas.auth import LoginRequest, UserOut
 from app.services.auth import SESSION_TTL, create_session, verify_password
@@ -22,6 +23,7 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
         max_age=int(SESSION_TTL.total_seconds()),
         httponly=True,
         samesite="lax",
+        secure=get_settings().session_cookie_secure,
     )
     return user
 

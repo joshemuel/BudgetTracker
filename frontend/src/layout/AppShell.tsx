@@ -36,11 +36,11 @@ function Masthead({ me, onLog }: { me: Me | undefined; onLog: () => void }) {
     today.getFullYear();
 
   return (
-    <header className="relative pt-10 pb-6">
-      <div className="flex items-baseline justify-between smallcaps text-ink-mute">
-        <span>Beta Version</span>
-        <span className="hidden md:inline">{dateStr}</span>
-        <span className="flex items-center gap-4">
+    <header className="relative pt-6 sm:pt-8 md:pt-10 pb-5 sm:pb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-baseline sm:justify-between smallcaps text-ink-mute">
+        <span className="order-1">Beta Version</span>
+        <span className="order-3 sm:order-2 hidden md:inline">{dateStr}</span>
+        <span className="order-2 sm:order-3 flex items-center gap-2 sm:gap-4 self-start sm:self-auto">
           <button
             onClick={onLog}
             className="smallcaps px-3 py-1 border border-ink text-ink hover:bg-ink hover:text-paper transition-colors"
@@ -48,7 +48,11 @@ function Masthead({ me, onLog }: { me: Me | undefined; onLog: () => void }) {
           >
             + New entry
           </button>
-          {me && <span className="text-ink-soft normal-case tracking-normal font-[450] hidden md:inline">{me.username}</span>}
+          {me && (
+            <span className="text-ink-soft normal-case tracking-normal font-[450] hidden sm:inline">
+              {me.username}
+            </span>
+          )}
           <button
             onClick={() => logout.mutate()}
             className="hover:text-accent transition-colors"
@@ -59,7 +63,7 @@ function Masthead({ me, onLog }: { me: Me | undefined; onLog: () => void }) {
       </div>
 
       <div className="mt-4 anim-in">
-        <h1 className="display text-[88px] md:text-[124px] leading-[0.9] text-ink">
+        <h1 className="display text-[48px] sm:text-[72px] md:text-[104px] lg:text-[124px] leading-[0.92] text-ink">
           Budget <span className="display-italic text-accent">Tracker</span>
         </h1>
       </div>
@@ -77,8 +81,8 @@ function Masthead({ me, onLog }: { me: Me | undefined; onLog: () => void }) {
 
 function SectionNav() {
   return (
-    <nav className="py-3 border-b border-paper-rule overflow-x-auto">
-      <ul className="flex gap-6 smallcaps">
+    <nav className="py-3 border-b border-paper-rule overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+      <ul className="flex gap-4 sm:gap-6 smallcaps min-w-max">
         {nav.map((n) => (
           <li key={n.to}>
             <NavLink
@@ -133,15 +137,17 @@ export default function AppShell() {
   }
 
   return (
-    <div className="max-w-[1560px] mx-auto px-4 md:px-6 xl:px-8">
+    <div className="max-w-[1560px] mx-auto px-3 sm:px-4 md:px-6 xl:px-8">
       <Masthead me={me} onLog={() => setLogOpen(true)} />
       <SectionNav />
-      <main className="py-10">
+      <main className="py-6 sm:py-8 md:py-10">
         <Outlet />
       </main>
-      <footer className="py-10 border-t border-paper-rule flex justify-between smallcaps text-ink-mute">
+      <footer className="py-8 sm:py-10 border-t border-paper-rule flex flex-col gap-2 sm:flex-row sm:justify-between smallcaps text-ink-mute">
         <span>Printed locally · Jakarta</span>
-        <span>Press <kbd className="px-1 border border-paper-rule num">N</kbd> to log · <span className="italic">— fin —</span></span>
+        <span>
+          Press <kbd className="px-1 border border-paper-rule num">N</kbd> to log · <span className="italic">— fin —</span>
+        </span>
       </footer>
       <QuickLog open={logOpen} onClose={() => setLogOpen(false)} />
     </div>
