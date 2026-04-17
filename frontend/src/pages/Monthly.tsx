@@ -114,8 +114,8 @@ export default function MonthlyPage() {
         </ResponsiveContainer>
       </div>
 
-      <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-        <table className="ledger-table mt-10 min-w-[640px]">
+      <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
+        <table className="ledger-table mt-10 w-full text-[11px] sm:text-[13px]">
           <thead>
             <tr>
               <th>Month</th>

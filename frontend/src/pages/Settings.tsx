@@ -92,8 +92,8 @@ function SourcesBlock() {
   return (
     <section>
       <SectionTitle kicker="The wallets">Sources</SectionTitle>
-      <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-        <table className="ledger-table mb-4 min-w-[760px]">
+      <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
+        <table className="ledger-table mb-4 w-full text-[11px] sm:text-[13px]">
           <thead>
             <tr>
               <th>Name</th>
@@ -366,8 +366,8 @@ function BudgetsBlock() {
   return (
     <section className="mt-12">
       <SectionTitle kicker="The fences">Budgets</SectionTitle>
-      <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-        <table className="ledger-table mb-4 min-w-[620px]">
+      <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
+        <table className="ledger-table mb-4 w-full text-[11px] sm:text-[13px]">
           <thead>
             <tr>
               <th>Category</th>

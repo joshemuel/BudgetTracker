@@ -119,8 +119,8 @@ export default function TransactionsPage() {
         </label>
       </div>
 
-      <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-        <table className="ledger-table min-w-[860px]">
+      <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
+        <table className="ledger-table w-full text-[11px] sm:text-[13px]">
           <thead>
             <tr>
               <th>When</th>
