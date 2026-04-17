@@ -112,8 +112,17 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
     preferred_src = None
     if user.default_expense_source_id is not None:
         preferred_src = next((s for s in sources if s.id == user.default_expense_source_id), None)
+    currency_src = next(
+        (
+            s
+            for s in sources
+            if (s.currency or "IDR").upper() == (user.default_currency or "IDR").upper()
+        ),
+        None,
+    )
     default_src = (
         preferred_src
+        or currency_src
         or src_by_name.get(DEFAULT_SOURCE.lower())
         or (sources[0] if sources else None)
     )
