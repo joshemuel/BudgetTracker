@@ -65,7 +65,7 @@ function Masthead({ me, onLog }: { me: Me | undefined; onLog: () => void }) {
       </div>
 
       <div className="mt-6 sm:mt-8 md:mt-10 anim-in">
-        <h1 className="display text-[44px] sm:text-[88px] md:text-[124px] lg:text-[156px] xl:text-[180px] leading-[0.9] text-ink">
+        <h1 className="display text-[32px] sm:text-[64px] md:text-[96px] lg:text-[120px] xl:text-[140px] leading-[0.9] text-ink">
           Budget <span className="display-italic text-accent">Tracker</span>
         </h1>
       </div>

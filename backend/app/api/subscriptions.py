@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal, ROUND_HALF_UP
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
@@ -10,12 +11,35 @@ from app.db.models import Category, Source, Subscription, SubscriptionCharge, Us
 from app.schemas.subscriptions import (
     ChargeOut,
     SubscriptionIn,
+    SubscriptionMonthlyTotal,
     SubscriptionOut,
     SubscriptionUpdate,
 )
+from app.services import fx
 from app.services import subscriptions as sub_svc
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
+
+SUPPORTED_CURRENCIES = {"IDR", "SGD", "JPY", "AUD", "TWD"}
+
+
+def _report_currency(user: User, currency: str | None) -> str:
+    cur = (currency or user.default_currency or "IDR").upper()
+    if cur not in SUPPORTED_CURRENCIES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unsupported currency")
+    return cur
+
+
+def _round_currency(v: Decimal, currency: str) -> Decimal:
+    if currency in {"IDR", "JPY"}:
+        return v.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    return v.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _monthly_equivalent(amount: Decimal, frequency: str) -> Decimal:
+    if frequency == "yearly":
+        return amount / Decimal("12")
+    return amount
 
 
 def _name_maps(db: Session, user_id: int) -> tuple[dict[int, str], dict[int, str]]:
@@ -41,6 +65,25 @@ def _to_out(s: Subscription, cats: dict[int, str], srcs: dict[int, str]) -> Subs
         end_date=s.end_date,
         next_billing_date=s.next_billing_date,
         last_billed_at=s.last_billed_at,
+    )
+
+
+@router.get("/monthly-total", response_model=SubscriptionMonthlyTotal)
+def monthly_total(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    currency: str | None = Query(default=None),
+):
+    report_currency = _report_currency(user, currency)
+    rates = fx.get_rates_cached(db)
+    subs = db.query(Subscription).filter_by(user_id=user.id, active=True).all()
+    total = Decimal("0")
+    for s in subs:
+        monthly = _monthly_equivalent(Decimal(s.amount), s.frequency)
+        total += fx.convert(monthly, s.currency or "IDR", report_currency, rates)
+    return SubscriptionMonthlyTotal(
+        total=_round_currency(total, report_currency),
+        currency=report_currency,
     )
 
 

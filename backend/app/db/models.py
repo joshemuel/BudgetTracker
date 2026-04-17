@@ -98,6 +98,7 @@ class Budget(Base):
         ForeignKey("categories.id", ondelete="CASCADE"), nullable=False
     )
     monthly_limit: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="IDR")
 
 
 class Subscription(Base):

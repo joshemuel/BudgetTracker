@@ -28,6 +28,7 @@ export type Budget = {
   category_id: number;
   category_name: string;
   monthly_limit: string;
+  currency: CurrencyCode;
 };
 
 export type TxType = "expense" | "income";
@@ -82,4 +83,14 @@ export type CategoryStat = {
   expense: string;
   transactions: number;
 };
-export type CategoryStats = { from: string; to: string; categories: CategoryStat[] };
+export type CategoryStats = {
+  from: string;
+  to: string;
+  currency: CurrencyCode;
+  categories: CategoryStat[];
+};
+
+export type SubscriptionMonthlyTotal = {
+  total: string;
+  currency: CurrencyCode;
+};

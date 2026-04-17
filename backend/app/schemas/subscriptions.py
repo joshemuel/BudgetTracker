@@ -25,6 +25,7 @@ class SubscriptionIn(BaseModel):
 class SubscriptionUpdate(BaseModel):
     name: str | None = None
     amount: Decimal | None = None
+    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD)$")
     source_id: int | None = None
     category_id: int | None = None
     billing_day: int | None = Field(default=None, ge=1, le=31)
@@ -32,6 +33,11 @@ class SubscriptionUpdate(BaseModel):
     active: bool | None = None
     end_date: date | None = None
     next_billing_date: date | None = None
+
+
+class SubscriptionMonthlyTotal(BaseModel):
+    total: Decimal
+    currency: str
 
 
 class SubscriptionOut(BaseModel):

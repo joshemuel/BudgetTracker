@@ -75,7 +75,7 @@ export default function DailyPage() {
         </div>
       </div>
 
-      <div className="h-[280px] mt-4">
+      <div className="h-[200px] sm:h-[280px] mt-4">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
             <defs>

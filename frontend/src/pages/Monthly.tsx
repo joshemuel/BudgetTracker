@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { api } from "@/api";
 import type { Me, Monthly } from "@/types";
-import { fmtMoney, fmtShort, monthName, toNumber } from "@/lib/format";
+import { fmtCompactMoney, fmtMoney, fmtShort, monthName, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
 
@@ -28,6 +28,8 @@ export default function MonthlyPage() {
     queryFn: () => api.get<Monthly>(withCurrency(`/stats/monthly?year=${year}`, currency)),
   });
   const reportCurrency = data?.currency ?? currency;
+
+  const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
 
   const chartData =
     data?.months.map((m) => ({
@@ -72,11 +74,15 @@ export default function MonthlyPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 border-t border-ink pt-4">
         <div>
           <p className="smallcaps text-ink-mute">YTD In</p>
-          <p className="num text-2xl text-gain">{fmtMoney(totals.income, reportCurrency)}</p>
+          <p className="num text-2xl text-gain">
+            {isMobile ? fmtCompactMoney(totals.income, reportCurrency) : fmtMoney(totals.income, reportCurrency)}
+          </p>
         </div>
         <div>
           <p className="smallcaps text-ink-mute">YTD Out</p>
-          <p className="num text-2xl text-accent">{fmtMoney(totals.expense, reportCurrency)}</p>
+          <p className="num text-2xl text-accent">
+            {isMobile ? fmtCompactMoney(totals.expense, reportCurrency) : fmtMoney(totals.expense, reportCurrency)}
+          </p>
         </div>
         <div>
           <p className="smallcaps text-ink-mute">YTD Net</p>
@@ -85,12 +91,14 @@ export default function MonthlyPage() {
               totals.income - totals.expense >= 0 ? "text-gain" : "text-accent"
             }`}
           >
-            {fmtMoney(totals.income - totals.expense, reportCurrency)}
+            {isMobile
+              ? fmtCompactMoney(totals.income - totals.expense, reportCurrency)
+              : fmtMoney(totals.income - totals.expense, reportCurrency)}
           </p>
         </div>
       </div>
 
-      <div className="mt-8 h-[360px]">
+      <div className="mt-8 h-[240px] sm:h-[360px]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
             <CartesianGrid stroke="#d9cdb4" vertical={false} />

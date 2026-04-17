@@ -15,6 +15,7 @@ def _to_out(b: Budget, cat_name_by_id: dict[int, str]) -> BudgetOut:
         category_id=b.category_id,
         category_name=cat_name_by_id.get(b.category_id, ""),
         monthly_limit=b.monthly_limit,
+        currency=b.currency,
     )
 
 
@@ -37,7 +38,13 @@ def create_budget(
     cat = db.query(Category).filter_by(id=payload.category_id, user_id=user.id).one_or_none()
     if cat is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown category")
-    b = Budget(user_id=user.id, category_id=payload.category_id, monthly_limit=payload.monthly_limit)
+    currency = payload.currency or user.default_currency or "IDR"
+    b = Budget(
+        user_id=user.id,
+        category_id=payload.category_id,
+        monthly_limit=payload.monthly_limit,
+        currency=currency,
+    )
     db.add(b)
     try:
         db.commit()

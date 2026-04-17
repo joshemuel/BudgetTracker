@@ -8,9 +8,10 @@ import {
   Tooltip,
 } from "recharts";
 import { api } from "@/api";
-import type { CategoryStats } from "@/types";
-import { fmtIDR, fmtPct, todayISO, toNumber } from "@/lib/format";
+import type { CategoryStats, Me } from "@/types";
+import { fmtCompactMoney, fmtMoney, fmtPct, todayISO, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
+import { preferredCurrency, withCurrency } from "@/lib/preferences";
 
 const PALETTE = [
   "#a02a1a",
@@ -33,12 +34,24 @@ function firstOfMonthISO(): string {
 export default function CategoriesPage() {
   const [from, setFrom] = useState(firstOfMonthISO());
   const [to, setTo] = useState(todayISO());
+  const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
+
+  const { data: me } = useQuery<Me>({
+    queryKey: ["me"],
+    queryFn: () => api.get<Me>("/auth/me"),
+  });
+  const currency = preferredCurrency(me);
 
   const { data } = useQuery<CategoryStats>({
-    queryKey: ["category-stats", from, to],
+    queryKey: ["category-stats", from, to, currency],
     queryFn: () =>
-      api.get<CategoryStats>(`/stats/categories?from=${from}&to=${to}`),
+      api.get<CategoryStats>(
+        withCurrency(`/stats/categories?from=${from}&to=${to}`, currency)
+      ),
   });
+  const reportCurrency = data?.currency ?? currency;
+  const fmtAmount = (v: string | number) =>
+    isMobile ? fmtCompactMoney(v, reportCurrency) : fmtMoney(v, reportCurrency);
 
   const rows = (data?.categories ?? []).filter(
     (c) => toNumber(c.expense) > 0
@@ -75,7 +88,7 @@ export default function CategoriesPage() {
       </div>
 
       <div className="grid grid-cols-12 gap-8 mt-8">
-        <div className="col-span-12 md:col-span-5 h-[320px]">
+        <div className="col-span-12 md:col-span-5 h-[220px] sm:h-[320px]">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -98,7 +111,7 @@ export default function CategoriesPage() {
                   borderRadius: 0,
                   fontFamily: "Instrument Sans",
                 }}
-                formatter={(v: number) => fmtIDR(v)}
+                formatter={(v: number) => fmtMoney(v, reportCurrency)}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -128,7 +141,7 @@ export default function CategoriesPage() {
                         {r.category_name}
                       </td>
                       <td className="text-right num text-accent">
-                        {fmtIDR(r.expense)}
+                        {fmtAmount(r.expense)}
                       </td>
                       <td className="text-right num text-ink-mute">
                         {fmtPct(share)}
@@ -141,7 +154,7 @@ export default function CategoriesPage() {
                 })}
                 <tr className="font-[500]">
                   <td className="smallcaps">Total</td>
-                  <td className="text-right num">{fmtIDR(total)}</td>
+                  <td className="text-right num">{fmtAmount(total)}</td>
                   <td></td>
                   <td></td>
                 </tr>

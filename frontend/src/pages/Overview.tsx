@@ -120,7 +120,7 @@ export default function OverviewPage() {
                 <th className="text-right">Spent</th>
                 <th className="text-right">Limit</th>
                 <th className="text-right">Remaining</th>
-                <th className="w-40">Pace</th>
+                <th className="w-[96px] sm:w-40">Pace</th>
                 <th className="text-right">Status</th>
               </tr>
             </thead>
@@ -161,18 +161,24 @@ export default function OverviewPage() {
       <aside className="col-span-12 lg:col-span-4 mt-6 space-y-10">
         <div className="border-t-2 border-ink pt-4">
           <p className="smallcaps text-ink-mute">Credit Card</p>
-          <p className="num text-3xl mt-1 text-accent">{fmtMoney(ov.credit.outstanding, ov.currency)}</p>
+          <p className="num text-3xl mt-1 text-accent">
+            {isMobile ? fmtCompactMoney(ov.credit.outstanding, ov.currency) : fmtMoney(ov.credit.outstanding, ov.currency)}
+          </p>
           <p className="text-sm text-ink-soft mt-1">Outstanding balance (negative means payable)</p>
 
           <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
             <div>
               <p className="smallcaps text-ink-mute">This Month</p>
-              <p className="num text-accent">{fmtMoney(ov.credit.month_charges, ov.currency)}</p>
+              <p className="num text-accent">
+                {isMobile ? fmtCompactMoney(ov.credit.month_charges, ov.currency) : fmtMoney(ov.credit.month_charges, ov.currency)}
+              </p>
               <p className="text-ink-mute text-xs">charges</p>
             </div>
             <div>
               <p className="smallcaps text-ink-mute">Paid</p>
-              <p className="num text-gain">{fmtMoney(ov.credit.month_payments, ov.currency)}</p>
+              <p className="num text-gain">
+                {isMobile ? fmtCompactMoney(ov.credit.month_payments, ov.currency) : fmtMoney(ov.credit.month_payments, ov.currency)}
+              </p>
               <p className="text-ink-mute text-xs">payments</p>
             </div>
           </div>

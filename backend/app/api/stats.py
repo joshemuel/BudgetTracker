@@ -14,10 +14,6 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 SUPPORTED_CURRENCIES = {"IDR", "SGD", "JPY", "AUD", "TWD"}
 
 
-def _idr_round(v: Decimal) -> Decimal:
-    return v.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-
-
 def _round_currency(v: Decimal, currency: str) -> Decimal:
     if currency in {"IDR", "JPY"}:
         return v.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
@@ -170,7 +166,7 @@ def overview(
     budgets = db.query(Budget).filter_by(user_id=user.id).all()
     budget_rows = []
     for b in budgets:
-        limit = fx.convert(Decimal(b.monthly_limit), "IDR", report_currency, rates)
+        limit = fx.convert(Decimal(b.monthly_limit), b.currency, report_currency, rates)
         limit = _round_currency(limit, report_currency)
         spent = spent_by_cat.get(b.category_id, Decimal("0"))
         remaining = _round_currency(limit - spent, report_currency)
@@ -339,6 +335,7 @@ def categories_stats(
     db: Session = Depends(get_db),
     from_: date | None = Query(default=None, alias="from"),
     to: date | None = None,
+    currency: str | None = Query(default=None),
 ):
     now = datetime.now(timezone.utc)
     start_dt = (
@@ -351,6 +348,7 @@ def categories_stats(
         if to
         else start_dt + timedelta(days=32)
     )
+    report_currency = _report_currency(user, currency)
     rates = fx.get_rates_cached(db)
 
     rows = db.execute(
@@ -371,18 +369,20 @@ def categories_stats(
     ).all()
     cat_names = {c.id: c.name for c in db.query(Category).filter_by(user_id=user.id).all()}
     agg: dict[int, dict[str, Decimal | int]] = {}
-    for category_id, t_type, amount, currency in rows:
+    for category_id, t_type, amount, source_currency in rows:
         if category_id not in agg:
             agg[category_id] = {
                 "income": Decimal("0"),
                 "expense": Decimal("0"),
                 "n": 0,
             }
-        amount_idr = fx.convert_to_idr(Decimal(amount), currency or "IDR", rates)
+        amount_report = fx.convert(
+            Decimal(amount), source_currency or "IDR", report_currency, rates
+        )
         if t_type == "income":
-            agg[category_id]["income"] = Decimal(agg[category_id]["income"]) + amount_idr
+            agg[category_id]["income"] = Decimal(agg[category_id]["income"]) + amount_report
         else:
-            agg[category_id]["expense"] = Decimal(agg[category_id]["expense"]) + amount_idr
+            agg[category_id]["expense"] = Decimal(agg[category_id]["expense"]) + amount_report
         agg[category_id]["n"] = int(agg[category_id]["n"]) + 1
 
     out = []
@@ -391,8 +391,8 @@ def categories_stats(
             {
                 "category_id": category_id,
                 "category_name": cat_names.get(category_id, ""),
-                "income": str(_idr_round(Decimal(row["income"]))),
-                "expense": str(_idr_round(Decimal(row["expense"]))),
+                "income": str(_round_currency(Decimal(row["income"]), report_currency)),
+                "expense": str(_round_currency(Decimal(row["expense"]), report_currency)),
                 "transactions": row["n"],
             }
         )
@@ -400,5 +400,6 @@ def categories_stats(
     return {
         "from": start_dt.date().isoformat(),
         "to": (end_dt - timedelta(days=1)).date().isoformat(),
+        "currency": report_currency,
         "categories": out,
     }

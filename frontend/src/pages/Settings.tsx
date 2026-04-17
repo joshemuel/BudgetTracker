@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Budget, Category, Source } from "@/types";
-import { fmtIDR, fmtMoney } from "@/lib/format";
+import type { Budget, Category, Me, Source } from "@/types";
+import { fmtMoney } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
@@ -126,13 +126,13 @@ function SourcesBlock() {
                       setEditCurrentFundsInput(normalizeInput(String(s.current_balance), s.currency));
                       setEditCurrency(s.currency);
                     }}
-                    className="smallcaps text-ink-mute hover:text-accent mr-3"
+                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2 mr-1"
                   >
                     edit
                   </button>
                   <button
                     onClick={() => setPendingDelete(s)}
-                    className="smallcaps text-ink-mute hover:text-accent"
+                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
                   >
                     delete
                   </button>
@@ -347,6 +347,11 @@ function CategoriesBlock() {
 
 function BudgetsBlock() {
   const qc = useQueryClient();
+  const { data: me } = useQuery<Me>({
+    queryKey: ["me"],
+    queryFn: () => api.get<Me>("/auth/me"),
+  });
+  const userDefault = (me?.default_currency ?? "IDR") as CurrencyCode;
   const { data: budgets } = useQuery<Budget[]>({
     queryKey: ["budgets"],
     queryFn: () => api.get<Budget[]>("/budgets"),
@@ -357,16 +362,26 @@ function BudgetsBlock() {
   });
   const [categoryId, setCategoryId] = useState<number | "">("");
   const [limit, setLimit] = useState("");
+  const [currency, setCurrency] = useState<CurrencyCode>(userDefault);
+  const [editing, setEditing] = useState<Budget | null>(null);
+  const [editLimit, setEditLimit] = useState("");
+  const [editCurrency, setEditCurrency] = useState<CurrencyCode>("IDR");
+
+  useEffect(() => {
+    setCurrency(userDefault);
+  }, [userDefault]);
 
   const save = useMutation({
     mutationFn: () =>
       api.post("/budgets", {
         category_id: Number(categoryId),
         monthly_limit: limit,
+        currency,
       }),
     onSuccess: () => {
       setCategoryId("");
       setLimit("");
+      setCurrency(userDefault);
       qc.invalidateQueries({ queryKey: ["budgets"] });
       qc.invalidateQueries({ queryKey: ["overview"] });
     },
@@ -376,6 +391,15 @@ function BudgetsBlock() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["budgets"] });
       qc.invalidateQueries({ queryKey: ["overview"] });
+    },
+  });
+  const patch = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: Record<string, unknown> }) =>
+      api.patch(`/budgets/${id}`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["budgets"] });
+      qc.invalidateQueries({ queryKey: ["overview"] });
+      setEditing(null);
     },
   });
 
@@ -395,11 +419,21 @@ function BudgetsBlock() {
             {budgets?.map((b) => (
               <tr key={b.id}>
                 <td className="font-[450]">{b.category_name}</td>
-                <td className="text-right num">{fmtIDR(b.monthly_limit)}</td>
-                <td className="text-right">
+                <td className="text-right num">{fmtMoney(b.monthly_limit, b.currency)}</td>
+                <td className="text-right whitespace-nowrap">
+                  <button
+                    onClick={() => {
+                      setEditing(b);
+                      setEditLimit(String(b.monthly_limit));
+                      setEditCurrency(b.currency);
+                    }}
+                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2 mr-1"
+                  >
+                    edit
+                  </button>
                   <button
                     onClick={() => del.mutate(b.id)}
-                    className="smallcaps text-ink-mute hover:text-accent"
+                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
                   >
                     delete
                   </button>
@@ -409,8 +443,71 @@ function BudgetsBlock() {
           </tbody>
         </table>
       </div>
+      {editing && (
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="modal-card w-full max-w-md p-6">
+            <h3 className="font-semibold mb-4">Edit: {editing.category_name}</h3>
+            <div className="space-y-3">
+              <label className="block">
+                <span className="smallcaps text-ink-mute block mb-1">Monthly limit</span>
+                <div className="flex items-center gap-2">
+                  <span className="smallcaps text-ink-mute min-w-10">{currencySymbol(editCurrency)}</span>
+                  <input
+                    type="number"
+                    value={editLimit}
+                    onChange={(e) => setEditLimit(e.target.value)}
+                    className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full num"
+                  />
+                </div>
+              </label>
+              <label className="block">
+                <span className="smallcaps text-ink-mute block mb-1">Currency</span>
+                <select
+                  value={editCurrency}
+                  onChange={(e) => setEditCurrency(e.target.value as CurrencyCode)}
+                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                >
+                  {CURRENCIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={() => {
+                    if (!editing) return;
+                    const body: Record<string, unknown> = {};
+                    if (!isSameNumeric(editLimit, editing.monthly_limit)) {
+                      body.monthly_limit = editLimit || "0";
+                    }
+                    if (editCurrency !== editing.currency) {
+                      body.currency = editCurrency;
+                    }
+                    if (Object.keys(body).length === 0) {
+                      setEditing(null);
+                      return;
+                    }
+                    patch.mutate({ id: editing.id, body });
+                  }}
+                  className="smallcaps px-3 py-1 bg-ink text-paper rounded"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditing(null)}
+                  className="smallcaps px-3 py-1 border border-ink/30 rounded"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <form
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end"
         onSubmit={(e) => {
           e.preventDefault();
           if (categoryId && limit) save.mutate();
@@ -435,12 +532,29 @@ function BudgetsBlock() {
         </label>
         <label>
           <span className="smallcaps text-ink-mute block">Monthly limit</span>
-          <input
-            type="number"
-            value={limit}
-            onChange={(e) => setLimit(e.target.value)}
-            className="bg-transparent border-b border-ink py-1 w-40 num"
-          />
+          <div className="flex items-center gap-2">
+            <span className="smallcaps text-ink-mute min-w-10">{currencySymbol(currency)}</span>
+            <input
+              type="number"
+              value={limit}
+              onChange={(e) => setLimit(e.target.value)}
+              className="bg-transparent border-b border-ink py-1 w-full num"
+            />
+          </div>
+        </label>
+        <label>
+          <span className="smallcaps text-ink-mute block">Currency</span>
+          <select
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
+            className="bg-transparent border-b border-ink py-1"
+          >
+            {CURRENCIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
         </label>
         <button type="submit" className="smallcaps px-3 py-1 bg-ink text-paper w-full sm:w-auto">
           Save

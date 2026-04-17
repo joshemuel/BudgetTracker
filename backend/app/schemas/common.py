@@ -55,10 +55,12 @@ class CategoryOut(BaseModel):
 class BudgetIn(BaseModel):
     category_id: int
     monthly_limit: Decimal
+    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD)$")
 
 
 class BudgetUpdate(BaseModel):
     monthly_limit: Decimal | None = None
+    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD)$")
 
 
 class BudgetOut(BaseModel):
@@ -66,6 +68,7 @@ class BudgetOut(BaseModel):
     category_id: int
     category_name: str
     monthly_limit: Decimal
+    currency: str
 
 
 TransactionType = Literal["expense", "income"]
