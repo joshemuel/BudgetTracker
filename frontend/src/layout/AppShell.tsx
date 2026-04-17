@@ -5,6 +5,7 @@ import { api } from "@/api";
 import type { Me } from "@/types";
 import { monthName } from "@/lib/format";
 import QuickLog from "@/components/QuickLog";
+import UserPrefsMenu from "@/components/UserPrefsMenu";
 
 const nav = [
   { to: "/", label: "Overview", end: true },
@@ -40,10 +41,11 @@ function Masthead({ me, onLog }: { me: Me | undefined; onLog: () => void }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-baseline sm:justify-between smallcaps text-ink-mute">
         <span className="order-1">Beta Version</span>
         <span className="order-3 sm:order-2 hidden md:inline">{dateStr}</span>
-        <span className="order-2 sm:order-3 flex items-center gap-2 sm:gap-4 self-start sm:self-auto">
+        <span className="order-2 sm:order-3 flex items-center gap-2 sm:gap-3 self-start sm:self-auto">
+          <UserPrefsMenu me={me} />
           <button
             onClick={onLog}
-            className="smallcaps px-3 py-1 border border-ink text-ink hover:bg-ink hover:text-paper transition-colors"
+            className="smallcaps px-2 py-1 border border-ink text-ink hover:bg-ink hover:text-paper transition-colors"
             title="Press N"
           >
             + New entry
@@ -137,7 +139,7 @@ export default function AppShell() {
   }
 
   return (
-    <div className="max-w-[1560px] mx-auto px-3 sm:px-4 md:px-6 xl:px-8">
+    <div className="max-w-[1380px] mx-auto px-3 sm:px-4 md:px-6 xl:px-8">
       <Masthead me={me} onLog={() => setLogOpen(true)} />
       <SectionNav />
       <main className="py-6 sm:py-8 md:py-10">

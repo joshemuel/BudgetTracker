@@ -12,6 +12,7 @@ def classify(text: str, categories: list[str], sources: list[str]) -> dict[str, 
     """Port of classifyIntent. Returns { type: "log"|"query"|... , ... }."""
     cats = ", ".join(categories)
     srcs = ", ".join(sources)
+
     prompt = f"""
     Classify this message into exactly one intent.
     Message: "{text}"

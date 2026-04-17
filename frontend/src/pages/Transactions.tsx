@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Category, Source, Transaction } from "@/types";
-import { fmtDateTime, fmtMoney, toNumber } from "@/lib/format";
+import { fmtCompactMoney, fmtDateTime, fmtMoney, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 
 type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
@@ -13,6 +13,7 @@ export default function TransactionsPage() {
   const [categoryId, setCategoryId] = useState<number | "">("");
   const [sourceId, setSourceId] = useState<number | "">("");
   const [limit, setLimit] = useState(100);
+  const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
 
   const { data: cats } = useQuery<Category[]>({
     queryKey: ["categories"],
@@ -149,7 +150,9 @@ export default function TransactionsPage() {
                   }`}
                 >
                   {t.type === "expense" ? "−" : "+"}
-                  {fmtMoney(toNumber(t.amount), currencyBySource[t.source_id] ?? "IDR")}
+                  {isMobile
+                    ? fmtCompactMoney(toNumber(t.amount), currencyBySource[t.source_id] ?? "IDR")
+                    : fmtMoney(toNumber(t.amount), currencyBySource[t.source_id] ?? "IDR")}
                 </td>
                 <td className="text-right">
                   <button

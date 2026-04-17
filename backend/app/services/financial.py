@@ -109,7 +109,14 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
     sources = db.query(Source).filter_by(user_id=user.id, active=True).all()
     src_by_name: dict[str, Source] = {s.name.lower(): s for s in sources}
     valid_names = [s.name for s in sources]
-    default_src = src_by_name.get(DEFAULT_SOURCE.lower()) or (sources[0] if sources else None)
+    preferred_src = None
+    if user.default_expense_source_id is not None:
+        preferred_src = next((s for s in sources if s.id == user.default_expense_source_id), None)
+    default_src = (
+        preferred_src
+        or src_by_name.get(DEFAULT_SOURCE.lower())
+        or (sources[0] if sources else None)
+    )
     if default_src is None:
         raise RuntimeError("User has no sources defined")
 
@@ -136,7 +143,11 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
         category = cat_by_name.get(cat_name.lower(), other_cat)
 
         raw_src = item.get("source")
-        resolved_name = resolve_source_name(raw_src, valid_names, default_src.name)
+        fallback_name = default_src.name
+        # For incomes, prefer explicit source or first active; for expenses use preferred default.
+        if t_type == "income" and not raw_src and sources:
+            fallback_name = sources[0].name
+        resolved_name = resolve_source_name(raw_src, valid_names, fallback_name)
         source = src_by_name.get(resolved_name.lower(), default_src)
         used_default = not raw_src
 

@@ -39,6 +39,30 @@ export function fmtMoney(
   return `${CURRENCY_SYMBOL[currency] ?? currency} ${nf.format(n)}`;
 }
 
+export function fmtCompactMoney(
+  v: string | number | null | undefined,
+  currency: "IDR" | "SGD" | "JPY" | "AUD" | "TWD" = "IDR"
+): string {
+  const n = toNumber(v);
+  const abs = Math.abs(n);
+  let unit = "";
+  let value = n;
+  if (abs >= 1_000_000_000) {
+    value = n / 1_000_000_000;
+    unit = "b";
+  } else if (abs >= 1_000_000) {
+    value = n / 1_000_000;
+    unit = "m";
+  } else if (abs >= 1_000) {
+    value = n / 1_000;
+    unit = "k";
+  }
+  const symbol = CURRENCY_SYMBOL[currency] ?? currency;
+  if (!unit) return fmtMoney(n, currency);
+  const shown = Number(value.toFixed(1));
+  return `${symbol} ${shown}${unit}`;
+}
+
 export function fmtShort(v: string | number | null | undefined): string {
   const n = toNumber(v);
   return "Rp " + COMPACT.format(n);

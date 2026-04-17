@@ -1,4 +1,9 @@
-export type Me = { id: number; username: string };
+export type Me = {
+  id: number;
+  username: string;
+  default_currency: "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
+  default_expense_source_id: number | null;
+};
 
 export type Source = {
   id: number;

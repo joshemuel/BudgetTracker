@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "@/api";
 import type { Overview, Source } from "@/types";
-import { fmtIDR, fmtPct, monthName, toNumber } from "@/lib/format";
+import { fmtCompactMoney, fmtIDR, fmtPct, monthName, toNumber } from "@/lib/format";
 import { Figure, SectionTitle, Pullquote } from "@/components/Figure";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -54,6 +54,7 @@ export default function OverviewPage() {
   const net = toNumber(ov.totals.net);
   const netTone = net >= 0 ? "gain" : "accent";
   const paceRatio = ov.today_day / ov.days_in_month;
+  const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
 
   return (
     <div className="grid grid-cols-12 gap-3 sm:gap-6 lg:gap-8">
@@ -120,14 +121,16 @@ export default function OverviewPage() {
               {ov.budgets.map((b) => (
                 <tr key={b.category_id}>
                   <td className="font-[450]">{b.category_name}</td>
-                  <td className="text-right num">{fmtIDR(b.spent)}</td>
-                  <td className="text-right num text-ink-mute">{fmtIDR(b.limit)}</td>
+                  <td className="text-right num">{isMobile ? fmtCompactMoney(b.spent) : fmtIDR(b.spent)}</td>
+                  <td className="text-right num text-ink-mute">
+                    {isMobile ? fmtCompactMoney(b.limit) : fmtIDR(b.limit)}
+                  </td>
                   <td
                     className={`text-right num ${
                       toNumber(b.remaining) < 0 ? "text-accent" : ""
                     }`}
                   >
-                    {fmtIDR(b.remaining)}
+                    {isMobile ? fmtCompactMoney(b.remaining) : fmtIDR(b.remaining)}
                   </td>
                   <td>
                     <Bar pct={b.pct_used} status={b.status} />

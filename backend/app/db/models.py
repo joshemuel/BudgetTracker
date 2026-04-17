@@ -42,6 +42,7 @@ DEFAULT_CATEGORIES: list[str] = [
     "Other",
     "Investment",
     "Credit Payment",
+    "Untracked",
 ]
 
 
@@ -52,6 +53,8 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     telegram_chat_id: Mapped[str | None] = mapped_column(String(64))
+    default_currency: Mapped[str] = mapped_column(String(3), nullable=False, default="IDR")
+    default_expense_source_id: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

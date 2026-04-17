@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Category, Source } from "@/types";
-import { fmtIDR, fmtMoney, toNumber, todayISO } from "@/lib/format";
+import { fmtCompactMoney, fmtIDR, fmtMoney, toNumber, todayISO } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 
 type Frequency = "monthly" | "yearly";
@@ -173,6 +173,7 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
 export default function SubscriptionsPage() {
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
+  const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
 
   const { data: subs } = useQuery<Subscription[]>({
     queryKey: ["subscriptions"],
@@ -289,7 +290,9 @@ export default function SubscriptionsPage() {
                   <td className="text-ink-soft">{s.source_name}</td>
                   <td>{s.category_name}</td>
                   <td className="text-right num text-accent">
-                    {fmtMoney(s.amount, (s.currency as CurrencyCode) || "IDR")}
+                    {isMobile
+                      ? fmtCompactMoney(s.amount, (s.currency as CurrencyCode) || "IDR")
+                      : fmtMoney(s.amount, (s.currency as CurrencyCode) || "IDR")}
                   </td>
                   <td className="smallcaps text-ink-mute">{s.frequency}</td>
                   <td className="num text-ink-soft">{s.next_billing_date}</td>

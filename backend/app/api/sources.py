@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -6,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
-from app.db.models import Source, Transaction, User
+from app.db.models import Category, Source, Transaction, User
 from app.schemas.common import SourceIn, SourceOut, SourceUpdate
 from app.services import fx
 
@@ -127,22 +128,44 @@ def update_source(
         for t in txs:
             t.amount = _round_currency(Decimal(t.amount), dst_currency)
 
-    if current_balance is not None:
-        deltas = _current_balance_map(db, user.id)
-        delta = deltas.get(src.id, Decimal("0"))
-        target_currency = str(updates.get("currency") or src.currency or "IDR")
-        updates["starting_balance"] = _round_currency(
-            Decimal(current_balance) - delta, target_currency
-        )
-
     if "starting_balance" in updates:
         target_currency = str(updates.get("currency") or src.currency or "IDR")
         updates["starting_balance"] = _round_currency(
             Decimal(updates["starting_balance"]), target_currency
         )
 
+    # Prevent direct starting_balance mutation from UI; use current_balance reset flow
+    updates.pop("starting_balance", None)
+
     for k, v in updates.items():
         setattr(src, k, v)
+
+    # When user manually resets current balance, log the delta as "Untracked"
+    # so transaction history + balances remain reconcilable.
+    if current_balance is not None:
+        deltas_now = _current_balance_map(db, user.id)
+        current_now = _round_currency(
+            src.starting_balance + deltas_now.get(src.id, Decimal("0")), src.currency
+        )
+        target = _round_currency(Decimal(current_balance), src.currency)
+        delta = target - current_now
+        if delta != 0:
+            untracked = (
+                db.query(Category).filter_by(user_id=user.id, name="Untracked").one_or_none()
+            )
+            if untracked is not None:
+                db.add(
+                    Transaction(
+                        user_id=user.id,
+                        occurred_at=datetime.now(timezone.utc),
+                        type="income" if delta > 0 else "expense",
+                        category_id=untracked.id,
+                        amount=abs(delta),
+                        source_id=src.id,
+                        description="Starting Budget",
+                        is_internal=False,
+                    )
+                )
     try:
         db.commit()
     except IntegrityError:

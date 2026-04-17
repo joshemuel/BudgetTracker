@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import SESSION_COOKIE, get_current_user, get_db
 from app.config import get_settings
-from app.db.models import SessionToken, User
-from app.schemas.auth import LoginRequest, UserOut
+from app.db.models import SessionToken, Source, User
+from app.schemas.auth import LoginRequest, UserOut, UserPreferencesUpdate
 from app.services.auth import SESSION_TTL, create_session, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -41,4 +41,34 @@ def logout(
 
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)):
+    return user
+
+
+@router.patch("/me", response_model=UserOut)
+def update_me(
+    payload: UserPreferencesUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if "default_currency" in payload.model_fields_set and payload.default_currency is not None:
+        cur = payload.default_currency.upper()
+        if cur not in {"IDR", "SGD", "JPY", "AUD", "TWD"}:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unsupported currency")
+        user.default_currency = cur
+
+    if "default_expense_source_id" in payload.model_fields_set:
+        if payload.default_expense_source_id is None:
+            user.default_expense_source_id = None
+        else:
+            src = (
+                db.query(Source)
+                .filter_by(id=payload.default_expense_source_id, user_id=user.id, active=True)
+                .one_or_none()
+            )
+            if src is None:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown source")
+            user.default_expense_source_id = src.id
+
+    db.commit()
+    db.refresh(user)
     return user
