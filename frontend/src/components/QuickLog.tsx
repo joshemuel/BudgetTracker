@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Category, Source, TxType } from "@/types";
+import type { Category, Me, Source, TxType } from "@/types";
 import { fmtMoney } from "@/lib/format";
 
 function nowLocalISO(): string {
@@ -64,10 +64,36 @@ function firstActiveSourceId(srcs: Source[] | undefined): number | "" {
   return srcs?.find((s) => s.active)?.id ?? "";
 }
 
+function defaultSourceId(
+  srcs: Source[] | undefined,
+  preferredSourceId: number | null | undefined
+): number | "" {
+  if (!srcs?.length) return "";
+  if (preferredSourceId != null) {
+    const preferred = srcs.find((s) => s.id === preferredSourceId && s.active);
+    if (preferred) return preferred.id;
+  }
+  return firstActiveSourceId(srcs);
+}
+
+function defaultUntrackableCategoryId(cats: Category[] | undefined): number | "" {
+  if (!cats?.length) return "";
+  const hit = cats.find((c) => {
+    const n = c.name.toLowerCase();
+    return n === "untrackable" || n === "untracked";
+  });
+  return hit?.id ?? "";
+}
+
 type EntryKind = TxType | "transfer";
 
 export default function QuickLog({ open, onClose }: Props) {
   const qc = useQueryClient();
+  const { data: me } = useQuery<Me>({
+    queryKey: ["me"],
+    queryFn: () => api.get<Me>("/auth/me"),
+    enabled: open,
+  });
   const { data: cats } = useQuery<Category[]>({
     queryKey: ["categories"],
     queryFn: () => api.get<Category[]>("/categories"),
@@ -119,10 +145,34 @@ export default function QuickLog({ open, onClose }: Props) {
       setToSourceId("");
     }
     if (kind === "transfer" && !sourceId) {
-      const first = firstActiveSourceId(srcs);
+      const first = defaultSourceId(srcs, me?.default_expense_source_id);
       if (first) setSourceId(first);
     }
-  }, [kind, open, srcs, categoryId, toSourceId, sourceId]);
+  }, [kind, open, srcs, categoryId, toSourceId, sourceId, me?.default_expense_source_id]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!sourceId) {
+      const preferred = defaultSourceId(srcs, me?.default_expense_source_id);
+      if (preferred) {
+        setSourceId(preferred);
+      }
+    }
+    if (kind !== "transfer" && !categoryId) {
+      const untrackable = defaultUntrackableCategoryId(cats);
+      if (untrackable) {
+        setCategoryId(untrackable);
+      }
+    }
+  }, [
+    open,
+    kind,
+    sourceId,
+    categoryId,
+    srcs,
+    cats,
+    me?.default_expense_source_id,
+  ]);
 
   useEffect(() => {
     if (!open) return;

@@ -205,15 +205,15 @@ export default function TransactionsPage() {
                       setEditAmount(String(toNumber(t.amount)));
                       setEditDescription(t.description ?? "");
                     }}
-                    className="smallcaps px-2 py-0.5 border border-ink/30 hover:border-accent hover:text-accent mr-2"
+                    className="smallcaps text-ink-mute hover:text-accent mr-3"
                   >
-                    Edit
+                    edit
                   </button>
                   <button
                     onClick={() => setPendingDelete(t)}
-                    className="smallcaps px-2 py-0.5 border border-ink/30 hover:border-accent hover:text-accent text-ink-mute"
+                    className="smallcaps text-ink-mute hover:text-accent"
                   >
-                    Delete
+                    delete
                   </button>
                 </td>
               </tr>
