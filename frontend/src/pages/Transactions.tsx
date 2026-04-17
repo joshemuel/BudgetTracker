@@ -194,7 +194,7 @@ export default function TransactionsPage() {
                     ? fmtCompactMoney(toNumber(t.amount), currencyBySource[t.source_id] ?? "IDR")
                     : fmtMoney(toNumber(t.amount), currencyBySource[t.source_id] ?? "IDR")}
                 </td>
-                <td className="text-right">
+                <td className="text-right whitespace-nowrap">
                   <button
                     onClick={() => {
                       setEditing(t);
@@ -205,15 +205,15 @@ export default function TransactionsPage() {
                       setEditAmount(String(toNumber(t.amount)));
                       setEditDescription(t.description ?? "");
                     }}
-                    className="smallcaps text-ink-mute hover:text-accent mr-3"
+                    className="smallcaps px-2 py-0.5 border border-ink/30 hover:border-accent hover:text-accent mr-2"
                   >
-                    edit
+                    Edit
                   </button>
                   <button
                     onClick={() => setPendingDelete(t)}
-                    className="smallcaps text-ink-mute hover:text-accent"
+                    className="smallcaps px-2 py-0.5 border border-ink/30 hover:border-accent hover:text-accent text-ink-mute"
                   >
-                    delete
+                    Delete
                   </button>
                 </td>
               </tr>
