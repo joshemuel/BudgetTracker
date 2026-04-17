@@ -5,7 +5,7 @@ import type { Category, Source, Transaction } from "@/types";
 import { fmtDateTime, fmtMoney, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 
-const CURRENCY_BY_SOURCE: Record<number, "IDR" | "SGD" | "JPY" | "AUD"> = {};
+type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
 
 export default function TransactionsPage() {
   const qc = useQueryClient();
@@ -36,6 +36,14 @@ export default function TransactionsPage() {
     queryKey: ["transactions", qs],
     queryFn: () => api.get<Transaction[]>(`/transactions?${qs}`),
   });
+
+  const currencyBySource = useMemo(() => {
+    const m: Record<number, CurrencyCode> = {};
+    for (const s of srcs ?? []) {
+      m[s.id] = s.currency;
+    }
+    return m;
+  }, [srcs]);
 
   const del = useMutation({
     mutationFn: (id: number) => api.del(`/transactions/${id}`),
@@ -140,15 +148,7 @@ export default function TransactionsPage() {
                 }`}
               >
                 {t.type === "expense" ? "−" : "+"}
-                {(() => {
-                  if (srcs) {
-                    for (const s of srcs) {
-                      CURRENCY_BY_SOURCE[s.id] = s.currency;
-                    }
-                  }
-                  const currency = CURRENCY_BY_SOURCE[t.source_id] ?? "IDR";
-                  return fmtMoney(toNumber(t.amount), currency);
-                })()}
+                {fmtMoney(toNumber(t.amount), currencyBySource[t.source_id] ?? "IDR")}
               </td>
               <td className="text-right">
                 <button

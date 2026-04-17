@@ -70,9 +70,9 @@ def _credit_summary(
     for source_id, t_type, amount in all_rows:
         amount_idr = fx.convert_to_idr(Decimal(amount), curr_by_id.get(source_id, "IDR"), rates)
         if t_type == "income":
-            outstanding += amount_idr
-        else:
             outstanding -= amount_idr
+        else:
+            outstanding += amount_idr
 
     month_rows = db.execute(
         select(Transaction.source_id, Transaction.type, Transaction.amount).where(
@@ -92,6 +92,7 @@ def _credit_summary(
             month_payments += amount_idr
 
     return {
+        # Keep sign: negative means debt still owed on credit cards.
         "outstanding": str(_idr_round(outstanding)),
         "month_charges": str(_idr_round(month_charges)),
         "month_payments": str(_idr_round(month_payments)),

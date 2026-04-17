@@ -10,7 +10,7 @@ class SourceIn(BaseModel):
     name: str = Field(min_length=1, max_length=64)
     current_balance: Decimal | None = None
     starting_balance: Decimal = Decimal("0")
-    currency: str = Field(default="IDR", pattern="^(IDR|SGD|JPY|AUD)$")
+    currency: str = Field(default="IDR", pattern="^(IDR|SGD|JPY|AUD|TWD)$")
     is_credit_card: bool = False
     active: bool = True
 
@@ -19,7 +19,7 @@ class SourceUpdate(BaseModel):
     name: str | None = None
     current_balance: Decimal | None = None
     starting_balance: Decimal | None = None
-    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD)$")
+    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD)$")
     is_credit_card: bool | None = None
     active: bool | None = None
 
@@ -79,6 +79,14 @@ class TransactionIn(BaseModel):
     source_id: int
     description: str | None = None
     transfer_group_id: UUID | None = None
+
+
+class TransferIn(BaseModel):
+    occurred_at: datetime
+    amount: Decimal
+    from_source_id: int
+    to_source_id: int
+    description: str | None = None
 
 
 class TransactionUpdate(BaseModel):

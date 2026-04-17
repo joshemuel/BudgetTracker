@@ -11,7 +11,7 @@ from app.db.models import AppState
 
 log = logging.getLogger(__name__)
 
-SUPPORTED = {"IDR", "SGD", "JPY", "AUD"}
+SUPPORTED = {"IDR", "SGD", "JPY", "AUD", "TWD"}
 STATE_KEY = "FX_RATES_USD"
 
 
@@ -65,7 +65,14 @@ def get_rates_cached(db) -> FxRates:
         # Last-resort fallback: no conversion (1:1) so API remains available.
         one = Decimal("1")
         return FxRates(
-            rates_per_usd={"USD": one, "IDR": one, "SGD": one, "JPY": one, "AUD": one},
+            rates_per_usd={
+                "USD": one,
+                "IDR": one,
+                "SGD": one,
+                "JPY": one,
+                "AUD": one,
+                "TWD": one,
+            },
             fetched_at=datetime.now(timezone.utc),
         )
 
@@ -77,7 +84,12 @@ def get_rates_cached(db) -> FxRates:
         state = AppState(key=STATE_KEY, value=payload)
         db.add(state)
     else:
-        state.value = payload
+        merged = dict(state.value.get("rates", {})) if isinstance(state.value, dict) else {}
+        merged.update(payload["rates"])
+        state.value = {
+            "fetched_at": payload["fetched_at"],
+            "rates": merged,
+        }
     db.commit()
     return fresh
 
@@ -92,3 +104,15 @@ def convert_to_idr(amount: Decimal, source_currency: str, rates: FxRates) -> Dec
     usd = amount / rates.rates_per_usd[source_currency]
     idr = usd * rates.rates_per_usd["IDR"]
     return idr.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def convert(amount: Decimal, from_currency: str, to_currency: str, rates: FxRates) -> Decimal:
+    src = (from_currency or "IDR").upper()
+    dst = (to_currency or "IDR").upper()
+    if src == dst:
+        return amount
+    if src not in rates.rates_per_usd or dst not in rates.rates_per_usd:
+        return amount
+    usd = amount / rates.rates_per_usd[src]
+    out = usd * rates.rates_per_usd[dst]
+    return out.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)

@@ -8,6 +8,7 @@ const CURRENCY_SYMBOL: Record<string, string> = {
   SGD: "S$",
   JPY: "JP¥",
   AUD: "A$",
+  TWD: "NT$",
 };
 
 const COMPACT = new Intl.NumberFormat("en-US", {
@@ -27,7 +28,7 @@ export function fmtIDR(v: string | number | null | undefined): string {
 
 export function fmtMoney(
   v: string | number | null | undefined,
-  currency: "IDR" | "SGD" | "JPY" | "AUD" = "IDR"
+  currency: "IDR" | "SGD" | "JPY" | "AUD" | "TWD" = "IDR"
 ): string {
   const n = toNumber(v);
   const fixedDecimals = currency === "JPY" ? 0 : 2;

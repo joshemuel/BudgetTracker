@@ -91,8 +91,9 @@ def _credit_outstanding(db: Session, user_id: int) -> Decimal:
         )
         .scalar()
     )
-    balance = start + Decimal(income) - Decimal(expense)
-    return -balance if balance < 0 else Decimal("0")
+    # Keep sign negative when card is owed (charges > payments).
+    # Formula mirrors stats: charges increase debt, payments reduce debt.
+    return Decimal(expense) - (start + Decimal(income))
 
 
 def answer(db: Session, user: User, question: str) -> str:
@@ -103,7 +104,11 @@ def answer(db: Session, user: User, question: str) -> str:
     src = _sources_csv(db, user.id)
     lim = _limits_csv(db, user.id)
     credit = _credit_outstanding(db, user.id)
-    credit_ctx = f"\nCredit Card Outstanding Balance: {int(credit)}\n" if credit > 0 else ""
+    credit_ctx = (
+        f"\nCredit Card Outstanding Balance (negative means you still owe): {int(credit)}\n"
+        if credit != 0
+        else ""
+    )
 
     prompt = f"""
     You are Leo, a cheerful and concise personal budget assistant on Telegram.

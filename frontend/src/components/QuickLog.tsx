@@ -27,6 +27,7 @@ const SYMBOL_BY_CURRENCY: Record<string, string> = {
   SGD: "S$",
   JPY: "JP¥",
   AUD: "A$",
+  TWD: "NT$",
 };
 
 function parseRawAmount(raw: string): string {
@@ -40,7 +41,7 @@ function parseRawAmount(raw: string): string {
 }
 
 function displayAmount(raw: string, currency: string): string {
-  const code = (currency || "IDR") as "IDR" | "SGD" | "JPY" | "AUD";
+  const code = (currency || "IDR") as "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
   const symbol = SYMBOL_BY_CURRENCY[code] ?? code;
   return fmtMoney(parseRawAmount(raw), code).replace(`${symbol} `, "");
 }
@@ -53,6 +54,17 @@ function normalizeByCurrency(raw: string, currency: string): string {
   }
   return parsed;
 }
+
+function sourceCurrency(srcs: Source[] | undefined, sourceId: number | ""): string {
+  if (!srcs || !sourceId) return "IDR";
+  return srcs.find((s) => s.id === Number(sourceId))?.currency ?? "IDR";
+}
+
+function firstActiveSourceId(srcs: Source[] | undefined): number | "" {
+  return srcs?.find((s) => s.active)?.id ?? "";
+}
+
+type EntryKind = TxType | "transfer";
 
 export default function QuickLog({ open, onClose }: Props) {
   const qc = useQueryClient();
@@ -67,10 +79,11 @@ export default function QuickLog({ open, onClose }: Props) {
     enabled: open,
   });
 
-  const [type, setType] = useState<TxType>("expense");
+  const [kind, setKind] = useState<EntryKind>("expense");
   const [amountInput, setAmountInput] = useState("");
   const [categoryId, setCategoryId] = useState<number | "">("");
   const [sourceId, setSourceId] = useState<number | "">("");
+  const [toSourceId, setToSourceId] = useState<number | "">("");
   const [description, setDescription] = useState("");
   const [occurredAt, setOccurredAt] = useState(nowLocalISO());
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +95,11 @@ export default function QuickLog({ open, onClose }: Props) {
   useEffect(() => {
     if (open) {
       setError(null);
+      setKind("expense");
       setAmountInput("");
+      setCategoryId("");
+      setSourceId("");
+      setToSourceId("");
       setDescription("");
       setOccurredAt(nowLocalISO());
     }
@@ -92,6 +109,20 @@ export default function QuickLog({ open, onClose }: Props) {
     if (!open) return;
     setAmountInput(displayAmount(normalizeByCurrency(amountInput, amountCurrency), amountCurrency));
   }, [amountCurrency]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (kind === "transfer" && categoryId) {
+      setCategoryId("");
+    }
+    if (kind !== "transfer" && toSourceId) {
+      setToSourceId("");
+    }
+    if (kind === "transfer" && !sourceId) {
+      const first = firstActiveSourceId(srcs);
+      if (first) setSourceId(first);
+    }
+  }, [kind, open, srcs, categoryId, toSourceId, sourceId]);
 
   useEffect(() => {
     if (!open) return;
@@ -106,7 +137,7 @@ export default function QuickLog({ open, onClose }: Props) {
     mutationFn: () =>
       api.post("/transactions", {
         occurred_at: new Date(occurredAt).toISOString(),
-        type,
+        type: kind === "income" ? "income" : "expense",
         category_id: Number(categoryId),
         amount: parseRawAmount(amountInput),
         source_id: Number(sourceId),
@@ -124,7 +155,34 @@ export default function QuickLog({ open, onClose }: Props) {
     onError: (e: Error) => setError(e.message || "Could not record entry"),
   });
 
-  const canSubmit = parseRawAmount(amountInput) && categoryId && sourceId && !create.isPending;
+  const transfer = useMutation({
+    mutationFn: () =>
+      api.post("/transactions/transfer", {
+        occurred_at: new Date(occurredAt).toISOString(),
+        amount: parseRawAmount(amountInput),
+        from_source_id: Number(sourceId),
+        to_source_id: Number(toSourceId),
+        description: description || null,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["overview"] });
+      qc.invalidateQueries({ queryKey: ["sources"] });
+      qc.invalidateQueries({ queryKey: ["monthly"] });
+      qc.invalidateQueries({ queryKey: ["daily"] });
+      qc.invalidateQueries({ queryKey: ["categoryStats"] });
+      onClose();
+    },
+    onError: (e: Error) => setError(e.message || "Could not transfer funds"),
+  });
+
+  const parsedAmount = Number(parseRawAmount(amountInput));
+  const hasAmount = Number.isFinite(parsedAmount) && parsedAmount > 0;
+  const isTransfer = kind === "transfer";
+
+  const canSubmitSingle = hasAmount && !isTransfer && categoryId && sourceId && !create.isPending;
+  const canSubmitTransfer =
+    hasAmount && isTransfer && sourceId && toSourceId && sourceId !== toSourceId && !transfer.isPending;
 
   return (
     <>
@@ -157,29 +215,42 @@ export default function QuickLog({ open, onClose }: Props) {
             className="flex-1 overflow-y-auto px-6 py-5 space-y-5"
             onSubmit={(e) => {
               e.preventDefault();
-              if (canSubmit) create.mutate();
+              if (isTransfer) {
+                if (canSubmitTransfer) transfer.mutate();
+              } else {
+                if (canSubmitSingle) create.mutate();
+              }
             }}
           >
             <div>
               <span className="smallcaps text-ink-mute block mb-2">Kind</span>
-              <div className="grid grid-cols-2 border border-ink">
+              <div className="grid grid-cols-3 border border-ink">
                 <button
                   type="button"
-                  onClick={() => setType("expense")}
+                  onClick={() => setKind("expense")}
                   className={`py-2 smallcaps border-r border-ink ${
-                    type === "expense" ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
+                    kind === "expense" ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
                   }`}
                 >
                   − Expense
                 </button>
                 <button
                   type="button"
-                  onClick={() => setType("income")}
-                  className={`py-2 smallcaps ${
-                    type === "income" ? "bg-gain text-paper" : "text-ink-soft hover:text-ink"
+                  onClick={() => setKind("income")}
+                  className={`py-2 smallcaps border-r border-ink ${
+                    kind === "income" ? "bg-gain text-paper" : "text-ink-soft hover:text-ink"
                   }`}
                 >
                   + Income
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setKind("transfer")}
+                  className={`py-2 smallcaps ${
+                    kind === "transfer" ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
+                  }`}
+                >
+                  Transfer
                 </button>
               </div>
             </div>
@@ -205,48 +276,95 @@ export default function QuickLog({ open, onClose }: Props) {
               </div>
             </label>
 
-            <div className="grid grid-cols-2 gap-4">
-              <label className="block">
-                <span className="smallcaps text-ink-mute">Category</span>
-                <select
-                  value={categoryId}
-                  onChange={(e) =>
-                    setCategoryId(e.target.value ? Number(e.target.value) : "")
-                  }
-                  className="mt-1 w-full bg-transparent border-b border-ink py-1 focus:outline-none focus:border-accent"
-                >
-                  <option value="">—</option>
-                  {cats?.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="smallcaps text-ink-mute">Source</span>
-                <select
-                  value={sourceId}
-                  onChange={(e) => {
-                    const nextId = e.target.value ? Number(e.target.value) : "";
-                    setSourceId(nextId);
-                    const nextSource = srcs?.find((s) => s.id === Number(nextId));
-                    const nextCurrency = nextSource?.currency ?? "IDR";
-                    setAmountInput(displayAmount(normalizeByCurrency(amountInput, nextCurrency), nextCurrency));
-                  }}
-                  className="mt-1 w-full bg-transparent border-b border-ink py-1 focus:outline-none focus:border-accent"
-                >
-                  <option value="">—</option>
-                  {srcs
-                    ?.filter((s) => s.active)
-                    .map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
+            {!isTransfer ? (
+              <div className="grid grid-cols-2 gap-4">
+                <label className="block">
+                  <span className="smallcaps text-ink-mute">Category</span>
+                  <select
+                    value={categoryId}
+                    onChange={(e) =>
+                      setCategoryId(e.target.value ? Number(e.target.value) : "")
+                    }
+                    className="mt-1 w-full bg-transparent border-b border-ink py-1 focus:outline-none focus:border-accent"
+                  >
+                    <option value="">—</option>
+                    {cats?.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
                       </option>
                     ))}
-                </select>
-              </label>
-            </div>
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="smallcaps text-ink-mute">Source</span>
+                  <select
+                    value={sourceId}
+                    onChange={(e) => {
+                      const nextId = e.target.value ? Number(e.target.value) : "";
+                      setSourceId(nextId);
+                      const nextCurrency = sourceCurrency(srcs, nextId);
+                      setAmountInput(
+                        displayAmount(normalizeByCurrency(amountInput, nextCurrency), nextCurrency)
+                      );
+                    }}
+                    className="mt-1 w-full bg-transparent border-b border-ink py-1 focus:outline-none focus:border-accent"
+                  >
+                    <option value="">—</option>
+                    {srcs
+                      ?.filter((s) => s.active)
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <label className="block">
+                  <span className="smallcaps text-ink-mute">From source</span>
+                  <select
+                    value={sourceId}
+                    onChange={(e) => {
+                      const nextId = e.target.value ? Number(e.target.value) : "";
+                      setSourceId(nextId);
+                      const nextCurrency = sourceCurrency(srcs, nextId);
+                      setAmountInput(
+                        displayAmount(normalizeByCurrency(amountInput, nextCurrency), nextCurrency)
+                      );
+                    }}
+                    className="mt-1 w-full bg-transparent border-b border-ink py-1 focus:outline-none focus:border-accent"
+                  >
+                    <option value="">—</option>
+                    {srcs
+                      ?.filter((s) => s.active)
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="smallcaps text-ink-mute">To source</span>
+                  <select
+                    value={toSourceId}
+                    onChange={(e) => setToSourceId(e.target.value ? Number(e.target.value) : "")}
+                    className="mt-1 w-full bg-transparent border-b border-ink py-1 focus:outline-none focus:border-accent"
+                  >
+                    <option value="">—</option>
+                    {srcs
+                      ?.filter((s) => s.active)
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              </div>
+            )}
 
             <label className="block">
               <span className="smallcaps text-ink-mute">Occurred at</span>
@@ -286,11 +404,23 @@ export default function QuickLog({ open, onClose }: Props) {
             </button>
             <button
               type="button"
-              onClick={() => canSubmit && create.mutate()}
-              disabled={!canSubmit}
+              onClick={() => {
+                if (isTransfer) {
+                  if (canSubmitTransfer) transfer.mutate();
+                } else {
+                  if (canSubmitSingle) create.mutate();
+                }
+              }}
+              disabled={isTransfer ? !canSubmitTransfer : !canSubmitSingle}
               className="smallcaps px-5 py-2 bg-ink text-paper disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent transition-colors"
             >
-              {create.isPending ? "Committing…" : "Commit to ledger"}
+              {isTransfer
+                ? transfer.isPending
+                ? "Transferring…"
+                : "Transfer funds"
+                : create.isPending
+                ? "Committing…"
+                : "Commit to ledger"}
             </button>
           </div>
         </div>

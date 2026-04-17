@@ -5,13 +5,14 @@ import type { Budget, Category, Source } from "@/types";
 import { fmtIDR, fmtMoney } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 
-const CURRENCIES = ["IDR", "SGD", "JPY", "AUD"] as const;
+const CURRENCIES = ["IDR", "SGD", "JPY", "AUD", "TWD"] as const;
 type CurrencyCode = (typeof CURRENCIES)[number];
 
 function currencySymbol(c: CurrencyCode): string {
   if (c === "IDR") return "Rp";
   if (c === "SGD") return "S$";
   if (c === "JPY") return "JP¥";
+  if (c === "TWD") return "NT$";
   return "A$";
 }
 
@@ -30,7 +31,10 @@ function parseDisplayAmount(raw: string): string {
 }
 
 function normalizeInput(raw: string, currency: CurrencyCode): string {
-  const parsed = parseDisplayAmount(raw);
+  let parsed = parseDisplayAmount(raw);
+  if (currency === "JPY") {
+    parsed = String(Math.round(Number(parsed || "0")));
+  }
   return displayAmount(parsed, currency);
 }
 

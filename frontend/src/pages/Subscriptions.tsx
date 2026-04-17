@@ -2,10 +2,11 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Category, Source } from "@/types";
-import { fmtIDR, todayISO } from "@/lib/format";
+import { fmtIDR, fmtMoney, toNumber, todayISO } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 
 type Frequency = "monthly" | "yearly";
+type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
 type Subscription = {
   id: number;
   name: string;
@@ -187,7 +188,7 @@ export default function SubscriptionsPage() {
     mutationFn: (id: number) => api.del(`/subscriptions/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["subscriptions"] }),
   });
-  const confirm = useMutation({
+  const confirmCharge = useMutation({
     mutationFn: (id: number) => api.post(`/subscriptions/charges/${id}/confirm`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["subscriptions"] });
@@ -202,7 +203,7 @@ export default function SubscriptionsPage() {
 
   const monthlyTotal = (subs ?? [])
     .filter((s) => s.active && s.frequency === "monthly")
-    .reduce((a, s) => a + parseFloat(s.amount), 0);
+    .reduce((a, s) => a + toNumber(s.amount), 0);
 
   return (
     <div className="space-y-10">
@@ -232,7 +233,7 @@ export default function SubscriptionsPage() {
                     Skip
                   </button>
                   <button
-                    onClick={() => confirm.mutate(c.id)}
+                    onClick={() => confirmCharge.mutate(c.id)}
                     className="smallcaps px-3 py-1 bg-ink text-paper"
                   >
                     Confirm
@@ -286,13 +287,15 @@ export default function SubscriptionsPage() {
                 <td className="font-[500]">{s.name}</td>
                 <td className="text-ink-soft">{s.source_name}</td>
                 <td>{s.category_name}</td>
-                <td className="text-right num text-accent">{fmtIDR(s.amount)}</td>
+                <td className="text-right num text-accent">
+                  {fmtMoney(s.amount, (s.currency as CurrencyCode) || "IDR")}
+                </td>
                 <td className="smallcaps text-ink-mute">{s.frequency}</td>
                 <td className="num text-ink-soft">{s.next_billing_date}</td>
                 <td className="text-right">
                   <button
                     onClick={() => {
-                      if (confirm(`Delete ${s.name}?`)) del.mutate(s.id);
+                      if (window.confirm(`Delete ${s.name}?`)) del.mutate(s.id);
                     }}
                     className="smallcaps text-ink-mute hover:text-accent"
                   >

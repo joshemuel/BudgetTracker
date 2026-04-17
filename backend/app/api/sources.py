@@ -113,13 +113,7 @@ def update_source(
         def _convert(amount: Decimal, c_from: str, c_to: str) -> Decimal:
             if c_from == c_to:
                 return amount
-            amount_idr = fx.convert_to_idr(amount, c_from, rates)
-            if c_to == "IDR":
-                return _round_currency(amount_idr, c_to)
-            if c_to not in rates.rates_per_usd:
-                return amount
-            usd = amount_idr / rates.rates_per_usd["IDR"]
-            return _round_currency(usd * rates.rates_per_usd[c_to], c_to)
+            return _round_currency(fx.convert(amount, c_from, c_to, rates), c_to)
 
         src.starting_balance = _convert(Decimal(src.starting_balance), src_currency, dst_currency)
         txs = (
