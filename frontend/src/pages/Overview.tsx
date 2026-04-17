@@ -145,17 +145,8 @@ export default function OverviewPage() {
       <aside className="col-span-12 lg:col-span-4 mt-6 space-y-10">
         <div className="border-t-2 border-ink pt-4">
           <p className="smallcaps text-ink-mute">Credit Card</p>
-          {(() => {
-            const out = toNumber(ov.credit.outstanding);
-            const tone = out < 0 ? "text-accent" : "text-gain";
-            const label = out < 0 ? "Still to pay" : "Overpaid / credit";
-            return (
-              <>
-                <p className={`num text-3xl mt-1 ${tone}`}>{fmtIDR(ov.credit.outstanding)}</p>
-                <p className="text-sm text-ink-soft mt-1">{label}</p>
-              </>
-            );
-          })()}
+          <p className="num text-3xl mt-1 text-accent">{fmtIDR(ov.credit.outstanding)}</p>
+          <p className="text-sm text-ink-soft mt-1">Outstanding balance</p>
 
           <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
             <div>
@@ -185,9 +176,7 @@ export default function OverviewPage() {
                     )}
                   </span>
                   <span
-                    className={`num ${
-                      toNumber(s.current_balance) < 0 ? "text-accent" : ""
-                    }`}
+                    className={`num ${s.is_credit_card ? "text-accent" : toNumber(s.current_balance) < 0 ? "text-accent" : ""}`}
                   >
                     {new Intl.NumberFormat("de-DE", {
                       minimumFractionDigits: s.currency === "JPY" ? 0 : 2,

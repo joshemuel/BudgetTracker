@@ -7,9 +7,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.config import get_settings
 from app.db.models import AppState, Category, Source, User
 from app.services import financial, intent, query, telegram
+from app.services.auth import verify_password
 from app.services.parse import now_local
 
 log = logging.getLogger(__name__)
@@ -20,24 +20,33 @@ HELLO = (
     "Hey there! Leo is awake and ready. Tell me what you spent, earned, "
     "or ask me anything about your finances."
 )
+LOGIN_PROMPT = "Send `/login <username> <password>` to connect this chat to your account."
 CREDIT_HELP_EMPTY = "No credit cards configured yet."
 
 
 def _user_for_chat(db: Session, chat_id: int | str) -> User | None:
+    """Return the DB user bound to this chat_id, or None if the chat is not bound yet."""
+    return db.query(User).filter_by(telegram_chat_id=str(chat_id)).one_or_none()
+
+
+def _handle_login(db: Session, chat_id: int | str, text: str) -> None:
+    parts = text.strip().split()
+    if len(parts) != 3:
+        telegram.send_message(chat_id, "Usage: /login <username> <password>")
+        return
+    _, username, password = parts
+    user = db.query(User).filter_by(username=username).one_or_none()
+    if user is None or not verify_password(password, user.password_hash):
+        telegram.send_message(chat_id, "Invalid credentials.")
+        return
     cid = str(chat_id)
-    return (
-        db.query(User)
-        .filter((User.telegram_chat_id == cid) | (User.telegram_chat_id == None))  # noqa: E711
-        .order_by(User.telegram_chat_id.is_(None))
-        .first()
+    # Evict any prior binding for this chat (different user) and for this user (different chat).
+    db.query(User).filter(User.telegram_chat_id == cid, User.id != user.id).update(
+        {"telegram_chat_id": None}
     )
-
-
-def _is_authorized(chat_id: int | str) -> bool:
-    allowed = get_settings().telegram_chat_id
-    if not allowed:
-        return True  # dev mode: unset => allow
-    return str(chat_id) == str(allowed)
+    user.telegram_chat_id = cid
+    db.commit()
+    telegram.send_message(chat_id, f"Logged in as {user.username}. {HELLO}")
 
 
 def _ensure_update_new(db: Session, update_id: int) -> bool:
@@ -62,8 +71,13 @@ def _names(db: Session, user_id: int) -> tuple[list[str], list[str]]:
 
 def _handle_text(db: Session, user: User, chat_id: int | str, text: str) -> None:
     t = text.strip()
-    if t == "/start":
+    if t == "/start" or t == "/help":
         telegram.send_message(chat_id, HELLO)
+        return
+    if t == "/logout":
+        user.telegram_chat_id = None
+        db.commit()
+        telegram.send_message(chat_id, "Chat unbound. Send /login to reconnect.")
         return
     cats, srcs = _names(db, user.id)
     itn = intent.classify(t, cats, srcs)
@@ -138,44 +152,34 @@ def _handle_media(db: Session, user: User, chat_id: int | str, file_id: str, mim
         telegram.send_message(chat_id, "Didn't catch anything financial in there.")
 
 
-@router.post("/webhook")
-async def webhook(update: dict[str, Any], db: Session = Depends(get_db)):
-    update_id = update.get("update_id")
-    if update_id is None or not _ensure_update_new(db, int(update_id)):
-        return {"ok": True}
-
-    # Inline-keyboard callback (used by subscriptions confirm/skip)
+def dispatch_update(db: Session, update: dict[str, Any]) -> None:
+    """Shared dispatch for both webhook and polling paths."""
     cb = update.get("callback_query")
     if cb:
         from app.services import subscriptions  # lazy to avoid import cycles
 
         chat_id = cb["message"]["chat"]["id"]
-        if not _is_authorized(chat_id):
-            telegram.answer_callback_query(cb["id"], "Not allowed.")
-            return {"ok": True}
         user = _user_for_chat(db, chat_id)
         if user is None:
-            telegram.answer_callback_query(cb["id"], "Unknown user.")
-            return {"ok": True}
+            telegram.answer_callback_query(cb["id"], "Please /login first.")
+            return
         subscriptions.handle_callback(db, user, cb)
-        return {"ok": True}
+        return
 
     msg = update.get("message")
     if not msg:
-        return {"ok": True}
+        return
     chat_id = msg["chat"]["id"]
-    if not _is_authorized(chat_id):
-        telegram.send_message(chat_id, "Sorry, Leo only works for the boss.")
-        return {"ok": True}
+    text = msg.get("text", "") or ""
+
+    if text.strip().startswith("/login"):
+        _handle_login(db, chat_id, text)
+        return
 
     user = _user_for_chat(db, chat_id)
     if user is None:
-        telegram.send_message(chat_id, "No user configured on the server.")
-        return {"ok": True}
-
-    if user.telegram_chat_id is None:
-        user.telegram_chat_id = str(chat_id)
-        db.commit()
+        telegram.send_message(chat_id, LOGIN_PROMPT)
+        return
 
     if msg.get("voice"):
         _handle_media(db, user, chat_id, msg["voice"]["file_id"], "audio/ogg")
@@ -189,8 +193,16 @@ async def webhook(update: dict[str, Any], db: Session = Depends(get_db)):
             msg["video"]["file_id"],
             msg["video"].get("mime_type", "video/mp4"),
         )
-    elif msg.get("text"):
-        _handle_text(db, user, chat_id, msg["text"])
+    elif text:
+        _handle_text(db, user, chat_id, text)
+
+
+@router.post("/webhook")
+async def webhook(update: dict[str, Any], db: Session = Depends(get_db)):
+    update_id = update.get("update_id")
+    if update_id is None or not _ensure_update_new(db, int(update_id)):
+        return {"ok": True}
+    dispatch_update(db, update)
     return {"ok": True}
 
 

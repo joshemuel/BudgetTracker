@@ -109,7 +109,9 @@ function SourcesBlock() {
                   <span className="ml-2 smallcaps text-accent">credit</span>
                 )}
               </td>
-              <td className="text-right num">{fmtMoney(s.current_balance, s.currency)}</td>
+              <td className={`text-right num ${s.is_credit_card ? "text-accent" : ""}`}>
+                {fmtMoney(s.current_balance, s.currency)}
+              </td>
               <td className="text-right">
                 <button
                   onClick={() => {
