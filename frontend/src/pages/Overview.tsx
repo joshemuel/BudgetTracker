@@ -146,7 +146,7 @@ export default function OverviewPage() {
         <div className="border-t-2 border-ink pt-4">
           <p className="smallcaps text-ink-mute">Credit Card</p>
           <p className="num text-3xl mt-1 text-accent">{fmtIDR(ov.credit.outstanding)}</p>
-          <p className="text-sm text-ink-soft mt-1">Outstanding balance</p>
+          <p className="text-sm text-ink-soft mt-1">Outstanding balance (negative means payable)</p>
 
           <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
             <div>

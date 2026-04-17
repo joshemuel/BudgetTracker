@@ -90,7 +90,7 @@ def _handle_text(db: Session, user: User, chat_id: int | str, text: str) -> None
 
     if kind == "show_credit":
         credit = query._credit_outstanding(db, user.id)
-        if credit > 0:
+        if credit < 0:
             telegram.send_message(
                 chat_id,
                 f"Credit card outstanding: {int(credit):,}".replace(",", "."),

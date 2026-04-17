@@ -92,7 +92,8 @@ def _credit_summary(
             month_payments += amount_idr
 
     return {
-        "outstanding": str(_idr_round(-outstanding) if outstanding < 0 else Decimal("0")),
+        # Negative means debt still owed, 0 means clear.
+        "outstanding": str(_idr_round(outstanding) if outstanding < 0 else Decimal("0")),
         "month_charges": str(_idr_round(month_charges)),
         "month_payments": str(_idr_round(month_payments)),
     }
