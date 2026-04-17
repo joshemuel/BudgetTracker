@@ -1,0 +1,7 @@
+{
+  "include": ["backend/app", "backend/tests", "backend/migrations"],
+  "extraPaths": ["backend"],
+  "pythonVersion": "3.12",
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none"
+}
