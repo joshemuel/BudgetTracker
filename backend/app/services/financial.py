@@ -1,5 +1,5 @@
 """Port of processFinancialMessage — takes parsed transaction items and writes
-them to the DB, returns confirmations + budget notes in Cookie's voice."""
+them to the DB, returns confirmations + budget notes in Leo's voice."""
 
 from __future__ import annotations
 
@@ -57,11 +57,7 @@ def _monthly_status(
     else:
         next_month = month_start.replace(month=now.month + 1)
 
-    b = (
-        db.query(Budget)
-        .filter_by(user_id=user_id, category_id=category_id)
-        .one_or_none()
-    )
+    b = db.query(Budget).filter_by(user_id=user_id, category_id=category_id).one_or_none()
     if b is None:
         return None
 
@@ -195,9 +191,7 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
     )
 
 
-def _link_transfers(
-    created: list[Transaction], topup_cat: Category | None
-) -> None:
+def _link_transfers(created: list[Transaction], topup_cat: Category | None) -> None:
     if topup_cat is None:
         return
     topups = [t for t in created if t.category_id == topup_cat.id]

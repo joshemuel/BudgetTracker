@@ -27,9 +27,11 @@ services:
       APP_SECRET: ${APP_SECRET:-dev-secret-change-me}
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash-lite}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      LLM_MODEL: ${LLM_MODEL:-qwen-audio-turbo}
       TZ: ${TZ:-Asia/Jakarta}
+      TELEGRAM_POLLING: ${TELEGRAM_POLLING:-false}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:

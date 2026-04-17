@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from app.services import gemini
+from app.services import llm
 
 log = logging.getLogger(__name__)
 
@@ -35,11 +35,11 @@ def classify(text: str, categories: list[str], sources: list[str]) -> dict[str, 
     - delete_last: {{"type": "delete_last"}}
     """
     try:
-        raw = gemini.call(prompt, json_mode=True)
-        parsed = gemini.parse_json(raw)
+        raw = llm.call(prompt, json_mode=True)
+        parsed = llm.parse_json(raw)
         if isinstance(parsed, dict) and "type" in parsed:
             return parsed
-    except gemini.GeminiError as e:
+    except llm.LLMError as e:
         log.warning("intent classify error, defaulting to log: %s", e)
     return {"type": "log"}
 
@@ -83,8 +83,8 @@ def extract_financial(
 
     If no clear financial data, return an empty array [].
     """
-    raw = gemini.call(prompt, json_mode=True)
-    parsed = gemini.parse_json(raw)
+    raw = llm.call(prompt, json_mode=True)
+    parsed = llm.parse_json(raw)
     if isinstance(parsed, dict):
         return [parsed] if parsed else []
     if isinstance(parsed, list):
@@ -120,8 +120,8 @@ def extract_from_media(
     dd/MM/yyyy only. "40k"=40000. No emojis. Transfers return two objects (Top-up Expense + Top-up Income).
     If nothing financial, return [].
     """
-    raw = gemini.call_with_media(prompt, base64_data, mime_type)
-    parsed = gemini.parse_json(raw)
+    raw = llm.call_with_media(prompt, base64_data, mime_type)
+    parsed = llm.parse_json(raw)
 
     if isinstance(parsed, dict):
         if parsed.get("intent") == "query" and parsed.get("question"):

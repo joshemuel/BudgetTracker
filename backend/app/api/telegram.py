@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/telegram", tags=["telegram"])
 
 HELLO = (
-    "Hey there! Cookie is awake and ready. Tell me what you spent, earned, "
+    "Hey there! Leo is awake and ready. Tell me what you spent, earned, "
     "or ask me anything about your finances."
 )
 CREDIT_HELP_EMPTY = "No credit cards configured yet."
@@ -56,10 +56,7 @@ def _ensure_update_new(db: Session, update_id: int) -> bool:
 
 def _names(db: Session, user_id: int) -> tuple[list[str], list[str]]:
     cats = [c.name for c in db.query(Category).filter_by(user_id=user_id).all()]
-    srcs = [
-        s.name
-        for s in db.query(Source).filter_by(user_id=user_id, active=True).all()
-    ]
+    srcs = [s.name for s in db.query(Source).filter_by(user_id=user_id, active=True).all()]
     return cats, srcs
 
 
@@ -95,9 +92,8 @@ def _handle_text(db: Session, user: User, chat_id: int | str, text: str) -> None
         else:
             telegram.send_message(
                 chat_id,
-                f"Removed last entry: {gone.type} of "
-                f"{int(gone.amount):,}".replace(",", ".") +
-                f" ({gone.description or '—'}).",
+                f"Removed last entry: {gone.type} of {int(gone.amount):,}".replace(",", ".")
+                + f" ({gone.description or '—'}).",
             )
         return
 
@@ -107,21 +103,19 @@ def _handle_text(db: Session, user: User, chat_id: int | str, text: str) -> None
         items = intent.extract_financial(t, cats, srcs, today)
     except Exception as e:
         log.exception("extract_financial failed: %s", e)
-        telegram.send_message(chat_id, "Cookie hit a snag parsing that. Try again?")
+        telegram.send_message(chat_id, "Leo hit a snag parsing that. Try again?")
         return
     if not items:
         telegram.send_message(
             chat_id,
-            "Cookie couldn't find any financial data. Try 'spent 50k on food'.",
+            "Leo couldn't find any financial data. Try 'spent 50k on food'.",
         )
         return
     outcome = financial.log_items(db, user, items)
     telegram.send_message(chat_id, outcome.as_message())
 
 
-def _handle_media(
-    db: Session, user: User, chat_id: int | str, file_id: str, mime: str
-) -> None:
+def _handle_media(db: Session, user: User, chat_id: int | str, file_id: str, mime: str) -> None:
     b64 = telegram.download_file_b64(file_id)
     if not b64:
         telegram.send_message(chat_id, "Couldn't grab that file from Telegram.")
@@ -132,7 +126,7 @@ def _handle_media(
         result = intent.extract_from_media(b64, mime, cats, srcs, today)
     except Exception as e:
         log.exception("extract_from_media failed: %s", e)
-        telegram.send_message(chat_id, "Cookie got confused by that one.")
+        telegram.send_message(chat_id, "Leo got confused by that one.")
         return
 
     if result["kind"] == "query":
@@ -171,7 +165,7 @@ async def webhook(update: dict[str, Any], db: Session = Depends(get_db)):
         return {"ok": True}
     chat_id = msg["chat"]["id"]
     if not _is_authorized(chat_id):
-        telegram.send_message(chat_id, "Sorry, Cookie only works for the boss.")
+        telegram.send_message(chat_id, "Sorry, Leo only works for the boss.")
         return {"ok": True}
 
     user = _user_for_chat(db, chat_id)

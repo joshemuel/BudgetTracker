@@ -16,10 +16,16 @@ class Settings(BaseSettings):
     telegram_token: str = Field(default="", alias="TELEGRAM_TOKEN")
     telegram_chat_id: str = Field(default="", alias="TELEGRAM_CHAT_ID")
 
-    gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
-    gemini_model: str = Field(default="gemini-2.5-flash-lite", alias="GEMINI_MODEL")
+    llm_api_key: str = Field(default="", alias="DASHSCOPE_API_KEY")
+    llm_base_url: str = Field(
+        default="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        alias="LLM_BASE_URL",
+    )
+    llm_model: str = Field(default="qwen-audio-turbo", alias="LLM_MODEL")
 
     tz: str = Field(default="Asia/Jakarta", alias="TZ")
+
+    telegram_polling: bool = Field(default=False, alias="TELEGRAM_POLLING")
 
 
 @lru_cache
