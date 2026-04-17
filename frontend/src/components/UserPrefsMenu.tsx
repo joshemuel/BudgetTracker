@@ -24,18 +24,24 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
 
   const save = useMutation({
     mutationFn: () =>
-      api.patch('/auth/me', {
+      api.patch<Me>('/auth/me', {
         default_currency: currency,
         default_expense_source_id: sourceId || null,
       }),
-    onSuccess: (updated) => {
+    onSuccess: async (updated) => {
       qc.setQueryData(["me"], updated);
-      qc.invalidateQueries({ queryKey: ["me"] });
-      qc.invalidateQueries({ queryKey: ["sources"] });
-      qc.invalidateQueries({ queryKey: ["overview"] });
-      qc.invalidateQueries({ queryKey: ["monthly"] });
-      qc.invalidateQueries({ queryKey: ["daily"] });
-      qc.invalidateQueries({ queryKey: ["category-stats"] });
+      qc.removeQueries({ queryKey: ["overview"] });
+      qc.removeQueries({ queryKey: ["monthly"] });
+      qc.removeQueries({ queryKey: ["daily"] });
+      qc.removeQueries({ queryKey: ["category-stats"] });
+      await Promise.all([
+        qc.refetchQueries({ queryKey: ["me"] }),
+        qc.refetchQueries({ queryKey: ["sources"] }),
+        qc.refetchQueries({ queryKey: ["overview"], type: "active" }),
+        qc.refetchQueries({ queryKey: ["monthly"], type: "active" }),
+        qc.refetchQueries({ queryKey: ["daily"], type: "active" }),
+        qc.refetchQueries({ queryKey: ["category-stats"], type: "active" }),
+      ]);
       setOpen(false);
     },
   });
