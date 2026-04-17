@@ -70,7 +70,7 @@ export default function OverviewPage() {
         <p className="smallcaps text-ink-mute">
           {monthName(ov.month)} MMXXVI · Day {ov.today_day} of {ov.days_in_month}
         </p>
-        <h2 className="display text-3xl sm:text-5xl md:text-6xl lg:text-7xl mt-2">
+        <h2 className="display text-2xl sm:text-3xl md:text-4xl lg:text-5xl mt-2">
           <span className="display-italic">A month</span>, in figures.
         </h2>
       </section>
