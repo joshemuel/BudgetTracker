@@ -9,6 +9,7 @@ export default function Login() {
   const qc = useQueryClient();
   const [username, setUsername] = useState("josia");
   const [password, setPassword] = useState("");
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   const login = useMutation({
     mutationFn: (body: { username: string; password: string }) =>
@@ -75,12 +76,53 @@ export default function Login() {
           >
             {login.isPending ? "Opening the book…" : "Open the book"}
           </button>
+
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => setForgotOpen(true)}
+              className="smallcaps text-ink-mute hover:text-accent"
+            >
+              Forgot password?
+            </button>
+          </div>
         </form>
 
         <p className="mt-8 text-center smallcaps text-ink-mute">
           — entries since MMXXVI —
         </p>
       </div>
+
+      {forgotOpen && (
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="modal-card w-full max-w-md p-6">
+            <h3 className="font-semibold mb-4">Forgot password</h3>
+            <p className="text-sm text-ink-soft mb-3">
+              Password recovery isn't automated for this private deployment.
+              Please contact the administrator to have your password reset.
+            </p>
+            <p className="text-sm text-ink-soft">
+              Reach out to{" "}
+              <a
+                href="mailto:josia.shemuel@gmail.com"
+                className="underline decoration-accent"
+              >
+                josia.shemuel@gmail.com
+              </a>{" "}
+              with your username and we'll send you a fresh temporary passphrase.
+            </p>
+            <div className="flex gap-2 mt-5 justify-end">
+              <button
+                type="button"
+                onClick={() => setForgotOpen(false)}
+                className="smallcaps px-3 py-1 bg-ink text-paper rounded"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
