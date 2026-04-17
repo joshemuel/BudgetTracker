@@ -8,14 +8,18 @@ from pydantic import BaseModel, Field
 
 class SourceIn(BaseModel):
     name: str = Field(min_length=1, max_length=64)
+    current_balance: Decimal | None = None
     starting_balance: Decimal = Decimal("0")
+    currency: str = Field(default="IDR", pattern="^(IDR|SGD|JPY|AUD)$")
     is_credit_card: bool = False
     active: bool = True
 
 
 class SourceUpdate(BaseModel):
     name: str | None = None
+    current_balance: Decimal | None = None
     starting_balance: Decimal | None = None
+    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD)$")
     is_credit_card: bool | None = None
     active: bool | None = None
 
@@ -24,6 +28,7 @@ class SourceOut(BaseModel):
     id: int
     name: str
     starting_balance: Decimal
+    currency: str
     is_credit_card: bool
     active: bool
     current_balance: Decimal

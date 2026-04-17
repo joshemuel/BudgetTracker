@@ -1,10 +1,16 @@
-const IDR = new Intl.NumberFormat("id-ID", {
-  style: "currency",
-  currency: "IDR",
+const IDR_INT = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 0,
   maximumFractionDigits: 0,
 });
 
-const COMPACT = new Intl.NumberFormat("id-ID", {
+const CURRENCY_SYMBOL: Record<string, string> = {
+  IDR: "Rp",
+  SGD: "S$",
+  JPY: "JP¥",
+  AUD: "A$",
+};
+
+const COMPACT = new Intl.NumberFormat("en-US", {
   notation: "compact",
   maximumFractionDigits: 1,
 });
@@ -16,7 +22,20 @@ export function toNumber(v: string | number | null | undefined): number {
 }
 
 export function fmtIDR(v: string | number | null | undefined): string {
-  return IDR.format(toNumber(v));
+  return `Rp ${IDR_INT.format(Math.round(toNumber(v)))}`;
+}
+
+export function fmtMoney(
+  v: string | number | null | undefined,
+  currency: "IDR" | "SGD" | "JPY" | "AUD" = "IDR"
+): string {
+  const n = toNumber(v);
+  const fixedDecimals = currency === "JPY" ? 0 : 2;
+  const nf = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: fixedDecimals,
+    maximumFractionDigits: fixedDecimals,
+  });
+  return `${CURRENCY_SYMBOL[currency] ?? currency} ${nf.format(n)}`;
 }
 
 export function fmtShort(v: string | number | null | undefined): string {

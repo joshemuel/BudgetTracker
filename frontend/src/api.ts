@@ -1,11 +1,18 @@
 type Method = "GET" | "POST" | "PATCH" | "DELETE";
 
+function normalizePath(path: string): string {
+  if (/^https?:\/\//.test(path)) return path;
+  if (path.startsWith("/api/")) return path;
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `/api${p}`;
+}
+
 async function request<T>(
   path: string,
   method: Method = "GET",
   body?: unknown
 ): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetch(normalizePath(path), {
     method,
     credentials: "include",
     headers: body ? { "Content-Type": "application/json" } : undefined,

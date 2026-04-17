@@ -157,3 +157,30 @@ hr {
 }
 .deco-cross::before { top: 4px; height: 1px; }
 .deco-cross::after { left: 4px; width: 1px; }
+
+/* Source edit modal */
+.modal-backdrop {
+  background: rgba(25, 23, 15, 0.52);
+  backdrop-filter: blur(2px);
+}
+
+.modal-card {
+  position: relative;
+  background: rgba(245, 239, 227, 0.98);
+  border: 1px solid rgba(25, 23, 15, 0.2);
+  border-radius: 4px;
+  box-shadow:
+    0 20px 44px rgba(25, 23, 15, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.modal-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background-image:
+    linear-gradient(transparent 31px, rgba(135, 126, 106, 0.07) 32px);
+  background-size: 100% 32px;
+}

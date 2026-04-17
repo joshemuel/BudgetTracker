@@ -30,7 +30,7 @@ export default function Login() {
         <div className="text-center">
           <p className="smallcaps text-ink-mute">Private Entry</p>
           <h1 className="display text-6xl mt-3">
-            The <span className="display-italic text-accent">Ledger</span>
+            Budget <span className="display-italic text-accent">Tracker</span>
           </h1>
           <div className="mt-5 h-[1px] bg-ink mx-auto w-16" />
         </div>

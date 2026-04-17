@@ -4,6 +4,7 @@ export type Source = {
   id: number;
   name: string;
   starting_balance: string;
+  currency: "IDR" | "SGD" | "JPY" | "AUD";
   is_credit_card: boolean;
   active: boolean;
   current_balance: string;

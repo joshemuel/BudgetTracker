@@ -23,9 +23,25 @@ from app.db.base import Base
 
 
 DEFAULT_CATEGORIES: list[str] = [
-    "Food", "Coffee", "Transport", "Subscriptions", "Entertainment", "Shopping",
-    "Health", "Utilities", "Rent", "Education", "Top-up", "Salary", "Freelance",
-    "Gift", "Gadgets", "Groceries", "Other", "Investment", "Credit Payment",
+    "Food",
+    "Coffee",
+    "Transport",
+    "Subscriptions",
+    "Entertainment",
+    "Shopping",
+    "Health",
+    "Utilities",
+    "Rent",
+    "Education",
+    "Top-up",
+    "Salary",
+    "Freelance",
+    "Gift",
+    "Gadgets",
+    "Groceries",
+    "Other",
+    "Investment",
+    "Credit Payment",
 ]
 
 
@@ -48,6 +64,7 @@ class Source(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     name: Mapped[str] = mapped_column(String(64), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="IDR")
     starting_balance: Mapped[Decimal] = mapped_column(
         Numeric(14, 2), nullable=False, default=Decimal("0")
     )
@@ -70,9 +87,7 @@ class Category(Base):
 
 class Budget(Base):
     __tablename__ = "budgets"
-    __table_args__ = (
-        UniqueConstraint("user_id", "category_id", name="uq_budgets_user_category"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "category_id", name="uq_budgets_user_category"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -110,9 +125,7 @@ class Subscription(Base):
 
 class SubscriptionCharge(Base):
     __tablename__ = "subscription_charges"
-    __table_args__ = (
-        UniqueConstraint("subscription_id", "due_date", name="uq_subcharge_sub_due"),
-    )
+    __table_args__ = (UniqueConstraint("subscription_id", "due_date", name="uq_subcharge_sub_due"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     subscription_id: Mapped[int] = mapped_column(
@@ -151,6 +164,7 @@ class Transaction(Base):
         )
     )
     transfer_group_id: Mapped[UUID | None] = mapped_column(SqlUUID(as_uuid=True))
+    is_internal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

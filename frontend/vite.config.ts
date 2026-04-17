@@ -8,16 +8,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const backendTarget = process.env.BACKEND_URL ?? "http://backend:8000";
 
 const proxiedPaths = [
-  "/auth",
-  "/sources",
-  "/categories",
-  "/budgets",
-  "/transactions",
-  "/subscriptions",
-  "/stats",
-  "/telegram",
-  "/healthz",
+  "/api/auth",
+  "/api/sources",
+  "/api/categories",
+  "/api/budgets",
+  "/api/transactions",
+  "/api/subscriptions",
+  "/api/stats",
+  "/api/telegram",
+  "/api/healthz",
 ];
+
+function rewriteApi(path: string): string {
+  return path.replace(/^\/api/, "") || "/";
+}
 
 export default defineConfig({
   plugins: [react(), tailwind()],
@@ -28,7 +32,10 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 5173,
     proxy: Object.fromEntries(
-      proxiedPaths.map((p) => [p, { target: backendTarget, changeOrigin: true }])
+      proxiedPaths.map((p) => [
+        p,
+        { target: backendTarget, changeOrigin: true, rewrite: rewriteApi },
+      ])
     ),
   },
 });

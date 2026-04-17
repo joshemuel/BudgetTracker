@@ -28,7 +28,6 @@ function Masthead({ me, onLog }: { me: Me | undefined; onLog: () => void }) {
   });
 
   const today = new Date();
-  const issueNo = String(today.getFullYear()).slice(2) + "." + String(today.getMonth() + 1).padStart(2, "0");
   const dateStr =
     today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric" }) +
     " " +
@@ -39,7 +38,7 @@ function Masthead({ me, onLog }: { me: Me | undefined; onLog: () => void }) {
   return (
     <header className="relative pt-10 pb-6">
       <div className="flex items-baseline justify-between smallcaps text-ink-mute">
-        <span>Vol. I · No. {issueNo}</span>
+        <span>Beta Version</span>
         <span className="hidden md:inline">{dateStr}</span>
         <span className="flex items-center gap-4">
           <button
@@ -61,11 +60,8 @@ function Masthead({ me, onLog }: { me: Me | undefined; onLog: () => void }) {
 
       <div className="mt-4 anim-in">
         <h1 className="display text-[88px] md:text-[124px] leading-[0.9] text-ink">
-          The <span className="display-italic text-accent">Ledger</span>
+          Budget <span className="display-italic text-accent">Tracker</span>
         </h1>
-        <p className="mt-2 smallcaps text-ink-mute">
-          A private accounting of means, methods &amp; minor indulgences
-        </p>
       </div>
 
       <div className="mt-6 relative h-[6px]">
@@ -128,7 +124,7 @@ export default function AppShell() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center smallcaps text-ink-mute">
-        Loading the ledger…
+        Loading Budget Tracker…
       </div>
     );
   }
@@ -137,7 +133,7 @@ export default function AppShell() {
   }
 
   return (
-    <div className="max-w-[1200px] mx-auto px-6 md:px-10">
+    <div className="max-w-[1560px] mx-auto px-4 md:px-6 xl:px-8">
       <Masthead me={me} onLog={() => setLogOpen(true)} />
       <SectionNav />
       <main className="py-10">
@@ -151,4 +147,3 @@ export default function AppShell() {
     </div>
   );
 }
-

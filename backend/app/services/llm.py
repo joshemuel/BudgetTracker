@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import json
 import logging
 from typing import Any
@@ -37,6 +36,7 @@ def _extract_text(body: dict[str, Any]) -> str:
 
 
 def call(prompt: str, json_mode: bool = True, timeout: float = 45.0) -> str:
+    """Default model (qwen3.5-omni-flash) — used for intent classification and extraction."""
     payload: dict[str, Any] = {
         "model": get_settings().llm_model,
         "messages": [{"role": "user", "content": prompt}],
@@ -51,7 +51,22 @@ def call(prompt: str, json_mode: bool = True, timeout: float = 45.0) -> str:
         return _extract_text(r.json())
 
 
+def call_query(prompt: str, timeout: float = 45.0) -> str:
+    """Uses qwen-plus — for natural language queries about finances."""
+    payload: dict[str, Any] = {
+        "model": get_settings().llm_query_model,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    with httpx.Client(timeout=timeout) as c:
+        r = c.post(_url(), json=payload, headers=_headers())
+        if r.status_code == 429:
+            raise LLMError("Hit the API rate limit. Try again later.")
+        r.raise_for_status()
+        return _extract_text(r.json())
+
+
 def call_with_media(prompt: str, base64_data: str, mime_type: str, timeout: float = 60.0) -> str:
+    """Uses qwen3.5-omni-flash — handles audio and image input."""
     is_audio = mime_type.startswith("audio")
     payload: dict[str, Any] = {
         "model": get_settings().llm_model,
@@ -63,9 +78,7 @@ def call_with_media(prompt: str, base64_data: str, mime_type: str, timeout: floa
                         "type": "input_audio" if is_audio else "image_url",
                         "input_audio" if is_audio else "image_url": {
                             "data": f"data:{mime_type};base64,{base64_data}",
-                            "format": mime_type.split("/")[1]
-                            if not is_audio
-                            else mime_type.split("/")[1],
+                            "format": mime_type.split("/")[1],
                         },
                     },
                     {"type": "text", "text": prompt},

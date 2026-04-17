@@ -48,41 +48,68 @@ def extract_financial(
     text: str, categories: list[str], sources: list[str], today_ddmmyyyy: str
 ) -> list[dict[str, Any]]:
     """Port of processFinancialMessage Gemini prompt. Returns list of items."""
+    from app.services.parse import now_local
+
+    now = now_local()
+    today_dow = now.strftime("%A")
     cats = ", ".join(categories)
     srcs = ", ".join(sources)
     prompt = f"""
-    Extract financial data from this text: "{text}"
-    Today's date is {today_ddmmyyyy}.
-    CRITICAL: All dates MUST be in dd/MM/yyyy format. Day comes FIRST, then month, then year.
-    Example: March 11, 2026 = "11/03/2026". NOT "03/11/2026".
+Extract financial data from this text: "{text}"
+Today is {today_dow}, {today_ddmmyyyy}. Use this to resolve ALL relative dates.
 
-    The message may contain MULTIPLE transactions. Return a JSON ARRAY of objects.
-    Even if there is only one transaction, wrap it in an array.
+CRITICAL: All dates MUST be in dd/MM/yyyy format. Day comes FIRST, then month, then year.
+Example: March 11, 2026 = "11/03/2026". NOT "03/11/2026".
 
-    TRANSFER DETECTION: If the user says "transferred X from [Source A] to [Source B]" or "moved X from A to B" or "topup X from A to B", return TWO objects:
-      1. {{"type": "Expense", "category": "Top-up", "amount": X, "source": "[Source A]", "description": "Transfer to [Source B]", "date": ..., "time": ...}}
-      2. {{"type": "Income", "category": "Top-up", "amount": X, "source": "[Source B]", "description": "Transfer from [Source A]", "date": ..., "time": ...}}
+DATE RESOLUTION RULES:
+- "yesterday" = subtract 1 day from today
+- "2 days ago" = subtract 2 days from today
+- "last Monday", "last Friday" = most recent occurrence of that weekday
+- "last week" = 7 days ago
+- "this week" = the Monday of the current week
+- "last month" = same day last month
+- Always return an EXACT date in dd/MM/yyyy. NEVER return null for date.
 
-    CREDIT CARD PAYMENT: If the text mentions paying credit card bill, credit payment, or paying off credit:
-      - Type: "Expense"
-      - Category: "Credit Payment"
-      - Source: the card being paid (e.g., "BCA Credit Card")
-      - Description: should include "Credit Payment"
+TIME INFERENCE RULES:
+- If user gives an explicit time ("at 3pm", "around 10am"), use it.
+- If no explicit time, INFER from meal/activity context:
+  - "breakfast", "morning coffee", "coffee", "nasi pagi" → "07:00:00"
+  - "lunch", "makan siang" → "12:00:00"
+  - "dinner", "makan malam" → "19:00:00"
+  - "snack", "jajanan" → "15:00:00"
+  - "midnight", "late night" → "23:00:00"
+- If the date is TODAY and no time can be inferred, return null (system will use current time).
+- If the date is a PAST DAY and no time can be inferred, return "00:00:00".
 
-    Each object:
-    - "type": strictly "Income" or "Expense"
-    - "category": one of [{cats}], pick closest match
-    - "amount": raw integer. "40k" = 40000. "Rp. 21.900" = 21900. "1.5jt" = 1500000. "2jt" = 2000000.
-    - "description": short description. Fix typos. Proper capitalization. No emojis.
-    - "date": "dd/MM/yyyy" or null (resolve relative dates relative to {today_ddmmyyyy})
-    - "time": "HH:mm:ss" or null.
-      ONLY return a time if the user gives an EXPLICIT clock time or temporal phrase like "at 3pm", "around 10am", "this morning".
-      DO NOT infer time from what was purchased. "lunch", "dinner", "coffee" describe WHAT was bought, NOT when.
-      If no explicit time or temporal phrase is stated, return null.
-    - "source": one of [{srcs}] or null. If no source mentioned, return null.
+The message may contain MULTIPLE transactions. Return a JSON ARRAY of objects.
+Even if there is only one transaction, wrap it in an array.
 
-    If no clear financial data, return an empty array [].
-    """
+TRANSFER DETECTION: If the user says "transferred X from [Source A] to [Source B]" or "moved X from A to B" or "topup X from A to B", return TWO objects:
+  1. {{"type": "Expense", "category": "Top-up", "amount": X, "source": "[Source A]", "description": "Transfer to [Source B]", "date": ..., "time": ...}}
+  2. {{"type": "Income", "category": "Top-up", "amount": X, "source": "[Source B]", "description": "Transfer from [Source A]", "date": ..., "time": ...}}
+
+CREDIT CARD PAYMENT — THIS IS THE MOST IMPORTANT RULE:
+If the text mentions paying a credit card, credit card bill, credit payment, or paying off credit, it is a CREDIT PAYMENT, NOT a regular expense.
+Phrases that mean credit payment: "paid credit card", "credit payment", "pay off credit", "paid X for credit card", "paid X credit card using [source]", "bayar kartu kredit", "bayar tagihan kartu".
+When it is a credit payment:
+  - Type: "Income" (this REDUCES the outstanding balance on the credit card)
+  - Category: "Credit Payment"
+  - Source: the CREDIT CARD being paid (e.g., "BCA Credit Card"), NOT the source used to pay it
+  - Description: "Credit Payment"
+  - is_internal: true
+Example: "Paid 1.4mil credit card using BCA" → Income on "BCA Credit Card", NOT Expense on BCA.
+
+Each object:
+- "type": strictly "Income" or "Expense"
+- "category": one of [{cats}], pick closest match
+- "amount": raw integer. "40k" = 40000. "Rp. 21.900" = 21900. "1.5jt" = 1500000. "2jt" = 2000000.
+- "description": short description. Fix typos. Proper capitalization. No emojis.
+- "date": "dd/MM/yyyy". NEVER null — always resolve to an exact date.
+- "time": "HH:mm:ss" or null (only null if date is today and no time context).
+- "source": one of [{srcs}] or null. If no source mentioned, return null.
+
+If no clear financial data, return an empty array [].
+"""
     raw = llm.call(prompt, json_mode=True)
     parsed = llm.parse_json(raw)
     if isinstance(parsed, dict):
@@ -100,26 +127,35 @@ def extract_from_media(
     today_ddmmyyyy: str,
 ) -> dict[str, Any]:
     """Returns {kind: 'query', question: ...} or {kind: 'log', items: [...]} or {kind: 'none'}."""
+    from app.services.parse import now_local
+
+    now = now_local()
+    today_dow = now.strftime("%A")
     cats = ", ".join(categories)
     srcs = ", ".join(sources)
     prompt = f"""
-    Listen to/watch this media and determine what the user wants.
-    Today's date is {today_ddmmyyyy}.
+Listen to/watch this media and determine what the user wants.
+Today is {today_dow}, {today_ddmmyyyy}. Use this to resolve ALL relative dates.
 
-    STEP 1 - FIRST determine the PRIMARY INTENT:
-    - Is the user ASKING A QUESTION about their finances?
-    - Or is the user LOGGING a transaction?
+STEP 1 - FIRST determine the PRIMARY INTENT:
+- Is the user ASKING A QUESTION about their finances?
+- Or is the user LOGGING a transaction?
 
-    STEP 2 - Return JSON:
+STEP 2 - Return JSON:
 
-    IF QUESTION: {{"intent": "query", "question": "transcribed question here"}}
+IF QUESTION: {{"intent": "query", "question": "transcribed question here"}}
 
-    IF LOGGING: a JSON ARRAY of transaction objects (even for single transaction).
-    Each: {{"intent": "log", "type": "Income"|"Expense", "category": one of [{cats}], "amount": int, "description": str, "date": "dd/MM/yyyy"|null, "time": "HH:mm:ss"|null, "source": one of [{srcs}]|null}}
+IF LOGGING: a JSON ARRAY of transaction objects (even for single transaction).
+Each: {{"intent": "log", "type": "Income"|"Expense", "category": one of [{cats}], "amount": int, "description": str, "date": "dd/MM/yyyy", "time": "HH:mm:ss"|null, "source": one of [{srcs}]|null, "is_internal": bool}}
 
-    dd/MM/yyyy only. "40k"=40000. No emojis. Transfers return two objects (Top-up Expense + Top-up Income).
-    If nothing financial, return [].
-    """
+DATE RULES: "yesterday" = subtract 1 day. "last Monday" = most recent Monday. Always return exact dd/MM/yyyy date. NEVER null.
+TIME RULES: Infer from context (breakfast→07:00, lunch→12:00, dinner→19:00). If today and no context, return null. If past day and no context, return "00:00:00".
+
+CREDIT CARD PAYMENT: If paying credit card bill → Type: "Income", Category: "Credit Payment", Source: the credit card name, is_internal: true.
+TRANSFER: "transferred X from A to B" → two objects (Expense on A + Income on B, both category "Top-up", both is_internal: true).
+"40k"=40000. No emojis.
+If nothing financial, return [].
+"""
     raw = llm.call_with_media(prompt, base64_data, mime_type)
     parsed = llm.parse_json(raw)
 

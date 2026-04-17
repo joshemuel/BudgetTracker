@@ -8,8 +8,15 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db
 from app.db.models import Source, Transaction, User
 from app.schemas.common import SourceIn, SourceOut, SourceUpdate
+from app.services import fx
 
 router = APIRouter(prefix="/sources", tags=["sources"])
+
+
+def _round_currency(amount: Decimal, currency: str) -> Decimal:
+    if currency in {"IDR", "JPY"}:
+        return amount.quantize(Decimal("1"))
+    return amount.quantize(Decimal("0.01"))
 
 
 def _current_balance_map(db: Session, user_id: int) -> dict[int, Decimal]:
@@ -31,13 +38,15 @@ def _current_balance_map(db: Session, user_id: int) -> dict[int, Decimal]:
 
 def _to_out(src: Source, delta_by_source: dict[int, Decimal]) -> SourceOut:
     delta = delta_by_source.get(src.id, Decimal("0"))
+    amount = _round_currency(src.starting_balance + delta, src.currency)
     return SourceOut(
         id=src.id,
         name=src.name,
         starting_balance=src.starting_balance,
+        currency=src.currency,
         is_credit_card=src.is_credit_card,
         active=src.active,
-        current_balance=src.starting_balance + delta,
+        current_balance=amount,
     )
 
 
@@ -61,7 +70,16 @@ def create_source(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    src = Source(user_id=user.id, **payload.model_dump())
+    data = payload.model_dump()
+    current_balance = data.pop("current_balance", None)
+    currency = str(data.get("currency") or "IDR")
+    if current_balance is not None:
+        data["starting_balance"] = _round_currency(Decimal(current_balance), currency)
+    else:
+        data["starting_balance"] = _round_currency(
+            Decimal(data.get("starting_balance", 0)), currency
+        )
+    src = Source(user_id=user.id, **data)
     db.add(src)
     try:
         db.commit()
@@ -82,7 +100,54 @@ def update_source(
     src = db.query(Source).filter_by(id=source_id, user_id=user.id).one_or_none()
     if src is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Source not found")
-    for k, v in payload.model_dump(exclude_unset=True).items():
+
+    updates = payload.model_dump(exclude_unset=True)
+    current_balance = updates.pop("current_balance", None)
+
+    new_currency = updates.get("currency")
+    if new_currency and new_currency != src.currency:
+        rates = fx.get_rates_cached(db)
+        src_currency = src.currency or "IDR"
+        dst_currency = str(new_currency)
+
+        def _convert(amount: Decimal, c_from: str, c_to: str) -> Decimal:
+            if c_from == c_to:
+                return amount
+            amount_idr = fx.convert_to_idr(amount, c_from, rates)
+            if c_to == "IDR":
+                return _round_currency(amount_idr, c_to)
+            if c_to not in rates.rates_per_usd:
+                return amount
+            usd = amount_idr / rates.rates_per_usd["IDR"]
+            return _round_currency(usd * rates.rates_per_usd[c_to], c_to)
+
+        src.starting_balance = _convert(Decimal(src.starting_balance), src_currency, dst_currency)
+        txs = (
+            db.query(Transaction)
+            .filter(Transaction.user_id == user.id, Transaction.source_id == src.id)
+            .all()
+        )
+        for t in txs:
+            t.amount = _convert(Decimal(t.amount), src_currency, dst_currency)
+        src.starting_balance = _round_currency(Decimal(src.starting_balance), dst_currency)
+        for t in txs:
+            t.amount = _round_currency(Decimal(t.amount), dst_currency)
+
+    if current_balance is not None:
+        deltas = _current_balance_map(db, user.id)
+        delta = deltas.get(src.id, Decimal("0"))
+        target_currency = str(updates.get("currency") or src.currency or "IDR")
+        updates["starting_balance"] = _round_currency(
+            Decimal(current_balance) - delta, target_currency
+        )
+
+    if "starting_balance" in updates:
+        target_currency = str(updates.get("currency") or src.currency or "IDR")
+        updates["starting_balance"] = _round_currency(
+            Decimal(updates["starting_balance"]), target_currency
+        )
+
+    for k, v in updates.items():
         setattr(src, k, v)
     try:
         db.commit()
@@ -102,16 +167,15 @@ def delete_source(
     src = db.query(Source).filter_by(id=source_id, user_id=user.id).one_or_none()
     if src is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Source not found")
-    # Refuse delete if transactions reference this source; deactivate instead.
+    # If source has history, soft-delete by deactivating it.
     txn_count = (
         db.query(func.count(Transaction.id))
         .filter(Transaction.source_id == source_id, Transaction.deleted_at.is_(None))
         .scalar()
     )
     if txn_count:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            f"Source has {txn_count} transactions; set active=false instead of deleting",
-        )
+        src.active = False
+        db.commit()
+        return
     db.delete(src)
     db.commit()

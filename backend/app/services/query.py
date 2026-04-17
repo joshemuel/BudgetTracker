@@ -47,9 +47,12 @@ def _tx_csv(db: Session, user_id: int) -> str:
 def _sources_csv(db: Session, user_id: int) -> str:
     rows = db.query(Source).filter_by(user_id=user_id, active=True).all()
     buf = StringIO()
-    buf.write("Method,StartingBalance,IsCredit\n")
+    buf.write("Method,Currency,StartingBalance,IsCredit\n")
     for s in rows:
-        buf.write(f"{s.name},{int(s.starting_balance)},{'yes' if s.is_credit_card else 'no'}\n")
+        buf.write(
+            f"{s.name},{s.currency},{int(s.starting_balance)},"
+            f"{'yes' if s.is_credit_card else 'no'}\n"
+        )
     return buf.getvalue()
 
 
@@ -127,6 +130,6 @@ def answer(db: Session, user: User, question: str) -> str:
     - Never use emojis.
     """
     try:
-        return llm.call(prompt, json_mode=False)
+        return llm.call_query(prompt)
     except llm.LLMError as e:
         return f"Leo's AI is hiccuping: {e}"

@@ -201,6 +201,7 @@ def run_import(
             user_id=user.id,
             name=s["name"],
             starting_balance=Decimal("0"),  # computed after transactions insert
+            currency="IDR",
             is_credit_card=("credit card" in s["name"].lower()),
             active=True,
         )
@@ -213,6 +214,7 @@ def run_import(
                 user_id=user.id,
                 name=t["source"],
                 starting_balance=Decimal("0"),
+                currency="IDR",
                 is_credit_card=("credit card" in t["source"].lower()),
                 active=True,
             )

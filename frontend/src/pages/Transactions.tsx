@@ -2,8 +2,10 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Category, Source, Transaction } from "@/types";
-import { fmtDateTime, fmtIDR, toNumber } from "@/lib/format";
+import { fmtDateTime, fmtMoney, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
+
+const CURRENCY_BY_SOURCE: Record<number, "IDR" | "SGD" | "JPY" | "AUD"> = {};
 
 export default function TransactionsPage() {
   const qc = useQueryClient();
@@ -138,7 +140,15 @@ export default function TransactionsPage() {
                 }`}
               >
                 {t.type === "expense" ? "−" : "+"}
-                {fmtIDR(toNumber(t.amount))}
+                {(() => {
+                  if (srcs) {
+                    for (const s of srcs) {
+                      CURRENCY_BY_SOURCE[s.id] = s.currency;
+                    }
+                  }
+                  const currency = CURRENCY_BY_SOURCE[t.source_id] ?? "IDR";
+                  return fmtMoney(toNumber(t.amount), currency);
+                })()}
               </td>
               <td className="text-right">
                 <button

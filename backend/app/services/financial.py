@@ -147,6 +147,8 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
         if description is not None:
             description = str(description).strip() or None
 
+        is_internal = item.get("is_internal", False) is True
+
         tx = Transaction(
             user_id=user.id,
             occurred_at=occurred,
@@ -155,6 +157,7 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
             amount=amount,
             source_id=source.id,
             description=description,
+            is_internal=is_internal,
         )
         db.add(tx)
         created.append(tx)
@@ -206,6 +209,8 @@ def _link_transfers(created: list[Transaction], topup_cat: Category | None) -> N
             gid = uuid4()
             other.transfer_group_id = gid
             t.transfer_group_id = gid
+            other.is_internal = True
+            t.is_internal = True
 
 
 def soft_delete_last(db: Session, user: User) -> Transaction | None:

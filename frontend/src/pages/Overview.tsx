@@ -180,7 +180,10 @@ export default function OverviewPage() {
                       toNumber(s.current_balance) < 0 ? "text-accent" : ""
                     }`}
                   >
-                    {fmtIDR(s.current_balance)}
+                    {new Intl.NumberFormat("de-DE", {
+                      minimumFractionDigits: s.currency === "IDR" || s.currency === "JPY" ? 0 : 2,
+                      maximumFractionDigits: s.currency === "IDR" || s.currency === "JPY" ? 0 : 2,
+                    }).format(toNumber(s.current_balance))} {s.currency}
                   </span>
                 </li>
               ))}

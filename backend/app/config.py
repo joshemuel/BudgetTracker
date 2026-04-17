@@ -18,10 +18,11 @@ class Settings(BaseSettings):
 
     llm_api_key: str = Field(default="", alias="DASHSCOPE_API_KEY")
     llm_base_url: str = Field(
-        default="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        default="https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
         alias="LLM_BASE_URL",
     )
-    llm_model: str = Field(default="qwen-audio-turbo", alias="LLM_MODEL")
+    llm_model: str = Field(default="qwen3.5-omni-flash", alias="LLM_MODEL")
+    llm_query_model: str = Field(default="qwen-plus", alias="LLM_QUERY_MODEL")
 
     tz: str = Field(default="Asia/Jakarta", alias="TZ")
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Category, Source, TxType } from "@/types";
+import { fmtMoney } from "@/lib/format";
 
 function nowLocalISO(): string {
   const d = new Date();
@@ -21,6 +22,38 @@ function nowLocalISO(): string {
 
 type Props = { open: boolean; onClose: () => void };
 
+const SYMBOL_BY_CURRENCY: Record<string, string> = {
+  IDR: "Rp",
+  SGD: "S$",
+  JPY: "JP¥",
+  AUD: "A$",
+};
+
+function parseRawAmount(raw: string): string {
+  const cleaned = raw.replace(/,/g, "").replace(/[^0-9.-]/g, "");
+  const neg = cleaned.startsWith("-");
+  const unsigned = cleaned.replace(/-/g, "");
+  const parts = unsigned.split(".");
+  const intPart = parts[0] || "0";
+  const fracPart = parts.slice(1).join("");
+  return `${neg ? "-" : ""}${intPart}${fracPart ? `.${fracPart}` : ""}`;
+}
+
+function displayAmount(raw: string, currency: string): string {
+  const code = (currency || "IDR") as "IDR" | "SGD" | "JPY" | "AUD";
+  const symbol = SYMBOL_BY_CURRENCY[code] ?? code;
+  return fmtMoney(parseRawAmount(raw), code).replace(`${symbol} `, "");
+}
+
+function normalizeByCurrency(raw: string, currency: string): string {
+  const parsed = parseRawAmount(raw);
+  if (currency === "JPY") {
+    const n = Math.round(Number(parsed || "0"));
+    return String(n);
+  }
+  return parsed;
+}
+
 export default function QuickLog({ open, onClose }: Props) {
   const qc = useQueryClient();
   const { data: cats } = useQuery<Category[]>({
@@ -35,21 +68,30 @@ export default function QuickLog({ open, onClose }: Props) {
   });
 
   const [type, setType] = useState<TxType>("expense");
-  const [amount, setAmount] = useState("");
+  const [amountInput, setAmountInput] = useState("");
   const [categoryId, setCategoryId] = useState<number | "">("");
   const [sourceId, setSourceId] = useState<number | "">("");
   const [description, setDescription] = useState("");
   const [occurredAt, setOccurredAt] = useState(nowLocalISO());
   const [error, setError] = useState<string | null>(null);
 
+  const selectedSource = srcs?.find((s) => s.id === Number(sourceId));
+  const amountCurrency = selectedSource?.currency ?? "IDR";
+  const amountSymbol = SYMBOL_BY_CURRENCY[amountCurrency] ?? amountCurrency;
+
   useEffect(() => {
     if (open) {
       setError(null);
-      setAmount("");
+      setAmountInput("");
       setDescription("");
       setOccurredAt(nowLocalISO());
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    setAmountInput(displayAmount(normalizeByCurrency(amountInput, amountCurrency), amountCurrency));
+  }, [amountCurrency]);
 
   useEffect(() => {
     if (!open) return;
@@ -66,7 +108,7 @@ export default function QuickLog({ open, onClose }: Props) {
         occurred_at: new Date(occurredAt).toISOString(),
         type,
         category_id: Number(categoryId),
-        amount,
+        amount: parseRawAmount(amountInput),
         source_id: Number(sourceId),
         description: description || null,
       }),
@@ -82,7 +124,7 @@ export default function QuickLog({ open, onClose }: Props) {
     onError: (e: Error) => setError(e.message || "Could not record entry"),
   });
 
-  const canSubmit = amount && categoryId && sourceId && !create.isPending;
+  const canSubmit = parseRawAmount(amountInput) && categoryId && sourceId && !create.isPending;
 
   return (
     <>
@@ -92,13 +134,13 @@ export default function QuickLog({ open, onClose }: Props) {
         }`}
         onClick={onClose}
       />
-      <aside
-        className={`fixed top-0 right-0 bottom-0 z-50 w-full sm:w-[460px] bg-paper border-l border-ink transition-transform duration-300 ease-out ${
-          open ? "translate-x-0" : "translate-x-full"
+      <div
+        className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-300 ${
+          open ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
         aria-hidden={!open}
       >
-        <div className="absolute inset-0 flex flex-col">
+        <div className="modal-card w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col">
           <div className="p-6 pb-4 border-b border-paper-rule">
             <div className="flex items-baseline justify-between smallcaps text-ink-mute">
               <span>New entry</span>
@@ -107,11 +149,8 @@ export default function QuickLog({ open, onClose }: Props) {
               </button>
             </div>
             <h3 className="display text-4xl mt-2 leading-none">
-              Record a <span className="display-italic text-accent">line</span>.
+              What should we <span className="display-italic text-accent">log</span> today?
             </h3>
-            <p className="text-sm text-ink-soft mt-2 italic">
-              One transaction, entered by hand. Numbers without witness do not count.
-            </p>
           </div>
 
           <form
@@ -146,15 +185,24 @@ export default function QuickLog({ open, onClose }: Props) {
             </div>
 
             <label className="block">
-              <span className="smallcaps text-ink-mute">Amount · IDR</span>
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0"
-                autoFocus
-                className="mt-1 w-full bg-transparent border-b-2 border-ink py-2 num text-3xl focus:outline-none focus:border-accent"
-              />
+              <span className="smallcaps text-ink-mute">Amount · {amountCurrency}</span>
+              <div className="mt-1 flex items-center gap-3 border-b-2 border-ink focus-within:border-accent">
+                <span className="smallcaps text-ink-mute min-w-10">{amountSymbol}</span>
+                <input
+                  value={amountInput}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v.includes(",")) return;
+                    setAmountInput(v);
+                  }}
+                  onBlur={() => setAmountInput(displayAmount(normalizeByCurrency(amountInput, amountCurrency), amountCurrency))}
+                  onFocus={() => setAmountInput(normalizeByCurrency(parseRawAmount(amountInput), amountCurrency))}
+                  placeholder="0"
+                  autoFocus
+                  inputMode="decimal"
+                  className="w-full bg-transparent py-2 num text-3xl focus:outline-none"
+                />
+              </div>
             </label>
 
             <div className="grid grid-cols-2 gap-4">
@@ -179,9 +227,13 @@ export default function QuickLog({ open, onClose }: Props) {
                 <span className="smallcaps text-ink-mute">Source</span>
                 <select
                   value={sourceId}
-                  onChange={(e) =>
-                    setSourceId(e.target.value ? Number(e.target.value) : "")
-                  }
+                  onChange={(e) => {
+                    const nextId = e.target.value ? Number(e.target.value) : "";
+                    setSourceId(nextId);
+                    const nextSource = srcs?.find((s) => s.id === Number(nextId));
+                    const nextCurrency = nextSource?.currency ?? "IDR";
+                    setAmountInput(displayAmount(normalizeByCurrency(amountInput, nextCurrency), nextCurrency));
+                  }}
                   className="mt-1 w-full bg-transparent border-b border-ink py-1 focus:outline-none focus:border-accent"
                 >
                   <option value="">—</option>
@@ -242,7 +294,7 @@ export default function QuickLog({ open, onClose }: Props) {
             </button>
           </div>
         </div>
-      </aside>
+      </div>
     </>
   );
 }
