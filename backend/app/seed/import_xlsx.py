@@ -188,6 +188,9 @@ def run_import(
         cats_by_name[name] = cat
     # any category referenced by transactions/budgets that isn't a default
     extra_names = {t["category"] for t in txn_rows} | {b["category"] for b in budget_rows}
+    if "Untracked" in extra_names:
+        extra_names.remove("Untracked")
+        extra_names.add("Untrackable")
     extra_names -= set(cats_by_name)
     for name in sorted(extra_names):
         cat = Category(user_id=user.id, name=name, is_default=False)

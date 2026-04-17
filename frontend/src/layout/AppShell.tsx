@@ -37,7 +37,7 @@ function Masthead({ me, onLog }: { me: Me | undefined; onLog: () => void }) {
     today.getFullYear();
 
   return (
-    <header className="relative pt-6 sm:pt-8 md:pt-10 pb-5 sm:pb-6">
+    <header className="relative pt-4 sm:pt-6 md:pt-7 lg:pt-8 pb-4 sm:pb-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-baseline sm:justify-between smallcaps text-ink-mute">
         <span className="order-1">Beta Version</span>
         <span className="order-3 sm:order-2 hidden md:inline">{dateStr}</span>
@@ -64,13 +64,13 @@ function Masthead({ me, onLog }: { me: Me | undefined; onLog: () => void }) {
         </span>
       </div>
 
-      <div className="mt-4 anim-in">
-        <h1 className="display text-[48px] sm:text-[72px] md:text-[104px] lg:text-[124px] leading-[0.92] text-ink">
+      <div className="mt-3 anim-in">
+        <h1 className="display text-[42px] sm:text-[58px] md:text-[78px] lg:text-[94px] xl:text-[106px] leading-[0.92] text-ink">
           Budget <span className="display-italic text-accent">Tracker</span>
         </h1>
       </div>
 
-      <div className="mt-6 relative h-[6px]">
+      <div className="mt-4 sm:mt-5 relative h-[6px]">
         <div className="anim-rule absolute inset-x-0 top-0 h-[3px] bg-ink" />
         <div
           className="anim-rule absolute inset-x-0 top-[5px] h-[1px] bg-ink"
@@ -139,10 +139,10 @@ export default function AppShell() {
   }
 
   return (
-    <div className="max-w-[1380px] mx-auto px-3 sm:px-4 md:px-6 xl:px-8">
+    <div className="max-w-[1160px] lg:max-w-[1220px] mx-auto px-3 sm:px-4 md:px-5 lg:px-6 xl:px-8">
       <Masthead me={me} onLog={() => setLogOpen(true)} />
       <SectionNav />
-      <main className="py-6 sm:py-8 md:py-10">
+      <main className="py-5 sm:py-7 md:py-8">
         <Outlet />
       </main>
       <footer className="py-8 sm:py-10 border-t border-paper-rule flex flex-col gap-2 sm:flex-row sm:justify-between smallcaps text-ink-mute">

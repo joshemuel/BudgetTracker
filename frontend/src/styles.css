@@ -223,3 +223,15 @@ hr {
     max-height: 100dvh;
   }
 }
+
+@media (min-width: 768px) and (max-width: 1366px) {
+  .smallcaps {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+  }
+
+  .ledger-table th,
+  .ledger-table td {
+    padding: 8px 9px;
+  }
+}

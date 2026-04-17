@@ -4,6 +4,7 @@ import { api } from "@/api";
 import type { Category, Source } from "@/types";
 import { fmtCompactMoney, fmtIDR, fmtMoney, toNumber, todayISO } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 type Frequency = "monthly" | "yearly";
 type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
@@ -173,6 +174,7 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
 export default function SubscriptionsPage() {
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Subscription | null>(null);
   const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
 
   const { data: subs } = useQuery<Subscription[]>({
@@ -187,7 +189,10 @@ export default function SubscriptionsPage() {
 
   const del = useMutation({
     mutationFn: (id: number) => api.del(`/subscriptions/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["subscriptions"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["subscriptions"] });
+      setPendingDelete(null);
+    },
   });
   const confirmCharge = useMutation({
     mutationFn: (id: number) => api.post(`/subscriptions/charges/${id}/confirm`),
@@ -298,9 +303,7 @@ export default function SubscriptionsPage() {
                   <td className="num text-ink-soft">{s.next_billing_date}</td>
                   <td className="text-right">
                     <button
-                      onClick={() => {
-                        if (window.confirm(`Delete ${s.name}?`)) del.mutate(s.id);
-                      }}
+                      onClick={() => setPendingDelete(s)}
                       className="smallcaps text-ink-mute hover:text-accent"
                     >
                       delete
@@ -319,6 +322,19 @@ export default function SubscriptionsPage() {
           </table>
         </div>
       </section>
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`Delete ${pendingDelete?.name ?? "this subscription"}?`}
+        message="This removes the recurring definition and future scheduled charges."
+        confirmLabel="Delete"
+        busy={del.isPending}
+        onClose={() => {
+          if (!del.isPending) setPendingDelete(null);
+        }}
+        onConfirm={() => {
+          if (pendingDelete) del.mutate(pendingDelete.id);
+        }}
+      />
     </div>
   );
 }

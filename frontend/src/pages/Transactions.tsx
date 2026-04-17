@@ -1,11 +1,20 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Category, Source, Transaction } from "@/types";
+import type { Category, Source, Transaction, TxType } from "@/types";
 import { fmtCompactMoney, fmtDateTime, fmtMoney, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
+
+function toLocalDateTimeInput(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
+}
 
 export default function TransactionsPage() {
   const qc = useQueryClient();
@@ -13,6 +22,14 @@ export default function TransactionsPage() {
   const [categoryId, setCategoryId] = useState<number | "">("");
   const [sourceId, setSourceId] = useState<number | "">("");
   const [limit, setLimit] = useState(100);
+  const [editing, setEditing] = useState<Transaction | null>(null);
+  const [editOccurredAt, setEditOccurredAt] = useState("");
+  const [editType, setEditType] = useState<TxType>("expense");
+  const [editCategoryId, setEditCategoryId] = useState<number | "">("");
+  const [editSourceId, setEditSourceId] = useState<number | "">("");
+  const [editAmount, setEditAmount] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
   const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
 
   const { data: cats } = useQuery<Category[]>({
@@ -52,8 +69,31 @@ export default function TransactionsPage() {
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["overview"] });
       qc.invalidateQueries({ queryKey: ["sources"] });
+      setPendingDelete(null);
     },
   });
+
+  const patch = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: Record<string, unknown> }) =>
+      api.patch(`/transactions/${id}`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["overview"] });
+      qc.invalidateQueries({ queryKey: ["sources"] });
+      qc.invalidateQueries({ queryKey: ["monthly"] });
+      qc.invalidateQueries({ queryKey: ["daily"] });
+      qc.invalidateQueries({ queryKey: ["category-stats"] });
+      setEditing(null);
+    },
+  });
+
+  const canEdit =
+    !!editing &&
+    editOccurredAt &&
+    editAmount !== "" &&
+    editCategoryId !== "" &&
+    editSourceId !== "" &&
+    !patch.isPending;
 
   return (
     <div>
@@ -157,8 +197,20 @@ export default function TransactionsPage() {
                 <td className="text-right">
                   <button
                     onClick={() => {
-                      if (confirm(`Delete this ${t.type}?`)) del.mutate(t.id);
+                      setEditing(t);
+                      setEditOccurredAt(toLocalDateTimeInput(t.occurred_at));
+                      setEditType(t.type);
+                      setEditCategoryId(t.category_id);
+                      setEditSourceId(t.source_id);
+                      setEditAmount(String(toNumber(t.amount)));
+                      setEditDescription(t.description ?? "");
                     }}
+                    className="smallcaps text-ink-mute hover:text-accent mr-3"
+                  >
+                    edit
+                  </button>
+                  <button
+                    onClick={() => setPendingDelete(t)}
                     className="smallcaps text-ink-mute hover:text-accent"
                   >
                     delete
@@ -176,6 +228,125 @@ export default function TransactionsPage() {
           </tbody>
         </table>
       </div>
+      {editing && (
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="modal-card w-full max-w-lg p-6">
+            <h3 className="font-semibold mb-4">Edit entry</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label className="block">
+                <span className="smallcaps text-ink-mute block mb-1">When</span>
+                <input
+                  type="datetime-local"
+                  value={editOccurredAt}
+                  onChange={(e) => setEditOccurredAt(e.target.value)}
+                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full num"
+                />
+              </label>
+              <label className="block">
+                <span className="smallcaps text-ink-mute block mb-1">Type</span>
+                <select
+                  value={editType}
+                  onChange={(e) => setEditType(e.target.value as TxType)}
+                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                >
+                  <option value="expense">Expense</option>
+                  <option value="income">Income</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="smallcaps text-ink-mute block mb-1">Category</span>
+                <select
+                  value={editCategoryId}
+                  onChange={(e) => setEditCategoryId(e.target.value ? Number(e.target.value) : "")}
+                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                >
+                  <option value="">—</option>
+                  {cats?.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="smallcaps text-ink-mute block mb-1">Source</span>
+                <select
+                  value={editSourceId}
+                  onChange={(e) => setEditSourceId(e.target.value ? Number(e.target.value) : "")}
+                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                >
+                  <option value="">—</option>
+                  {srcs?.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="smallcaps text-ink-mute block mb-1">Amount</span>
+                <input
+                  type="number"
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)}
+                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full num"
+                />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="smallcaps text-ink-mute block mb-1">Description</span>
+                <input
+                  type="text"
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                />
+              </label>
+            </div>
+            <div className="flex gap-2 mt-5 justify-end">
+              <button
+                onClick={() => setEditing(null)}
+                className="smallcaps px-3 py-1 border border-ink/30 rounded"
+                disabled={patch.isPending}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (!editing || !canEdit) return;
+                  patch.mutate({
+                    id: editing.id,
+                    body: {
+                      occurred_at: new Date(editOccurredAt).toISOString(),
+                      type: editType,
+                      category_id: Number(editCategoryId),
+                      source_id: Number(editSourceId),
+                      amount: editAmount,
+                      description: editDescription.trim() || null,
+                    },
+                  });
+                }}
+                disabled={!canEdit}
+                className="smallcaps px-3 py-1 bg-ink text-paper rounded disabled:opacity-60"
+              >
+                {patch.isPending ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`Delete this ${pendingDelete?.type ?? "entry"}?`}
+        message="The entry will be soft-deleted and removed from reports."
+        confirmLabel="Delete"
+        busy={del.isPending}
+        onClose={() => {
+          if (!del.isPending) setPendingDelete(null);
+        }}
+        onConfirm={() => {
+          if (pendingDelete) del.mutate(pendingDelete.id);
+        }}
+      />
     </div>
   );
 }

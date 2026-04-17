@@ -42,7 +42,7 @@ DEFAULT_CATEGORIES: list[str] = [
     "Other",
     "Investment",
     "Credit Payment",
-    "Untracked",
+    "Untrackable",
 ]
 
 

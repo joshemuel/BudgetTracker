@@ -13,3 +13,15 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 .DS_Store
+
+# Local artifacts
+BudgetTracker.xlsx
+QWEN.md
+
+# TypeScript build outputs in source tree
+frontend/src/**/*.js
+frontend/tsconfig.tsbuildinfo
+
+# Local recovery artifacts
+*.root-owned.bak/
+*.root-owned.bak.tmp/

@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "@/api";
-import type { Overview, Source } from "@/types";
-import { fmtCompactMoney, fmtIDR, fmtPct, monthName, toNumber } from "@/lib/format";
+import type { Me, Overview, Source } from "@/types";
+import { fmtCompactMoney, fmtMoney, fmtPct, monthName, toNumber } from "@/lib/format";
 import { Figure, SectionTitle, Pullquote } from "@/components/Figure";
+import { preferredCurrency, withCurrency } from "@/lib/preferences";
 
 const STATUS_LABEL: Record<string, string> = {
   ahead: "Ahead",
@@ -40,9 +41,15 @@ function Bar({ pct, status }: { pct: number; status: string }) {
 }
 
 export default function OverviewPage() {
+  const { data: me } = useQuery<Me>({
+    queryKey: ["me"],
+    queryFn: () => api.get<Me>("/auth/me"),
+  });
+  const currency = preferredCurrency(me);
+
   const { data: ov } = useQuery<Overview>({
-    queryKey: ["overview"],
-    queryFn: () => api.get<Overview>("/stats/overview"),
+    queryKey: ["overview", currency],
+    queryFn: () => api.get<Overview>(withCurrency("/stats/overview", currency)),
   });
   const { data: sources } = useQuery<Source[]>({
     queryKey: ["sources"],
@@ -63,7 +70,7 @@ export default function OverviewPage() {
         <p className="smallcaps text-ink-mute">
           {monthName(ov.month)} MMXXVI · Day {ov.today_day} of {ov.days_in_month}
         </p>
-        <h2 className="display text-3xl sm:text-5xl md:text-7xl mt-2">
+        <h2 className="display text-3xl sm:text-5xl md:text-6xl lg:text-7xl mt-2">
           <span className="display-italic">A month</span>, in figures.
         </h2>
       </section>
@@ -71,7 +78,7 @@ export default function OverviewPage() {
       <section className="col-span-12 md:col-span-4 border-t border-ink pt-2">
         <Figure
           label="In"
-          value={fmtIDR(ov.totals.income)}
+          value={fmtMoney(ov.totals.income, ov.currency)}
           tone="gain"
           sub="Credits posted this month"
         />
@@ -79,7 +86,7 @@ export default function OverviewPage() {
       <section className="col-span-12 md:col-span-4 border-t border-ink pt-2">
         <Figure
           label="Out"
-          value={fmtIDR(ov.totals.expense)}
+          value={fmtMoney(ov.totals.expense, ov.currency)}
           tone="accent"
           sub="Debits posted this month"
         />
@@ -87,7 +94,7 @@ export default function OverviewPage() {
       <section className="col-span-12 md:col-span-4 border-t border-ink pt-2">
         <Figure
           label="Net"
-          value={fmtIDR(ov.totals.net)}
+          value={fmtMoney(ov.totals.net, ov.currency)}
           tone={netTone}
           sub={`Pace · ${fmtPct(paceRatio)} of month elapsed`}
         />
@@ -121,16 +128,20 @@ export default function OverviewPage() {
               {ov.budgets.map((b) => (
                 <tr key={b.category_id}>
                   <td className="font-[450]">{b.category_name}</td>
-                  <td className="text-right num">{isMobile ? fmtCompactMoney(b.spent) : fmtIDR(b.spent)}</td>
+                  <td className="text-right num">
+                    {isMobile ? fmtCompactMoney(b.spent, ov.currency) : fmtMoney(b.spent, ov.currency)}
+                  </td>
                   <td className="text-right num text-ink-mute">
-                    {isMobile ? fmtCompactMoney(b.limit) : fmtIDR(b.limit)}
+                    {isMobile ? fmtCompactMoney(b.limit, ov.currency) : fmtMoney(b.limit, ov.currency)}
                   </td>
                   <td
                     className={`text-right num ${
                       toNumber(b.remaining) < 0 ? "text-accent" : ""
                     }`}
                   >
-                    {isMobile ? fmtCompactMoney(b.remaining) : fmtIDR(b.remaining)}
+                    {isMobile
+                      ? fmtCompactMoney(b.remaining, ov.currency)
+                      : fmtMoney(b.remaining, ov.currency)}
                   </td>
                   <td>
                     <Bar pct={b.pct_used} status={b.status} />
@@ -150,18 +161,18 @@ export default function OverviewPage() {
       <aside className="col-span-12 lg:col-span-4 mt-6 space-y-10">
         <div className="border-t-2 border-ink pt-4">
           <p className="smallcaps text-ink-mute">Credit Card</p>
-          <p className="num text-3xl mt-1 text-accent">{fmtIDR(ov.credit.outstanding)}</p>
+          <p className="num text-3xl mt-1 text-accent">{fmtMoney(ov.credit.outstanding, ov.currency)}</p>
           <p className="text-sm text-ink-soft mt-1">Outstanding balance (negative means payable)</p>
 
           <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
             <div>
               <p className="smallcaps text-ink-mute">This Month</p>
-              <p className="num text-accent">{fmtIDR(ov.credit.month_charges)}</p>
+              <p className="num text-accent">{fmtMoney(ov.credit.month_charges, ov.currency)}</p>
               <p className="text-ink-mute text-xs">charges</p>
             </div>
             <div>
               <p className="smallcaps text-ink-mute">Paid</p>
-              <p className="num text-gain">{fmtIDR(ov.credit.month_payments)}</p>
+              <p className="num text-gain">{fmtMoney(ov.credit.month_payments, ov.currency)}</p>
               <p className="text-ink-mute text-xs">payments</p>
             </div>
           </div>

@@ -1,4 +1,4 @@
-"""add user defaults and untracked category
+"""add user defaults and untrackable category
 
 Revision ID: 8e8ebf9e5a1c
 Revises: c2a19f44b0ad
@@ -25,16 +25,16 @@ def upgrade() -> None:
     op.add_column("users", sa.Column("default_expense_source_id", sa.Integer(), nullable=True))
 
     bind = op.get_bind()
-    # Seed Untracked for all users if missing
+    # Seed Untrackable for all users if missing
     bind.execute(
         sa.text(
             """
             INSERT INTO categories (user_id, name, is_default)
-            SELECT u.id, 'Untracked', true
+            SELECT u.id, 'Untrackable', true
             FROM users u
             WHERE NOT EXISTS (
                 SELECT 1 FROM categories c
-                WHERE c.user_id = u.id AND lower(c.name) = 'untracked'
+                WHERE c.user_id = u.id AND lower(c.name) IN ('untrackable', 'untracked')
             )
             """
         )

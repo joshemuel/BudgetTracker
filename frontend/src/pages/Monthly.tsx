@@ -10,16 +10,24 @@ import {
   YAxis,
 } from "recharts";
 import { api } from "@/api";
-import type { Monthly } from "@/types";
-import { fmtIDR, fmtShort, monthName, toNumber } from "@/lib/format";
+import type { Me, Monthly } from "@/types";
+import { fmtMoney, fmtShort, monthName, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
+import { preferredCurrency, withCurrency } from "@/lib/preferences";
 
 export default function MonthlyPage() {
   const [year, setYear] = useState(new Date().getFullYear());
-  const { data } = useQuery<Monthly>({
-    queryKey: ["monthly", year],
-    queryFn: () => api.get<Monthly>(`/stats/monthly?year=${year}`),
+  const { data: me } = useQuery<Me>({
+    queryKey: ["me"],
+    queryFn: () => api.get<Me>("/auth/me"),
   });
+  const currency = preferredCurrency(me);
+
+  const { data } = useQuery<Monthly>({
+    queryKey: ["monthly", year, currency],
+    queryFn: () => api.get<Monthly>(withCurrency(`/stats/monthly?year=${year}`, currency)),
+  });
+  const reportCurrency = data?.currency ?? currency;
 
   const chartData =
     data?.months.map((m) => ({
@@ -64,11 +72,11 @@ export default function MonthlyPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 border-t border-ink pt-4">
         <div>
           <p className="smallcaps text-ink-mute">YTD In</p>
-          <p className="num text-2xl text-gain">{fmtIDR(totals.income)}</p>
+          <p className="num text-2xl text-gain">{fmtMoney(totals.income, reportCurrency)}</p>
         </div>
         <div>
           <p className="smallcaps text-ink-mute">YTD Out</p>
-          <p className="num text-2xl text-accent">{fmtIDR(totals.expense)}</p>
+          <p className="num text-2xl text-accent">{fmtMoney(totals.expense, reportCurrency)}</p>
         </div>
         <div>
           <p className="smallcaps text-ink-mute">YTD Net</p>
@@ -77,7 +85,7 @@ export default function MonthlyPage() {
               totals.income - totals.expense >= 0 ? "text-gain" : "text-accent"
             }`}
           >
-            {fmtIDR(totals.income - totals.expense)}
+            {fmtMoney(totals.income - totals.expense, reportCurrency)}
           </p>
         </div>
       </div>
@@ -95,7 +103,7 @@ export default function MonthlyPage() {
             <YAxis
               stroke="#4a4437"
               tick={{ fontFamily: "JetBrains Mono", fontSize: 11 }}
-              tickFormatter={(v) => fmtShort(v)}
+              tickFormatter={(v) => fmtShort(v, reportCurrency)}
               tickLine={false}
               width={72}
             />
@@ -106,7 +114,7 @@ export default function MonthlyPage() {
                 borderRadius: 0,
                 fontFamily: "Instrument Sans",
               }}
-              formatter={(v: number) => fmtIDR(v)}
+              formatter={(v: number) => fmtMoney(v, reportCurrency)}
             />
             <Bar dataKey="Income" fill="#3f5d2e" />
             <Bar dataKey="Expense" fill="#a02a1a" />
@@ -128,14 +136,14 @@ export default function MonthlyPage() {
             {data?.months.map((m) => (
               <tr key={m.month}>
                 <td className="font-[450]">{monthName(m.month)}</td>
-                <td className="text-right num text-gain">{fmtIDR(m.income)}</td>
-                <td className="text-right num text-accent">{fmtIDR(m.expense)}</td>
+                <td className="text-right num text-gain">{fmtMoney(m.income, reportCurrency)}</td>
+                <td className="text-right num text-accent">{fmtMoney(m.expense, reportCurrency)}</td>
                 <td
                   className={`text-right num ${
                     toNumber(m.net) >= 0 ? "text-gain" : "text-accent"
                   }`}
                 >
-                  {fmtIDR(m.net)}
+                  {fmtMoney(m.net, reportCurrency)}
                 </td>
               </tr>
             ))}

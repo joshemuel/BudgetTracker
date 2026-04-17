@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -11,9 +11,24 @@ from app.services import fx
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
+SUPPORTED_CURRENCIES = {"IDR", "SGD", "JPY", "AUD", "TWD"}
+
 
 def _idr_round(v: Decimal) -> Decimal:
     return v.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
+
+def _round_currency(v: Decimal, currency: str) -> Decimal:
+    if currency in {"IDR", "JPY"}:
+        return v.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    return v.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _report_currency(user: User, currency: str | None) -> str:
+    cur = (currency or user.default_currency or "IDR").upper()
+    if cur not in SUPPORTED_CURRENCIES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unsupported currency")
+    return cur
 
 
 def _month_bounds(year: int, month: int) -> tuple[datetime, datetime]:
@@ -26,7 +41,12 @@ def _month_bounds(year: int, month: int) -> tuple[datetime, datetime]:
 
 
 def _category_spent(
-    db: Session, user_id: int, start: datetime, end: datetime, rates: fx.FxRates
+    db: Session,
+    user_id: int,
+    start: datetime,
+    end: datetime,
+    rates: fx.FxRates,
+    report_currency: str,
 ) -> dict[int, Decimal]:
     rows = db.execute(
         select(Transaction.category_id, Transaction.amount, Source.currency)
@@ -42,24 +62,38 @@ def _category_spent(
     ).all()
     out: dict[int, Decimal] = {}
     for category_id, amount, currency in rows:
-        out[category_id] = out.get(category_id, Decimal("0")) + fx.convert_to_idr(
-            Decimal(amount), currency or "IDR", rates
+        out[category_id] = out.get(category_id, Decimal("0")) + fx.convert(
+            Decimal(amount), currency or "IDR", report_currency, rates
         )
     return out
 
 
 def _credit_summary(
-    db: Session, user_id: int, start: datetime, end: datetime, rates: fx.FxRates
+    db: Session,
+    user_id: int,
+    start: datetime,
+    end: datetime,
+    rates: fx.FxRates,
+    report_currency: str,
 ) -> dict:
     cc_sources = db.query(Source).filter_by(user_id=user_id, is_credit_card=True).all()
     if not cc_sources:
-        return {"outstanding": "0", "month_charges": "0", "month_payments": "0"}
+        return {
+            "outstanding": "0",
+            "month_charges": "0",
+            "month_payments": "0",
+        }
     cc_ids = [s.id for s in cc_sources]
     curr_by_id = {s.id: s.currency or "IDR" for s in cc_sources}
 
     outstanding = Decimal("0")
     for s in cc_sources:
-        outstanding += fx.convert_to_idr(Decimal(s.starting_balance), s.currency or "IDR", rates)
+        outstanding += fx.convert(
+            Decimal(s.starting_balance),
+            s.currency or "IDR",
+            report_currency,
+            rates,
+        )
 
     all_rows = db.execute(
         select(Transaction.source_id, Transaction.type, Transaction.amount).where(
@@ -68,11 +102,16 @@ def _credit_summary(
         )
     ).all()
     for source_id, t_type, amount in all_rows:
-        amount_idr = fx.convert_to_idr(Decimal(amount), curr_by_id.get(source_id, "IDR"), rates)
+        amount_report = fx.convert(
+            Decimal(amount),
+            curr_by_id.get(source_id, "IDR"),
+            report_currency,
+            rates,
+        )
         if t_type == "income":
-            outstanding += amount_idr
+            outstanding += amount_report
         else:
-            outstanding -= amount_idr
+            outstanding -= amount_report
 
     month_rows = db.execute(
         select(Transaction.source_id, Transaction.type, Transaction.amount).where(
@@ -85,17 +124,24 @@ def _credit_summary(
     month_charges = Decimal("0")
     month_payments = Decimal("0")
     for source_id, t_type, amount in month_rows:
-        amount_idr = fx.convert_to_idr(Decimal(amount), curr_by_id.get(source_id, "IDR"), rates)
+        amount_report = fx.convert(
+            Decimal(amount),
+            curr_by_id.get(source_id, "IDR"),
+            report_currency,
+            rates,
+        )
         if t_type == "expense":
-            month_charges += amount_idr
+            month_charges += amount_report
         else:
-            month_payments += amount_idr
+            month_payments += amount_report
 
     return {
         # Negative means debt still owed, 0 means clear.
-        "outstanding": str(_idr_round(outstanding) if outstanding < 0 else Decimal("0")),
-        "month_charges": str(_idr_round(month_charges)),
-        "month_payments": str(_idr_round(month_payments)),
+        "outstanding": str(
+            _round_currency(outstanding, report_currency) if outstanding < 0 else Decimal("0")
+        ),
+        "month_charges": str(_round_currency(month_charges, report_currency)),
+        "month_payments": str(_round_currency(month_payments, report_currency)),
     }
 
 
@@ -105,10 +151,12 @@ def overview(
     db: Session = Depends(get_db),
     year: int | None = None,
     month: int | None = None,
+    currency: str | None = Query(default=None),
 ):
     today = datetime.now(timezone.utc)
     y = year or today.year
     m = month or today.month
+    report_currency = _report_currency(user, currency)
     start, end = _month_bounds(y, m)
     rates = fx.get_rates_cached(db)
 
@@ -116,15 +164,16 @@ def overview(
     days_in_month = (end - start).days
     today_day = today.day if (today.year == y and today.month == m) else days_in_month
 
-    # Per-category spent
-    spent_by_cat = _category_spent(db, user.id, start, end, rates)
+    # Per-category spent in selected reporting currency
+    spent_by_cat = _category_spent(db, user.id, start, end, rates, report_currency)
     cats = {c.id: c.name for c in db.query(Category).filter_by(user_id=user.id).all()}
     budgets = db.query(Budget).filter_by(user_id=user.id).all()
     budget_rows = []
     for b in budgets:
-        limit = _idr_round(Decimal(b.monthly_limit))
+        limit = fx.convert(Decimal(b.monthly_limit), "IDR", report_currency, rates)
+        limit = _round_currency(limit, report_currency)
         spent = spent_by_cat.get(b.category_id, Decimal("0"))
-        remaining = _idr_round(limit - spent)
+        remaining = _round_currency(limit - spent, report_currency)
         pct = float(spent / limit) if limit else 0.0
         expected_pct = today_day / days_in_month
         if pct > 1:
@@ -139,15 +188,15 @@ def overview(
             {
                 "category_id": b.category_id,
                 "category_name": cats.get(b.category_id, ""),
-                "limit": str(_idr_round(limit)),
-                "spent": str(_idr_round(spent)),
+                "limit": str(_round_currency(limit, report_currency)),
+                "spent": str(_round_currency(spent, report_currency)),
                 "remaining": str(remaining),
                 "pct_used": pct,
                 "status": status_str,
             }
         )
 
-    # Totals this month (exclude internal transfers/credit payments, normalized to IDR)
+    # Totals this month (exclude internal transfers/credit payments) in report currency
     totals_rows = db.execute(
         select(Transaction.type, Transaction.amount, Source.currency)
         .join(Source, Source.id == Transaction.source_id)
@@ -163,24 +212,25 @@ def overview(
     month_income = Decimal("0")
     month_expense = Decimal("0")
     for t_type, amount, currency in totals_rows:
-        amount_idr = fx.convert_to_idr(Decimal(amount), currency or "IDR", rates)
+        amount_report = fx.convert(Decimal(amount), currency or "IDR", report_currency, rates)
         if t_type == "income":
-            month_income += amount_idr
+            month_income += amount_report
         else:
-            month_expense += amount_idr
+            month_expense += amount_report
 
     return {
         "year": y,
         "month": m,
+        "currency": report_currency,
         "days_in_month": days_in_month,
         "today_day": today_day,
         "totals": {
-            "income": str(_idr_round(month_income)),
-            "expense": str(_idr_round(month_expense)),
-            "net": str(_idr_round(month_income - month_expense)),
+            "income": str(_round_currency(month_income, report_currency)),
+            "expense": str(_round_currency(month_expense, report_currency)),
+            "net": str(_round_currency(month_income - month_expense, report_currency)),
         },
         "budgets": budget_rows,
-        "credit": _credit_summary(db, user.id, start, end, rates),
+        "credit": _credit_summary(db, user.id, start, end, rates, report_currency),
     }
 
 
@@ -189,9 +239,11 @@ def monthly(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     year: int = Query(default=None),
+    currency: str | None = Query(default=None),
 ):
     if year is None:
         year = datetime.now(timezone.utc).year
+    report_currency = _report_currency(user, currency)
     year_start = datetime(year, 1, 1, tzinfo=timezone.utc)
     year_end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
     rates = fx.get_rates_cached(db)
@@ -213,8 +265,8 @@ def monthly(
     }
     for occurred_at, t_type, amount, currency in rows:
         m = int(occurred_at.month)
-        amount_idr = fx.convert_to_idr(Decimal(amount), currency or "IDR", rates)
-        by_month[m]["income" if t_type == "income" else "expense"] += amount_idr
+        amount_report = fx.convert(Decimal(amount), currency or "IDR", report_currency, rates)
+        by_month[m]["income" if t_type == "income" else "expense"] += amount_report
 
     out = []
     for m in range(1, 13):
@@ -223,12 +275,12 @@ def monthly(
         out.append(
             {
                 "month": m,
-                "income": str(_idr_round(inc)),
-                "expense": str(_idr_round(exp)),
-                "net": str(_idr_round(inc - exp)),
+                "income": str(_round_currency(inc, report_currency)),
+                "expense": str(_round_currency(exp, report_currency)),
+                "net": str(_round_currency(inc - exp, report_currency)),
             }
         )
-    return {"year": year, "months": out}
+    return {"year": year, "currency": report_currency, "months": out}
 
 
 @router.get("/daily")
@@ -237,10 +289,12 @@ def daily(
     db: Session = Depends(get_db),
     year: int = Query(default=None),
     month: int = Query(default=None),
+    currency: str | None = Query(default=None),
 ):
     now = datetime.now(timezone.utc)
     y = year or now.year
     m = month or now.month
+    report_currency = _report_currency(user, currency)
     start, end = _month_bounds(y, m)
     days_in_month = (end - start).days
     rates = fx.get_rates_cached(db)
@@ -262,15 +316,21 @@ def daily(
     }
     for occurred_at, t_type, amount, currency in rows:
         d = int(occurred_at.day)
-        amount_idr = fx.convert_to_idr(Decimal(amount), currency or "IDR", rates)
-        by_day[d]["income" if t_type == "income" else "expense"] += amount_idr
+        amount_report = fx.convert(Decimal(amount), currency or "IDR", report_currency, rates)
+        by_day[d]["income" if t_type == "income" else "expense"] += amount_report
 
     out = []
     for d in range(1, days_in_month + 1):
         inc = by_day[d]["income"]
         exp = by_day[d]["expense"]
-        out.append({"day": d, "income": str(_idr_round(inc)), "expense": str(_idr_round(exp))})
-    return {"year": y, "month": m, "days": out}
+        out.append(
+            {
+                "day": d,
+                "income": str(_round_currency(inc, report_currency)),
+                "expense": str(_round_currency(exp, report_currency)),
+            }
+        )
+    return {"year": y, "month": m, "currency": report_currency, "days": out}
 
 
 @router.get("/categories")

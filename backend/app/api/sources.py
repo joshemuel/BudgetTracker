@@ -140,7 +140,7 @@ def update_source(
     for k, v in updates.items():
         setattr(src, k, v)
 
-    # When user manually resets current balance, log the delta as "Untracked"
+    # When user manually resets current balance, log the delta as "Untrackable"
     # so transaction history + balances remain reconcilable.
     if current_balance is not None:
         deltas_now = _current_balance_map(db, user.id)
@@ -151,8 +151,12 @@ def update_source(
         delta = target - current_now
         if delta != 0:
             untracked = (
-                db.query(Category).filter_by(user_id=user.id, name="Untracked").one_or_none()
+                db.query(Category).filter_by(user_id=user.id, name="Untrackable").one_or_none()
             )
+            if untracked is None:
+                untracked = (
+                    db.query(Category).filter_by(user_id=user.id, name="Untracked").one_or_none()
+                )
             if untracked is not None:
                 db.add(
                     Transaction(
@@ -162,7 +166,7 @@ def update_source(
                         category_id=untracked.id,
                         amount=abs(delta),
                         source_id=src.id,
-                        description="Starting Budget",
+                        description=None,
                         is_internal=False,
                     )
                 )

@@ -22,7 +22,7 @@ export function Figure({
   return (
     <div className="py-4">
       <p className="smallcaps text-ink-mute">{label}</p>
-      <p className={`num ${color} mt-2 text-xl sm:text-2xl md:text-4xl`}>{value}</p>
+      <p className={`num ${color} mt-2 text-xl sm:text-2xl md:text-3xl lg:text-4xl`}>{value}</p>
       {sub && <p className="mt-1 text-xs sm:text-sm text-ink-soft">{sub}</p>}
     </div>
   );
@@ -32,7 +32,7 @@ export function SectionTitle({ children, kicker }: { children: ReactNode; kicker
   return (
     <div className="mb-4">
       {kicker && <p className="smallcaps text-ink-mute">{kicker}</p>}
-      <h2 className="display text-2xl sm:text-3xl md:text-4xl text-ink">{children}</h2>
+      <h2 className="display text-2xl sm:text-3xl md:text-[2.1rem] lg:text-4xl text-ink">{children}</h2>
       <div className="mt-3 h-[1px] bg-ink w-10" />
     </div>
   );

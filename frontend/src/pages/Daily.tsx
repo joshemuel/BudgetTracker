@@ -10,19 +10,26 @@ import {
   YAxis,
 } from "recharts";
 import { api } from "@/api";
-import type { Daily } from "@/types";
-import { fmtIDR, fmtShort, monthName, toNumber } from "@/lib/format";
+import type { Daily, Me } from "@/types";
+import { fmtMoney, fmtShort, monthName, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
+import { preferredCurrency, withCurrency } from "@/lib/preferences";
 
 export default function DailyPage() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const { data: me } = useQuery<Me>({
+    queryKey: ["me"],
+    queryFn: () => api.get<Me>("/auth/me"),
+  });
+  const currency = preferredCurrency(me);
 
   const { data } = useQuery<Daily>({
-    queryKey: ["daily", year, month],
-    queryFn: () => api.get<Daily>(`/stats/daily?year=${year}&month=${month}`),
+    queryKey: ["daily", year, month, currency],
+    queryFn: () => api.get<Daily>(withCurrency(`/stats/daily?year=${year}&month=${month}`, currency)),
   });
+  const reportCurrency = data?.currency ?? currency;
 
   const days = data?.days ?? [];
   let cum = 0;
@@ -81,7 +88,7 @@ export default function DailyPage() {
             <XAxis dataKey="day" stroke="#4a4437" tickLine={false} />
             <YAxis
               stroke="#4a4437"
-              tickFormatter={fmtShort}
+              tickFormatter={(v) => fmtShort(v, reportCurrency)}
               tick={{ fontFamily: "JetBrains Mono", fontSize: 11 }}
               tickLine={false}
               width={72}
@@ -93,7 +100,7 @@ export default function DailyPage() {
                 borderRadius: 0,
                 fontFamily: "Instrument Sans",
               }}
-              formatter={(v: number) => fmtIDR(v)}
+              formatter={(v: number) => fmtMoney(v, reportCurrency)}
               labelFormatter={(d) => `${monthName(month, true)} ${d}`}
             />
             <Area
@@ -118,7 +125,7 @@ export default function DailyPage() {
           return (
             <div
               key={d.day}
-              title={`${monthName(month, true)} ${d.day} · ${fmtIDR(d.expense)}`}
+              title={`${monthName(month, true)} ${d.day} · ${fmtMoney(d.expense, reportCurrency)}`}
               className="aspect-square relative border border-paper-rule p-1"
               style={{ backgroundColor: bg }}
             >
@@ -135,7 +142,7 @@ export default function DailyPage() {
                     ratio > 0.5 ? "text-paper" : "text-ink"
                   }`}
                 >
-                  {fmtShort(d.expense).replace("Rp ", "")}
+                  {fmtShort(d.expense, reportCurrency).replace(/^\S+\s/, "")}
                 </span>
               )}
             </div>

@@ -28,9 +28,14 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
         default_currency: currency,
         default_expense_source_id: sourceId || null,
       }),
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      qc.setQueryData(["me"], updated);
       qc.invalidateQueries({ queryKey: ["me"] });
       qc.invalidateQueries({ queryKey: ["sources"] });
+      qc.invalidateQueries({ queryKey: ["overview"] });
+      qc.invalidateQueries({ queryKey: ["monthly"] });
+      qc.invalidateQueries({ queryKey: ["daily"] });
+      qc.invalidateQueries({ queryKey: ["category-stats"] });
       setOpen(false);
     },
   });

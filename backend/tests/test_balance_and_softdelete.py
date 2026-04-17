@@ -35,9 +35,7 @@ def clean_test_source(db: Session):
     _hard_cleanup(db)
 
 
-def test_balance_reflects_transactions_and_soft_delete(
-    auth_client: TestClient, clean_test_source
-):
+def test_balance_reflects_transactions_and_soft_delete(auth_client: TestClient, clean_test_source):
     # Create a source with a known starting balance
     r = auth_client.post(
         "/sources",
@@ -86,17 +84,13 @@ def test_balance_reflects_transactions_and_soft_delete(
     assert r.status_code == 201
     income_txn = r.json()
 
-    src_after_income = next(
-        s for s in auth_client.get("/sources").json() if s["id"] == src_id
-    )
+    src_after_income = next(s for s in auth_client.get("/sources").json() if s["id"] == src_id)
     assert Decimal(src_after_income["current_balance"]) == Decimal("1250.00")
 
     # Soft-delete the expense → balance should rise by 250
     r = auth_client.delete(f"/transactions/{txn['id']}")
     assert r.status_code == 204
-    src_after_delete = next(
-        s for s in auth_client.get("/sources").json() if s["id"] == src_id
-    )
+    src_after_delete = next(s for s in auth_client.get("/sources").json() if s["id"] == src_id)
     assert Decimal(src_after_delete["current_balance"]) == Decimal("1500.00")
 
     # Soft-deleted transaction should not appear in listings
@@ -105,12 +99,10 @@ def test_balance_reflects_transactions_and_soft_delete(
     assert income_txn["id"] in listed_ids
 
 
-def test_cannot_delete_source_with_transactions(
+def test_deleting_source_with_transactions_deactivates_source(
     auth_client: TestClient, clean_test_source
 ):
-    r = auth_client.post(
-        "/sources", json={"name": TEST_SOURCE_NAME, "starting_balance": "0"}
-    )
+    r = auth_client.post("/sources", json={"name": TEST_SOURCE_NAME, "starting_balance": "0"})
     src_id = r.json()["id"]
     food = next(c for c in auth_client.get("/categories").json() if c["name"] == "Food")
     auth_client.post(
@@ -125,4 +117,11 @@ def test_cannot_delete_source_with_transactions(
     )
 
     r = auth_client.delete(f"/sources/{src_id}")
-    assert r.status_code == 409
+    assert r.status_code == 204
+
+    listed_active = auth_client.get("/sources").json()
+    assert all(s["id"] != src_id for s in listed_active)
+
+    listed_all = auth_client.get("/sources?include_inactive=true").json()
+    source_row = next(s for s in listed_all if s["id"] == src_id)
+    assert source_row["active"] is False

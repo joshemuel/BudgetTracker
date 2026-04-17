@@ -1,7 +1,9 @@
+export type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
+
 export type Me = {
   id: number;
   username: string;
-  default_currency: "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
+  default_currency: CurrencyCode;
   default_expense_source_id: number | null;
 };
 
@@ -9,7 +11,7 @@ export type Source = {
   id: number;
   name: string;
   starting_balance: string;
-  currency: "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
+  currency: CurrencyCode;
   is_credit_card: boolean;
   active: boolean;
   current_balance: string;
@@ -59,6 +61,7 @@ export type OverviewBudget = {
 export type Overview = {
   year: number;
   month: number;
+  currency: CurrencyCode;
   days_in_month: number;
   today_day: number;
   totals: { income: string; expense: string; net: string };
@@ -67,10 +70,10 @@ export type Overview = {
 };
 
 export type MonthlyRow = { month: number; income: string; expense: string; net: string };
-export type Monthly = { year: number; months: MonthlyRow[] };
+export type Monthly = { year: number; currency: CurrencyCode; months: MonthlyRow[] };
 
 export type DailyRow = { day: number; income: string; expense: string };
-export type Daily = { year: number; month: number; days: DailyRow[] };
+export type Daily = { year: number; month: number; currency: CurrencyCode; days: DailyRow[] };
 
 export type CategoryStat = {
   category_id: number;

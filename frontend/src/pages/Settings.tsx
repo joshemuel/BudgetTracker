@@ -4,6 +4,7 @@ import { api } from "@/api";
 import type { Budget, Category, Source } from "@/types";
 import { fmtIDR, fmtMoney } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 const CURRENCIES = ["IDR", "SGD", "JPY", "AUD", "TWD"] as const;
 type CurrencyCode = (typeof CURRENCIES)[number];
@@ -56,6 +57,7 @@ function SourcesBlock() {
   const [currentFundsInput, setCurrentFundsInput] = useState("0");
   const [currency, setCurrency] = useState<CurrencyCode>("IDR");
   const [editing, setEditing] = useState<Source | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Source | null>(null);
   const [editName, setEditName] = useState("");
   const [editCurrentFundsInput, setEditCurrentFundsInput] = useState("0");
   const [editCurrency, setEditCurrency] = useState<CurrencyCode>("IDR");
@@ -78,7 +80,10 @@ function SourcesBlock() {
   });
   const del = useMutation({
     mutationFn: (id: number) => api.del(`/sources/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["sources"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sources"] });
+      setPendingDelete(null);
+    },
   });
   const patch = useMutation({
     mutationFn: ({ id, body }: { id: number; body: Record<string, unknown> }) =>
@@ -126,9 +131,7 @@ function SourcesBlock() {
                     edit
                   </button>
                   <button
-                    onClick={() => {
-                      if (confirm(`Delete ${s.name}?`)) del.mutate(s.id);
-                    }}
+                    onClick={() => setPendingDelete(s)}
                     className="smallcaps text-ink-mute hover:text-accent"
                   >
                     delete
@@ -222,6 +225,19 @@ function SourcesBlock() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`Delete ${pendingDelete?.name ?? "this source"}?`}
+        message="If this source has transaction history, it will be deactivated and hidden from active lists."
+        confirmLabel="Delete"
+        busy={del.isPending}
+        onClose={() => {
+          if (!del.isPending) setPendingDelete(null);
+        }}
+        onConfirm={() => {
+          if (pendingDelete) del.mutate(pendingDelete.id);
+        }}
+      />
       <form
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end"
         onSubmit={(e) => {

@@ -63,9 +63,13 @@ export function fmtCompactMoney(
   return `${symbol} ${shown}${unit}`;
 }
 
-export function fmtShort(v: string | number | null | undefined): string {
+export function fmtShort(
+  v: string | number | null | undefined,
+  currency: "IDR" | "SGD" | "JPY" | "AUD" | "TWD" = "IDR"
+): string {
   const n = toNumber(v);
-  return "Rp " + COMPACT.format(n);
+  const symbol = CURRENCY_SYMBOL[currency] ?? currency;
+  return `${symbol} ${COMPACT.format(n)}`;
 }
 
 export function fmtPct(v: number): string {
