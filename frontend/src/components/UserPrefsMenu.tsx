@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { api } from "@/api";
 import type { Me, Source } from "@/types";
 
@@ -7,7 +8,13 @@ const CURRENCIES = ["IDR", "SGD", "JPY", "AUD", "TWD"] as const;
 
 export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
   const qc = useQueryClient();
+  const nav = useNavigate();
   const [open, setOpen] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [pwError, setPwError] = useState<string | null>(null);
   const [currency, setCurrency] = useState<Me["default_currency"]>("IDR");
   const [sourceId, setSourceId] = useState<number | "">("");
 
@@ -56,6 +63,38 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
       setOpen(false);
     },
   });
+
+  const changePw = useMutation({
+    mutationFn: (body: { current_password: string; new_password: string }) =>
+      api.post("/auth/change-password", body),
+    onSuccess: () => {
+      qc.clear();
+      nav("/login", { replace: true });
+    },
+    onError: (err: Error) => {
+      setPwError(err.message || "Couldn't change password");
+    },
+  });
+
+  function resetPwForm() {
+    setCurrentPw("");
+    setNewPw("");
+    setConfirmPw("");
+    setPwError(null);
+  }
+
+  function submitPw() {
+    setPwError(null);
+    if (newPw.length < 8) {
+      setPwError("New password must be at least 8 characters");
+      return;
+    }
+    if (newPw !== confirmPw) {
+      setPwError("New passwords don't match");
+      return;
+    }
+    changePw.mutate({ current_password: currentPw, new_password: newPw });
+  }
 
   return (
     <div className="relative">
@@ -106,6 +145,79 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
             >
               Save
             </button>
+          </div>
+          <div className="mt-3 pt-3 border-t border-paper-rule">
+            <button
+              className="smallcaps text-ink-mute hover:text-accent"
+              onClick={() => {
+                setOpen(false);
+                resetPwForm();
+                setPwOpen(true);
+              }}
+            >
+              Reset password →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {pwOpen && (
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="modal-card w-full max-w-md p-6">
+            <h3 className="font-semibold mb-4">Reset password</h3>
+            <div className="space-y-3">
+              <label className="block">
+                <span className="smallcaps text-ink-mute block mb-1">Current password</span>
+                <input
+                  type="password"
+                  value={currentPw}
+                  onChange={(e) => setCurrentPw(e.target.value)}
+                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                  autoFocus
+                />
+              </label>
+              <label className="block">
+                <span className="smallcaps text-ink-mute block mb-1">New password</span>
+                <input
+                  type="password"
+                  value={newPw}
+                  onChange={(e) => setNewPw(e.target.value)}
+                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                />
+              </label>
+              <label className="block">
+                <span className="smallcaps text-ink-mute block mb-1">Confirm new password</span>
+                <input
+                  type="password"
+                  value={confirmPw}
+                  onChange={(e) => setConfirmPw(e.target.value)}
+                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                />
+              </label>
+              {pwError && <p className="text-accent text-sm">{pwError}</p>}
+              <p className="text-xs text-ink-mute">
+                You'll be signed out of every device after the change.
+              </p>
+            </div>
+            <div className="flex gap-2 mt-5 justify-end">
+              <button
+                onClick={() => {
+                  setPwOpen(false);
+                  resetPwForm();
+                }}
+                className="smallcaps px-3 py-1 border border-ink/30 rounded"
+                disabled={changePw.isPending}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitPw}
+                className="smallcaps px-3 py-1 bg-ink text-paper rounded disabled:opacity-60"
+                disabled={changePw.isPending || !currentPw || !newPw || !confirmPw}
+              >
+                {changePw.isPending ? "Saving..." : "Save"}
+              </button>
+            </div>
           </div>
         </div>
       )}

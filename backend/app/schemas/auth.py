@@ -19,3 +19,8 @@ class UserOut(BaseModel):
 class UserPreferencesUpdate(BaseModel):
     default_currency: str | None = None
     default_expense_source_id: int | None = None
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str

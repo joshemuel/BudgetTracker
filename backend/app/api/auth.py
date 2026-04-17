@@ -4,8 +4,13 @@ from sqlalchemy.orm import Session
 from app.api.deps import SESSION_COOKIE, get_current_user, get_db
 from app.config import get_settings
 from app.db.models import SessionToken, Source, User
-from app.schemas.auth import LoginRequest, UserOut, UserPreferencesUpdate
-from app.services.auth import SESSION_TTL, create_session, verify_password
+from app.schemas.auth import (
+    ChangePasswordRequest,
+    LoginRequest,
+    UserOut,
+    UserPreferencesUpdate,
+)
+from app.services.auth import SESSION_TTL, create_session, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -72,3 +77,20 @@ def update_me(
     db.commit()
     db.refresh(user)
     return user
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(
+    payload: ChangePasswordRequest,
+    response: Response,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Current password is incorrect")
+    if len(payload.new_password) < 8:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "New password must be at least 8 characters")
+    user.password_hash = hash_password(payload.new_password)
+    db.query(SessionToken).filter_by(user_id=user.id).delete()
+    db.commit()
+    response.delete_cookie(SESSION_COOKIE)
