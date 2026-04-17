@@ -16,11 +16,22 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
     queryFn: () => api.get<Source[]>('/sources'),
   });
 
+  const activeSources = (sources ?? []).filter((s) => s.active);
+
   useEffect(() => {
     if (!me) return;
     setCurrency(me.default_currency || "IDR");
-    setSourceId(me.default_expense_source_id ?? "");
   }, [me]);
+
+  useEffect(() => {
+    if (!me || activeSources.length === 0) return;
+    if (me.default_expense_source_id != null) {
+      setSourceId(me.default_expense_source_id);
+      return;
+    }
+    const bca = activeSources.find((s) => s.name.toLowerCase() === "bca");
+    setSourceId(bca ? bca.id : activeSources[0].id);
+  }, [me, sources]);
 
   const save = useMutation({
     mutationFn: () =>
@@ -81,12 +92,9 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
               onChange={(e) => setSourceId(e.target.value ? Number(e.target.value) : "")}
               className="w-full bg-transparent border-b border-ink py-1"
             >
-              <option value="">Auto</option>
-              {(sources ?? [])
-                .filter((s) => s.active)
-                .map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
+              {activeSources.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
             </select>
           </label>
           <div className="flex justify-end gap-2">
