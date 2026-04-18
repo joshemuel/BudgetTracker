@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
-from app.db.models import Category, Transaction, User
+from app.db.models import Category, Subscription, Transaction, User
 from app.schemas.common import CategoryIn, CategoryOut, CategoryUpdate
 
 router = APIRouter(prefix="/categories", tags=["categories"])
@@ -74,12 +74,23 @@ def delete_category(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Category not found")
     in_use = (
         db.query(func.count(Transaction.id))
-        .filter(Transaction.category_id == category_id, Transaction.deleted_at.is_(None))
+        .filter(Transaction.category_id == category_id, Transaction.user_id == user.id)
         .scalar()
     )
     if in_use:
         raise HTTPException(
             status.HTTP_409_CONFLICT, f"Category has {in_use} transactions"
         )
+
+    sub_use = (
+        db.query(func.count(Subscription.id))
+        .filter(Subscription.category_id == category_id, Subscription.user_id == user.id)
+        .scalar()
+    )
+    if sub_use:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, f"Category has {sub_use} subscriptions"
+        )
+
     db.delete(cat)
     db.commit()
