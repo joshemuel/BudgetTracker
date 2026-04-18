@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Me } from "@/types";
 import { monthName } from "@/lib/format";
+import { startSyncPolling } from "@/lib/sync";
 import QuickLog from "@/components/QuickLog";
 import UserPrefsMenu from "@/components/UserPrefsMenu";
 
@@ -65,7 +66,7 @@ function Masthead({ me, onLog }: { me: Me | undefined; onLog: () => void }) {
       </div>
 
       <div className="mt-6 sm:mt-8 md:mt-10 anim-in">
-        <h1 className="display text-[32px] sm:text-[64px] md:text-[96px] lg:text-[120px] xl:text-[140px] leading-[0.9] text-ink">
+        <h1 className="display text-[28px] sm:text-[52px] md:text-[76px] lg:text-[94px] xl:text-[106px] leading-[0.92] text-ink">
           Budget <span className="display-italic text-accent">Tracker</span>
         </h1>
       </div>
@@ -107,6 +108,7 @@ function SectionNav() {
 }
 
 export default function AppShell() {
+  const qc = useQueryClient();
   const { data: me, isLoading, isError } = useQuery<Me>({
     queryKey: ["me"],
     queryFn: () => api.get<Me>("/auth/me"),
@@ -126,6 +128,11 @@ export default function AppShell() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  useEffect(() => {
+    if (!me) return;
+    return startSyncPolling(qc);
+  }, [qc, me?.id]);
 
   if (isLoading) {
     return (

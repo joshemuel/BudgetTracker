@@ -25,6 +25,7 @@ HELLO = (
 LOGIN_PROMPT = "Send `/login <username> <password>` to connect this chat to your account."
 CREDIT_HELP_EMPTY = "No credit cards configured yet."
 PENDING_SOURCE_PREFIX = "PENDING_SOURCE_CREATE"
+PENDING_SOURCE_CHOICE_PREFIX = "PENDING_SOURCE_CHOICE"
 
 
 def _user_for_chat(db: Session, chat_id: int | str) -> User | None:
@@ -76,8 +77,16 @@ def _pending_source_key(user_id: int) -> str:
     return f"{PENDING_SOURCE_PREFIX}:{user_id}"
 
 
+def _pending_source_choice_key(user_id: int) -> str:
+    return f"{PENDING_SOURCE_CHOICE_PREFIX}:{user_id}"
+
+
 def _pending_source_state(db: Session, user_id: int) -> AppState | None:
     return db.query(AppState).filter_by(key=_pending_source_key(user_id)).one_or_none()
+
+
+def _pending_source_choice_state(db: Session, user_id: int) -> AppState | None:
+    return db.query(AppState).filter_by(key=_pending_source_choice_key(user_id)).one_or_none()
 
 
 def _set_pending_source_state(
@@ -98,8 +107,37 @@ def _set_pending_source_state(
     db.commit()
 
 
+def _set_pending_source_choice_state(
+    db: Session,
+    user_id: int,
+    original_text: str,
+    items: list[dict[str, Any]],
+    target_indexes: list[int],
+    options: list[str],
+) -> None:
+    payload: dict[str, Any] = {
+        "original_text": original_text,
+        "items": items,
+        "target_indexes": target_indexes,
+        "options": options,
+    }
+    state = _pending_source_choice_state(db, user_id)
+    if state is None:
+        db.add(AppState(key=_pending_source_choice_key(user_id), value=payload))
+    else:
+        state.value = payload
+    db.commit()
+
+
 def _clear_pending_source_state(db: Session, user_id: int) -> None:
     state = _pending_source_state(db, user_id)
+    if state is not None:
+        db.delete(state)
+        db.commit()
+
+
+def _clear_pending_source_choice_state(db: Session, user_id: int) -> None:
+    state = _pending_source_choice_state(db, user_id)
     if state is not None:
         db.delete(state)
         db.commit()
@@ -151,6 +189,151 @@ def _missing_transfer_sources(items: list[dict[str, Any]], known_sources: list[s
 
 def _contains_topup_phrase(text: str) -> bool:
     return re.search(r"\btop\s*-?\s*up\b|\btopup\b", text.strip().lower()) is not None
+
+
+def _contains_credit_card_phrase(text: str) -> bool:
+    return (
+        re.search(
+            r"\bcredit\s*card\b|\bkartu\s*kredit\b|\bcc\b|\bkredit\b",
+            text.strip().lower(),
+        )
+        is not None
+    )
+
+
+def _is_generic_credit_source_label(name: str) -> bool:
+    tokens = re.sub(r"[^a-z0-9]+", " ", name.lower()).strip().split()
+    if not tokens:
+        return False
+    stop = {"my", "the", "a", "an", "nya", "ini", "that", "this", "pakai", "use"}
+    kept = [t for t in tokens if t not in stop]
+    if not kept:
+        return False
+    generic = {"credit", "card", "cc", "kredit", "kartu"}
+    return all(t in generic for t in kept)
+
+
+def _credit_source_targets(
+    items: list[dict[str, Any]],
+    original_text: str,
+    source_names: list[str],
+    credit_source_names: list[str],
+) -> list[int]:
+    if not credit_source_names:
+        return []
+
+    credit_set = {s.lower() for s in credit_source_names}
+    has_credit_phrase = _contains_credit_card_phrase(original_text)
+    targets: list[int] = []
+
+    for idx, item in enumerate(items):
+        if _is_transfer_like_item(item):
+            continue
+
+        category = str(item.get("category") or "").strip().lower()
+        raw_source = str(item.get("source") or "").strip()
+
+        if raw_source:
+            raw_generic = _is_generic_credit_source_label(raw_source)
+            resolved = resolve_source_name(raw_source, source_names, raw_source)
+            resolved_is_credit = resolved.lower() in credit_set
+
+            if raw_generic:
+                targets.append(idx)
+                continue
+
+            if category == "credit payment" and not resolved_is_credit:
+                targets.append(idx)
+            continue
+
+        if category == "credit payment" or (has_credit_phrase and len(items) == 1):
+            targets.append(idx)
+
+    return sorted(set(targets))
+
+
+def _credit_choice_prompt(options: list[str]) -> str:
+    options_text = "\n".join(f"{i + 1}. {name}" for i, name in enumerate(options))
+    return (
+        "I found multiple credit cards. Which one should I use?\n"
+        f"{options_text}\n"
+        "Reply with the number (e.g. 1) or card name. Reply 'no' to cancel."
+    )
+
+
+def _pick_source_from_reply(text: str, options: list[str]) -> str | None:
+    t = text.strip()
+    if not t:
+        return None
+    if t.isdigit():
+        idx = int(t) - 1
+        if 0 <= idx < len(options):
+            return options[idx]
+
+    resolved = resolve_source_name(t, options, "")
+    for opt in options:
+        if opt.lower() == resolved.lower():
+            return opt
+    return None
+
+
+def _handle_pending_source_choice_reply(
+    db: Session,
+    user: User,
+    chat_id: int | str,
+    text: str,
+) -> bool:
+    state = _pending_source_choice_state(db, user.id)
+    if state is None:
+        return False
+
+    value = state.value if isinstance(state.value, dict) else {}
+    options = [str(x).strip() for x in (value.get("options") or []) if str(x).strip()]
+    if len(options) < 2:
+        _clear_pending_source_choice_state(db, user.id)
+        telegram.send_message(chat_id, "That card selection expired. Please resend the transaction.")
+        return True
+
+    if _is_no(text):
+        _clear_pending_source_choice_state(db, user.id)
+        telegram.send_message(chat_id, "Got it, I cancelled that credit-card log.")
+        return True
+
+    chosen = _pick_source_from_reply(text, options)
+    if chosen is None:
+        telegram.send_message(chat_id, _credit_choice_prompt(options))
+        return True
+
+    raw_items = value.get("items") or []
+    items = [i for i in raw_items if isinstance(i, dict)]
+    targets_raw = value.get("target_indexes") or []
+    targets: list[int] = []
+    for i in targets_raw:
+        try:
+            idx = int(i)
+        except Exception:
+            continue
+        if 0 <= idx < len(items):
+            targets.append(idx)
+
+    if not items or not targets:
+        _clear_pending_source_choice_state(db, user.id)
+        telegram.send_message(chat_id, "That card selection expired. Please resend the transaction.")
+        return True
+
+    for idx in targets:
+        items[idx]["source"] = chosen
+
+    try:
+        outcome = financial.log_items(db, user, items)
+    except Exception as e:
+        log.exception("failed to log pending source choice: %s", e)
+        telegram.send_message(chat_id, "I couldn't finish that log. Please resend the transaction.")
+        return True
+
+    _clear_pending_source_choice_state(db, user.id)
+    telegram.send_message(chat_id, f"Using source '{chosen}'.\n\n{outcome.as_message()}")
+    return True
 
 
 def _handle_pending_source_reply(
@@ -220,6 +403,9 @@ def _handle_text(db: Session, user: User, chat_id: int | str, text: str) -> None
         telegram.send_message(chat_id, "Chat unbound. Send /login to reconnect.")
         return
 
+    if _handle_pending_source_choice_reply(db, user, chat_id, t):
+        return
+
     if _handle_pending_source_reply(db, user, chat_id, t):
         return
 
@@ -269,6 +455,28 @@ def _handle_text(db: Session, user: User, chat_id: int | str, text: str) -> None
             "Leo couldn't find any financial data. Try 'spent 50k on food'.",
         )
         return
+
+    active_sources = db.query(Source).filter_by(user_id=user.id, active=True).order_by(Source.name).all()
+    source_names = [s.name for s in active_sources]
+    credit_source_names = [s.name for s in active_sources if s.is_credit_card]
+
+    credit_targets = _credit_source_targets(items, t, source_names, credit_source_names)
+    if credit_targets:
+        if len(credit_source_names) == 1:
+            only = credit_source_names[0]
+            for idx in credit_targets:
+                items[idx]["source"] = only
+        elif len(credit_source_names) > 1:
+            _set_pending_source_choice_state(
+                db,
+                user.id,
+                original_text=t,
+                items=items,
+                target_indexes=credit_targets,
+                options=credit_source_names,
+            )
+            telegram.send_message(chat_id, _credit_choice_prompt(credit_source_names))
+            return
 
     missing_sources = _missing_transfer_sources(items, srcs)
     if not missing_sources and _contains_topup_phrase(t):

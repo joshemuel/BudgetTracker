@@ -27,6 +27,8 @@ def test_create_budget_defaults_to_user_default_currency(auth_client: TestClient
 
 
 def test_update_budget_currency(auth_client: TestClient):
+    me = auth_client.get("/auth/me").json()
+    user_default = me.get("default_currency", "IDR")
     cats = auth_client.get("/categories").json()
     cat_id = cats[0]["id"]
     _cleanup_budget(auth_client, cat_id)
@@ -45,7 +47,7 @@ def test_update_budget_currency(auth_client: TestClient):
         )
         assert patched.status_code == 200, patched.text
         body = patched.json()
-        assert body["currency"] == "TWD"
+        assert body["currency"] == user_default
         assert body["monthly_limit"] in ("42", "42.0", "42.00")
     finally:
         auth_client.delete(f"/budgets/{bid}")

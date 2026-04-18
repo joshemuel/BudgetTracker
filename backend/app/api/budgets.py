@@ -38,7 +38,7 @@ def create_budget(
     cat = db.query(Category).filter_by(id=payload.category_id, user_id=user.id).one_or_none()
     if cat is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown category")
-    currency = payload.currency or user.default_currency or "IDR"
+    currency = user.default_currency or "IDR"
     b = Budget(
         user_id=user.id,
         category_id=payload.category_id,
@@ -66,7 +66,10 @@ def update_budget(
     if b is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Budget not found")
     for k, v in payload.model_dump(exclude_unset=True).items():
+        if k == "currency":
+            continue
         setattr(b, k, v)
+    b.currency = user.default_currency or "IDR"
     db.commit()
     db.refresh(b)
     cat = db.get(Category, b.category_id)

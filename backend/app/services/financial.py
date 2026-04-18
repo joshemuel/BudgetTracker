@@ -4,6 +4,7 @@ them to the DB, returns confirmations + budget notes in Leo's voice."""
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -90,6 +91,44 @@ def _monthly_status(
     return spent, limit, status
 
 
+def _norm_tokens(text: str) -> list[str]:
+    return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip().split()
+
+
+def _base_token(token: str) -> str:
+    if token.endswith("ies") and len(token) > 3:
+        return token[:-3] + "y"
+    if token.endswith("s") and len(token) > 3:
+        return token[:-1]
+    return token
+
+
+def _resolve_category_name(parsed: str | None, valid: list[str], default: str) -> str:
+    if not parsed:
+        return default
+
+    p = " ".join(_norm_tokens(str(parsed)))
+    if not p:
+        return default
+    p_base = " ".join(_base_token(t) for t in p.split())
+
+    normalized: list[tuple[str, str, str]] = []
+    for v in valid:
+        n = " ".join(_norm_tokens(v))
+        n_base = " ".join(_base_token(t) for t in n.split())
+        normalized.append((v, n, n_base))
+
+    for v, n, n_base in normalized:
+        if n == p or n_base == p_base:
+            return v
+
+    for v, n, n_base in normalized:
+        if p in n or n in p or p_base in n_base or n_base in p_base:
+            return v
+
+    return default
+
+
 def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcome:
     """Apply a batch of parsed transactions. Items shape:
       { type: "Income"|"Expense"|"expense"|"income",
@@ -109,6 +148,7 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
         db.flush()
         categories = [fallback]
     cat_by_name: dict[str, Category] = {c.name.lower(): c for c in categories}
+    valid_cat_names = [c.name for c in categories]
     other_cat = cat_by_name.get("other") or categories[0]
 
     sources = db.query(Source).filter_by(user_id=user.id, active=True).all()
@@ -154,7 +194,8 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
         t_type = "income" if t_type_raw.startswith("inc") else "expense"
 
         cat_name = str(item.get("category") or "").strip()
-        category = cat_by_name.get(cat_name.lower(), other_cat)
+        resolved_cat_name = _resolve_category_name(cat_name, valid_cat_names, other_cat.name)
+        category = cat_by_name.get(resolved_cat_name.lower(), other_cat)
 
         raw_src = item.get("source")
         fallback_name = default_src.name
@@ -195,6 +236,7 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
         confirmations.append(conf)
 
         if t_type == "expense":
+            db.flush()
             ms = _monthly_status(db, user.id, category.id)
             if ms is not None:
                 spent, limit, status = ms

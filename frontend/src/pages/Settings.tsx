@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Budget, Category, Me, Source } from "@/types";
@@ -303,6 +303,8 @@ function CategoriesBlock() {
     queryFn: () => api.get<Category[]>("/categories"),
   });
   const [name, setName] = useState("");
+  const [editing, setEditing] = useState<Category | null>(null);
+  const [editName, setEditName] = useState("");
   const [pendingDelete, setPendingDelete] = useState<Category | null>(null);
   const [error, setError] = useState<string | null>(null);
   const create = useMutation({
@@ -311,8 +313,23 @@ function CategoriesBlock() {
       setName("");
       setError(null);
       qc.invalidateQueries({ queryKey: ["categories"] });
+      qc.invalidateQueries({ queryKey: ["category-stats"] });
     },
     onError: (e: Error) => setError(e.message || "Could not add category"),
+  });
+  const patch = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: Record<string, unknown> }) =>
+      api.patch(`/categories/${id}`, body),
+    onSuccess: () => {
+      setError(null);
+      setEditing(null);
+      qc.invalidateQueries({ queryKey: ["categories"] });
+      qc.invalidateQueries({ queryKey: ["category-stats"] });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["overview"] });
+      qc.invalidateQueries({ queryKey: ["budgets"] });
+    },
+    onError: (e: Error) => setError(e.message || "Could not rename category"),
   });
   const del = useMutation({
     mutationFn: (id: number) => api.del(`/categories/${id}`),
@@ -323,6 +340,7 @@ function CategoriesBlock() {
       qc.invalidateQueries({ queryKey: ["budgets"] });
       qc.invalidateQueries({ queryKey: ["overview"] });
       qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["category-stats"] });
     },
     onError: (e: Error) => {
       setPendingDelete(null);
@@ -333,22 +351,87 @@ function CategoriesBlock() {
   return (
     <section className="mt-12">
       <SectionTitle kicker="The taxonomy">Categories</SectionTitle>
-      <ul className="flex flex-wrap gap-x-4 gap-y-2 mb-6">
-        {data?.map((c) => (
-          <li key={c.id} className="flex items-center gap-1">
-            <span className="font-[450]">{c.name}</span>
-            {c.is_default && <span className="smallcaps text-ink-mute">default</span>}
-            <button
-              type="button"
-              onClick={() => setPendingDelete(c)}
-              className="smallcaps text-ink-mute hover:text-accent inline-block p-1"
-            >
-              delete
-            </button>
-          </li>
-        ))}
-      </ul>
+      <div className="-mx-2 px-2 sm:mx-0 sm:px-0 mb-6">
+        <table className="ledger-table w-full text-[11px] sm:text-[13px]">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {data?.map((c) => (
+              <tr key={c.id}>
+                <td className="font-[450]">{c.name}</td>
+                <td className="text-right whitespace-nowrap">
+                  <button
+                    onClick={() => {
+                      setEditing(c);
+                      setEditName(c.name);
+                    }}
+                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2 mr-1"
+                  >
+                    edit
+                  </button>
+                  <button
+                    onClick={() => setPendingDelete(c)}
+                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
+                  >
+                    delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {data && data.length === 0 && (
+              <tr>
+                <td colSpan={2} className="text-center text-ink-mute py-8">
+                  No categories yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
       {error && <p className="text-sm text-accent italic mb-4">{error}</p>}
+      {editing && (
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="modal-card w-full max-w-md p-6">
+            <h3 className="font-semibold mb-4">Edit: {editing.name}</h3>
+            <label className="block">
+              <span className="smallcaps text-ink-mute block mb-1">Rename</span>
+              <input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                autoFocus
+              />
+            </label>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => {
+                  if (!editing) return;
+                  const trimmed = editName.trim();
+                  if (!trimmed || trimmed === editing.name) {
+                    setEditing(null);
+                    return;
+                  }
+                  patch.mutate({ id: editing.id, body: { name: trimmed } });
+                }}
+                disabled={patch.isPending}
+                className="smallcaps px-3 py-1 bg-ink text-paper rounded disabled:opacity-60"
+              >
+                {patch.isPending ? "Saving..." : "Save"}
+              </button>
+              <button
+                onClick={() => setEditing(null)}
+                className="smallcaps px-3 py-1 border border-ink/30 rounded"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <form
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end"
         onSubmit={(e) => {
@@ -402,26 +485,18 @@ function BudgetsBlock() {
   });
   const [categoryId, setCategoryId] = useState<number | "">("");
   const [limit, setLimit] = useState("");
-  const [currency, setCurrency] = useState<CurrencyCode>(userDefault);
   const [editing, setEditing] = useState<Budget | null>(null);
   const [editLimit, setEditLimit] = useState("");
-  const [editCurrency, setEditCurrency] = useState<CurrencyCode>("IDR");
-
-  useEffect(() => {
-    setCurrency(userDefault);
-  }, [userDefault]);
 
   const save = useMutation({
     mutationFn: () =>
       api.post("/budgets", {
         category_id: Number(categoryId),
         monthly_limit: limit,
-        currency,
       }),
     onSuccess: () => {
       setCategoryId("");
       setLimit("");
-      setCurrency(userDefault);
       qc.invalidateQueries({ queryKey: ["budgets"] });
       qc.invalidateQueries({ queryKey: ["overview"] });
     },
@@ -465,7 +540,6 @@ function BudgetsBlock() {
                     onClick={() => {
                       setEditing(b);
                       setEditLimit(String(b.monthly_limit));
-                      setEditCurrency(b.currency);
                     }}
                     className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2 mr-1"
                   >
@@ -491,7 +565,7 @@ function BudgetsBlock() {
               <label className="block">
                 <span className="smallcaps text-ink-mute block mb-1">Monthly limit</span>
                 <div className="flex items-center gap-2">
-                  <span className="smallcaps text-ink-mute min-w-10">{currencySymbol(editCurrency)}</span>
+                  <span className="smallcaps text-ink-mute min-w-10">{currencySymbol(userDefault)}</span>
                   <input
                     type="number"
                     value={editLimit}
@@ -500,20 +574,6 @@ function BudgetsBlock() {
                   />
                 </div>
               </label>
-              <label className="block">
-                <span className="smallcaps text-ink-mute block mb-1">Currency</span>
-                <select
-                  value={editCurrency}
-                  onChange={(e) => setEditCurrency(e.target.value as CurrencyCode)}
-                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
-                >
-                  {CURRENCIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </label>
               <div className="flex gap-2 mt-4">
                 <button
                   onClick={() => {
@@ -521,9 +581,6 @@ function BudgetsBlock() {
                     const body: Record<string, unknown> = {};
                     if (!isSameNumeric(editLimit, editing.monthly_limit)) {
                       body.monthly_limit = editLimit || "0";
-                    }
-                    if (editCurrency !== editing.currency) {
-                      body.currency = editCurrency;
                     }
                     if (Object.keys(body).length === 0) {
                       setEditing(null);
@@ -547,7 +604,7 @@ function BudgetsBlock() {
         </div>
       )}
       <form
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end"
         onSubmit={(e) => {
           e.preventDefault();
           if (categoryId && limit) save.mutate();
@@ -573,7 +630,7 @@ function BudgetsBlock() {
         <label>
           <span className="smallcaps text-ink-mute block">Monthly limit</span>
           <div className="flex items-center gap-2">
-            <span className="smallcaps text-ink-mute min-w-10">{currencySymbol(currency)}</span>
+            <span className="smallcaps text-ink-mute min-w-10">{currencySymbol(userDefault)}</span>
             <input
               type="number"
               value={limit}
@@ -581,20 +638,6 @@ function BudgetsBlock() {
               className="bg-transparent border-b border-ink py-1 w-full num"
             />
           </div>
-        </label>
-        <label>
-          <span className="smallcaps text-ink-mute block">Currency</span>
-          <select
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
-            className="bg-transparent border-b border-ink py-1"
-          >
-            {CURRENCIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
         </label>
         <button type="submit" className="smallcaps px-3 py-1 bg-ink text-paper w-full sm:w-auto">
           Save

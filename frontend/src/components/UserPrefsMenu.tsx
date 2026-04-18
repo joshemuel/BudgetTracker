@@ -20,7 +20,7 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
 
   const { data: sources } = useQuery<Source[]>({
     queryKey: ["sources"],
-    queryFn: () => api.get<Source[]>('/sources'),
+    queryFn: () => api.get<Source[]>("/sources"),
   });
 
   const activeSources = (sources ?? []).filter((s) => s.active);
@@ -42,7 +42,7 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
 
   const save = useMutation({
     mutationFn: () =>
-      api.patch<Me>('/auth/me', {
+      api.patch<Me>("/auth/me", {
         default_currency: currency,
         default_expense_source_id: sourceId || null,
       }),
@@ -52,9 +52,11 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
       qc.removeQueries({ queryKey: ["monthly"] });
       qc.removeQueries({ queryKey: ["daily"] });
       qc.removeQueries({ queryKey: ["category-stats"] });
+      qc.removeQueries({ queryKey: ["budgets"] });
       await Promise.all([
         qc.refetchQueries({ queryKey: ["me"] }),
         qc.refetchQueries({ queryKey: ["sources"] }),
+        qc.refetchQueries({ queryKey: ["budgets"], type: "active" }),
         qc.refetchQueries({ queryKey: ["overview"], type: "active" }),
         qc.refetchQueries({ queryKey: ["monthly"], type: "active" }),
         qc.refetchQueries({ queryKey: ["daily"], type: "active" }),
@@ -75,6 +77,20 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
       setPwError(err.message || "Couldn't change password");
     },
   });
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        if (!changePw.isPending) {
+          setPwOpen(false);
+          resetPwForm();
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [changePw.isPending]);
 
   function resetPwForm() {
     setCurrentPw("");
@@ -114,7 +130,14 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-72 bg-paper border border-paper-rule p-3 shadow-lg z-50">
+        <>
+          <button
+            type="button"
+            aria-label="Close preferences"
+            className="fixed inset-0 z-40 bg-ink/25 sm:hidden"
+            onClick={() => setOpen(false)}
+          />
+          <div className="fixed top-14 left-3 right-3 max-h-[calc(100dvh-4rem)] overflow-y-auto bg-paper border border-paper-rule p-3 shadow-lg z-50 sm:absolute sm:top-full sm:left-auto sm:right-0 sm:mt-2 sm:w-72 sm:max-h-none">
           <p className="smallcaps text-ink-mute mb-2">Preferences</p>
           <label className="block mb-2">
             <span className="smallcaps text-ink-mute block mb-1">Default Currency</span>
@@ -162,7 +185,8 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
               Reset password →
             </button>
           </div>
-        </div>
+          </div>
+        </>
       )}
 
       {pwOpen && (

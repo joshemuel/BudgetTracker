@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Area,
   AreaChart,
+  Line,
+  ReferenceLine,
   CartesianGrid,
   ResponsiveContainer,
   Tooltip,
@@ -41,6 +43,47 @@ export default function DailyPage() {
       Cumulative: cum,
     };
   });
+
+  const previousMonth = month === 1 ? 12 : month - 1;
+  const previousYear = month === 1 ? year - 1 : year;
+  const { data: prevData } = useQuery<Daily>({
+    queryKey: ["daily", previousYear, previousMonth, currency, "prev"],
+    queryFn: () =>
+      api.get<Daily>(withCurrency(`/stats/daily?year=${previousYear}&month=${previousMonth}`, currency)),
+  });
+
+  const today = new Date();
+  const isCurrentMonth = today.getFullYear() === year && today.getMonth() + 1 === month;
+  const todayDay = isCurrentMonth ? today.getDate() : 0;
+
+  const previousByDay = new Map<number, number>();
+  let prevCum = 0;
+  for (const row of prevData?.days ?? []) {
+    prevCum += toNumber(row.expense);
+    previousByDay.set(row.day, prevCum);
+  }
+
+  const projectedDailyAvg =
+    isCurrentMonth && todayDay > 0 ? cum / Math.max(1, todayDay) : 0;
+
+  const chartDataWithGhost = chartData.map((row) => {
+    const prev = previousByDay.get(row.day);
+    const ghostPrev = isCurrentMonth && row.day > todayDay ? prev ?? null : null;
+    const ghostLinear =
+      isCurrentMonth && row.day > todayDay ? cum + projectedDailyAvg * (row.day - todayDay) : null;
+    return {
+      ...row,
+      GhostPrevious: ghostPrev,
+      GhostProjection: ghostLinear,
+    };
+  });
+
+  const maxGhost = Math.max(
+    1,
+    ...chartDataWithGhost.map((d) => d.Cumulative),
+    ...chartDataWithGhost.map((d) => d.GhostPrevious ?? 0),
+    ...chartDataWithGhost.map((d) => d.GhostProjection ?? 0)
+  );
   const maxExp = Math.max(1, ...days.map((d) => toNumber(d.expense)));
 
   return (
@@ -77,7 +120,7 @@ export default function DailyPage() {
 
       <div className="h-[200px] sm:h-[280px] mt-4">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={chartData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
+          <AreaChart data={chartDataWithGhost} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="cumFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#a02a1a" stopOpacity={0.35} />
@@ -92,6 +135,7 @@ export default function DailyPage() {
               tick={{ fontFamily: "JetBrains Mono", fontSize: 11 }}
               tickLine={false}
               width={72}
+              domain={[0, maxGhost]}
             />
             <Tooltip
               contentStyle={{
@@ -100,8 +144,44 @@ export default function DailyPage() {
                 borderRadius: 0,
                 fontFamily: "Instrument Sans",
               }}
-              formatter={(v: number) => fmtMoney(v, reportCurrency)}
+              formatter={(v: number, name: string) => {
+                if (name === "GhostPrevious") return [fmtMoney(v, reportCurrency), "Prev month pace"];
+                if (name === "GhostProjection") return [fmtMoney(v, reportCurrency), "Linear projection"];
+                if (name === "Cumulative") return [fmtMoney(v, reportCurrency), "Cumulative"];
+                return [fmtMoney(v, reportCurrency), name];
+              }}
               labelFormatter={(d) => `${monthName(month, true)} ${d}`}
+            />
+            {isCurrentMonth && todayDay > 0 && (
+              <ReferenceLine
+                x={todayDay}
+                stroke="#19170f"
+                strokeDasharray="4 4"
+                label={{
+                  value: "Today",
+                  fill: "#19170f",
+                  fontSize: 10,
+                  position: "insideTopRight",
+                }}
+              />
+            )}
+            <Line
+              type="monotone"
+              dataKey="GhostPrevious"
+              stroke="#877e6a"
+              strokeWidth={1.2}
+              strokeDasharray="5 4"
+              dot={false}
+              connectNulls={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="GhostProjection"
+              stroke="#b4721f"
+              strokeWidth={1.1}
+              strokeDasharray="2 4"
+              dot={false}
+              connectNulls={false}
             />
             <Area
               type="monotone"

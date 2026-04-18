@@ -108,11 +108,47 @@ def resolve_occurred_at(
 def resolve_source_name(parsed: str | None, valid: list[str], default: str) -> str:
     if not parsed:
         return default
-    p = str(parsed).strip().lower()
-    for v in valid:
-        if v.lower() == p:
+
+    def _norm(s: str) -> str:
+        return re.sub(r"[^a-z0-9]+", " ", s.lower()).strip()
+
+    p = _norm(str(parsed))
+    if not p:
+        return default
+
+    normalized: list[tuple[str, str]] = [(v, _norm(v)) for v in valid]
+
+    # Exact normalized match first.
+    for v, n in normalized:
+        if n == p:
             return v
-    for v in valid:
-        if v.lower() in p or p in v.lower():
-            return v
+
+    p_tokens = set(p.split())
+    credit_hint = bool(p_tokens.intersection({"credit", "card", "cc", "kredit"}))
+    scored: list[tuple[int, int, str]] = []
+
+    for v, n in normalized:
+        score = 0
+        n_tokens = set(n.split())
+
+        if p in n:
+            score = max(score, 60)
+        if n in p:
+            score = max(score, 50)
+
+        overlap = len(p_tokens.intersection(n_tokens))
+        if overlap:
+            score = max(score, overlap * 10)
+
+        if credit_hint and n_tokens.intersection({"credit", "card", "cc", "kredit"}):
+            score += 15
+
+        if score > 0:
+            scored.append((score, len(n), v))
+
+    if scored:
+        # Prefer stronger match, then more specific (longer) source name.
+        scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
+        return scored[0][2]
+
     return default

@@ -1,18 +1,27 @@
+from decimal import Decimal, ROUND_HALF_UP
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import SESSION_COOKIE, get_current_user, get_db
 from app.config import get_settings
-from app.db.models import SessionToken, Source, User
+from app.db.models import Budget, SessionToken, Source, User
 from app.schemas.auth import (
     ChangePasswordRequest,
     LoginRequest,
     UserOut,
     UserPreferencesUpdate,
 )
+from app.services import fx
 from app.services.auth import SESSION_TTL, create_session, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _round_currency(amount: Decimal, currency: str) -> Decimal:
+    if currency in {"IDR", "JPY"}:
+        return amount.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    return amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 @router.post("/login", response_model=UserOut)
@@ -59,6 +68,14 @@ def update_me(
         cur = payload.default_currency.upper()
         if cur not in {"IDR", "SGD", "JPY", "AUD", "TWD"}:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unsupported currency")
+        prev = (user.default_currency or "IDR").upper()
+        if cur != prev:
+            rates = fx.get_rates_cached(db)
+            budgets = db.query(Budget).filter_by(user_id=user.id).all()
+            for b in budgets:
+                converted = fx.convert(Decimal(b.monthly_limit), b.currency or prev, cur, rates)
+                b.monthly_limit = _round_currency(converted, cur)
+                b.currency = cur
         user.default_currency = cur
 
     if "default_expense_source_id" in payload.model_fields_set:

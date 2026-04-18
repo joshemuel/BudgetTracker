@@ -18,7 +18,7 @@ def list_categories(
     return (
         db.query(Category)
         .filter_by(user_id=user.id)
-        .order_by(Category.is_default.desc(), Category.name)
+        .order_by(Category.name)
         .all()
     )
 
@@ -50,8 +50,6 @@ def update_category(
     cat = db.query(Category).filter_by(id=category_id, user_id=user.id).one_or_none()
     if cat is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Category not found")
-    if cat.is_default:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Cannot rename default categories")
     for k, v in payload.model_dump(exclude_unset=True).items():
         setattr(cat, k, v)
     try:

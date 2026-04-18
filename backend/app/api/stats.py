@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
@@ -403,3 +403,14 @@ def categories_stats(
         "currency": report_currency,
         "categories": out,
     }
+
+
+@router.get("/sync")
+def sync_state(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    token = db.execute(
+        select(func.coalesce(func.max(Transaction.id), 0)).where(Transaction.user_id == user.id)
+    ).scalar_one()
+    return {"token": int(token or 0)}

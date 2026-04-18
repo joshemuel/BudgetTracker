@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "@/api";
@@ -5,6 +6,7 @@ import type { Me, Overview, Source } from "@/types";
 import { fmtCompactMoney, fmtMoney, fmtPct, monthName, toNumber } from "@/lib/format";
 import { Figure, SectionTitle } from "@/components/Figure";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
+import { SYNC_EVENT } from "@/lib/sync";
 
 const STATUS_LABEL: Record<string, string> = {
   ahead: "Ahead",
@@ -39,6 +41,22 @@ function Bar({ pct, status }: { pct: number; status: string }) {
 }
 
 export default function OverviewPage() {
+  const [freshPulse, setFreshPulse] = useState(false);
+
+  useEffect(() => {
+    let timer: number | null = null;
+    const onSync = () => {
+      setFreshPulse(true);
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => setFreshPulse(false), 1100);
+    };
+    window.addEventListener(SYNC_EVENT, onSync as EventListener);
+    return () => {
+      window.removeEventListener(SYNC_EVENT, onSync as EventListener);
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, []);
+
   const { data: me } = useQuery<Me>({
     queryKey: ["me"],
     queryFn: () => api.get<Me>("/auth/me"),
@@ -64,7 +82,7 @@ export default function OverviewPage() {
     isMobile ? fmtCompactMoney(v, ov.currency) : fmtMoney(v, ov.currency);
 
   return (
-    <div className="grid grid-cols-12 gap-3 sm:gap-6 lg:gap-8">
+    <div className={"grid grid-cols-12 gap-3 sm:gap-6 lg:gap-8 transition-colors duration-500 " + (freshPulse ? "bg-highlight/35" : "") }>
       <section className="col-span-12">
         <p className="smallcaps text-ink-mute">
           {monthName(ov.month)} MMXXVI · Day {ov.today_day} of {ov.days_in_month}

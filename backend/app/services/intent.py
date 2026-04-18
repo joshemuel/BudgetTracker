@@ -90,16 +90,25 @@ TRANSFER DETECTION: If the user says "transferred X from [Source A] to [Source B
   1. {{"type": "Expense", "category": "Untrackable", "amount": X, "source": "[Source A]" (or null if not specified), "description": "Transfer to [Source B]", "date": ..., "time": ..., "is_internal": true}}
   2. {{"type": "Income", "category": "Untrackable", "amount": X, "source": "[Source B]", "description": "Transfer from [Source A]", "date": ..., "time": ..., "is_internal": true}}
 
-CREDIT CARD PAYMENT — THIS IS THE MOST IMPORTANT RULE:
-If the text mentions paying a credit card, credit card bill, credit payment, or paying off credit, it is a CREDIT PAYMENT, NOT a regular expense.
-Phrases that mean credit payment: "paid credit card", "credit payment", "pay off credit", "paid X for credit card", "paid X credit card using [source]", "bayar kartu kredit", "bayar tagihan kartu".
+CREDIT CARD PAYMENT vs CREDIT CARD PURCHASE (IMPORTANT):
+Only classify as CREDIT PAYMENT when the user is clearly paying debt/bill/statement.
+Strong bill-payment cues: "bill", "tagihan", "statement", "outstanding", "pay off", "settle", "bayar tagihan", "bayar cicilan kartu".
+
 When it is a credit payment:
-  - Type: "Income" (this REDUCES the outstanding balance on the credit card)
+  - Type: "Income" (reduces card outstanding)
   - Category: "Credit Payment"
-  - Source: the CREDIT CARD being paid (e.g., "BCA Credit Card"), NOT the source used to pay it
+  - Source: the CREDIT CARD being paid (e.g., "BCA Credit Card")
   - Description: "Credit Payment"
   - is_internal: true
-Example: "Paid 1.4mil credit card using BCA" → Income on "BCA Credit Card", NOT Expense on BCA.
+
+If user is buying/spending USING a credit card ("spent 80k with credit card", "bought lunch pakai kartu kredit"), this is a NORMAL EXPENSE, NOT "Credit Payment".
+For card purchases:
+  - Type: "Expense"
+  - Category: best match from category list
+  - Source: the credit card source used for purchase
+  - is_internal: false unless the text is clearly an internal transfer/payment.
+
+If wording is ambiguous, prefer NORMAL EXPENSE unless there is explicit bill/debt payment language.
 
 Each object:
 - "type": strictly "Income" or "Expense"
@@ -153,7 +162,10 @@ Each: {{"intent": "log", "type": "Income"|"Expense", "category": one of [{cats}]
 DATE RULES: "yesterday" = subtract 1 day. "last Monday" = most recent Monday. Always return exact dd/MM/yyyy date. NEVER null.
 TIME RULES: Infer only from explicit temporal cues (breakfast/morning→07:00, lunch/noon→12:00, dinner/evening→19:00). Do not infer from words like "coffee" alone. If today and no time is specified, return null. If past day and no time context, return "12:00:00".
 
-CREDIT CARD PAYMENT: If paying credit card bill → Type: "Income", Category: "Credit Payment", Source: the credit card name, is_internal: true.
+CREDIT CARD PAYMENT vs PURCHASE:
+- Credit card bill/debt payment (explicit bill/statement/tagihan/pay-off language) → Type: "Income", Category: "Credit Payment", Source: credit card, is_internal: true.
+- Purchase using credit card ("spent/bought/paid ... with credit card") → normal "Expense", normal category, source = card, is_internal: false.
+- If unclear, default to normal expense.
 TRANSFER: "transferred X from A to B" / "top up B for X" → two objects (Expense on A + Income on B, both category "Untrackable", both is_internal: true).
 "40k"=40000. No emojis.
 If nothing financial, return [].

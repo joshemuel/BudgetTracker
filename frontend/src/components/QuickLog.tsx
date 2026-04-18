@@ -199,7 +199,7 @@ export default function QuickLog({ open, onClose }: Props) {
       qc.invalidateQueries({ queryKey: ["sources"] });
       qc.invalidateQueries({ queryKey: ["monthly"] });
       qc.invalidateQueries({ queryKey: ["daily"] });
-      qc.invalidateQueries({ queryKey: ["categoryStats"] });
+      qc.invalidateQueries({ queryKey: ["category-stats"] });
       onClose();
     },
     onError: (e: Error) => setError(e.message || "Could not record entry"),
@@ -220,7 +220,7 @@ export default function QuickLog({ open, onClose }: Props) {
       qc.invalidateQueries({ queryKey: ["sources"] });
       qc.invalidateQueries({ queryKey: ["monthly"] });
       qc.invalidateQueries({ queryKey: ["daily"] });
-      qc.invalidateQueries({ queryKey: ["categoryStats"] });
+      qc.invalidateQueries({ queryKey: ["category-stats"] });
       onClose();
     },
     onError: (e: Error) => setError(e.message || "Could not transfer funds"),

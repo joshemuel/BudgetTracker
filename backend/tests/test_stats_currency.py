@@ -68,34 +68,117 @@ def test_categories_stats_defaults_to_user_currency(auth_client: TestClient):
         auth_client.patch("/auth/me", json={"default_currency": original})
 
 
-def test_overview_converts_budget_from_its_own_currency(auth_client: TestClient):
-    cats = auth_client.get("/categories").json()
-    assert cats, "seed data should include categories"
-    cat_id = cats[0]["id"]
-
-    # Start clean: remove any existing budget on this category.
-    for b in auth_client.get("/budgets").json():
-        if b["category_id"] == cat_id:
-            auth_client.delete(f"/budgets/{b['id']}")
-
-    # Create a budget in SGD with limit 100.
-    created = auth_client.post(
-        "/budgets",
-        json={"category_id": cat_id, "monthly_limit": "100", "currency": "SGD"},
+def test_overview_converts_budget_from_default_currency(auth_client: TestClient):
+    me = auth_client.get("/auth/me").json()
+    original_currency = me.get("default_currency", "IDR")
+    created_cat = auth_client.post(
+        "/categories",
+        json={"name": "pytest_stats_budget_cat"},
     )
-    assert created.status_code == 201, created.text
-    assert created.json()["currency"] == "SGD"
-    budget_id = created.json()["id"]
+    assert created_cat.status_code in (201, 409), created_cat.text
+    cats = auth_client.get("/categories").json()
+    cat_id = next(c["id"] for c in cats if c["name"] == "pytest_stats_budget_cat")
 
     try:
-        # View overview in SGD — the 100 SGD limit should come back ≈100 (no FX change).
-        ov = auth_client.get("/stats/overview?currency=SGD").json()
-        row = next(b for b in ov["budgets"] if b["category_id"] == cat_id)
-        assert abs(_to_decimal(row["limit"]) - Decimal("100")) < Decimal("0.02")
+        auth_client.patch("/auth/me", json={"default_currency": "IDR"})
 
-        # View in IDR — should be much bigger (SGD→IDR FX).
+        for b in auth_client.get("/budgets").json():
+            if b["category_id"] == cat_id:
+                auth_client.delete(f"/budgets/{b['id']}")
+
+        created = auth_client.post(
+            "/budgets",
+            json={"category_id": cat_id, "monthly_limit": "100"},
+        )
+        assert created.status_code == 201, created.text
+        assert created.json()["currency"] == "IDR"
+        budget_id = created.json()["id"]
+
         ov_idr = auth_client.get("/stats/overview?currency=IDR").json()
         row_idr = next(b for b in ov_idr["budgets"] if b["category_id"] == cat_id)
-        assert _to_decimal(row_idr["limit"]) > Decimal("1000")
+        assert abs(_to_decimal(row_idr["limit"]) - Decimal("100")) < Decimal("0.02")
+
+        ov_sgd = auth_client.get("/stats/overview?currency=SGD").json()
+        row_sgd = next(b for b in ov_sgd["budgets"] if b["category_id"] == cat_id)
+        assert _to_decimal(row_sgd["limit"]) > Decimal("0")
+        assert _to_decimal(row_sgd["limit"]) < Decimal("100")
     finally:
-        auth_client.delete(f"/budgets/{budget_id}")
+        for b in auth_client.get("/budgets").json():
+            if b["category_id"] == cat_id:
+                auth_client.delete(f"/budgets/{b['id']}")
+        auth_client.delete(f"/categories/{cat_id}")
+        auth_client.patch("/auth/me", json={"default_currency": original_currency})
+
+
+def test_default_currency_change_propagates_existing_budget_currency(auth_client: TestClient):
+    me = auth_client.get("/auth/me").json()
+    original_currency = me.get("default_currency", "IDR")
+    created_cat = auth_client.post(
+        "/categories",
+        json={"name": "pytest_stats_budget_currency_cat"},
+    )
+    assert created_cat.status_code in (201, 409), created_cat.text
+    cats = auth_client.get("/categories").json()
+    cat_id = next(c["id"] for c in cats if c["name"] == "pytest_stats_budget_currency_cat")
+
+    try:
+        for b in auth_client.get("/budgets").json():
+            if b["category_id"] == cat_id:
+                auth_client.delete(f"/budgets/{b['id']}")
+
+        auth_client.patch("/auth/me", json={"default_currency": "IDR"})
+        created = auth_client.post(
+            "/budgets",
+            json={"category_id": cat_id, "monthly_limit": "150000"},
+        )
+        assert created.status_code == 201, created.text
+        bid = created.json()["id"]
+        assert created.json()["currency"] == "IDR"
+
+        changed = auth_client.patch("/auth/me", json={"default_currency": "SGD"})
+        assert changed.status_code == 200, changed.text
+
+        budgets = auth_client.get("/budgets").json()
+        target = next(b for b in budgets if b["id"] == bid)
+        assert target["currency"] == "SGD"
+        assert _to_decimal(target["monthly_limit"]) > Decimal("0")
+        assert _to_decimal(target["monthly_limit"]) < Decimal("150000")
+    finally:
+        for b in auth_client.get("/budgets").json():
+            if b["category_id"] == cat_id:
+                auth_client.delete(f"/budgets/{b['id']}")
+        auth_client.delete(f"/categories/{cat_id}")
+        auth_client.patch("/auth/me", json={"default_currency": original_currency})
+
+
+def test_sync_token_advances_after_new_transaction(auth_client: TestClient):
+    before = auth_client.get("/stats/sync")
+    assert before.status_code == 200, before.text
+    token_before = int(before.json().get("token", 0))
+
+    categories = auth_client.get("/categories").json()
+    sources = auth_client.get("/sources").json()
+    assert categories and sources
+
+    created = auth_client.post(
+        "/transactions",
+        json={
+            "occurred_at": "2026-04-18T10:00:00Z",
+            "type": "expense",
+            "category_id": categories[0]["id"],
+            "amount": "12345",
+            "source_id": sources[0]["id"],
+            "description": "sync-token-test",
+        },
+    )
+    assert created.status_code == 201, created.text
+    tx_id = created.json()["id"]
+
+    try:
+        after = auth_client.get("/stats/sync")
+        assert after.status_code == 200, after.text
+        token_after = int(after.json().get("token", 0))
+        assert token_after >= tx_id
+        assert token_after > token_before
+    finally:
+        auth_client.delete(f"/transactions/{tx_id}")
