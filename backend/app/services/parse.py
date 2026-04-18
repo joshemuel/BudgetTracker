@@ -93,7 +93,7 @@ def parse_time_hms(text: str | None) -> time | None:
 def resolve_occurred_at(
     parsed_date: str | None, parsed_time: str | None, now: datetime
 ) -> datetime:
-    """Port of resolveTime — today with no time = now, other day = 00:00:00."""
+    """Port of resolveTime — today with no time = now, other day = 12:00:00."""
     z = tz()
     d = parse_date_dmy(parsed_date) or now.astimezone(z).date()
     t = parse_time_hms(parsed_time)
@@ -101,7 +101,7 @@ def resolve_occurred_at(
         if d == now.astimezone(z).date():
             t = now.astimezone(z).time().replace(microsecond=0)
         else:
-            t = time(0, 0, 0)
+            t = time(12, 0, 0)
     return datetime.combine(d, t, tzinfo=z)
 
 

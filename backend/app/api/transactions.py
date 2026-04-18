@@ -8,8 +8,16 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.db.models import Category, Source, Transaction, User
-from app.schemas.common import TransferIn, TransactionIn, TransactionOut, TransactionUpdate
+from app.schemas.common import (
+    TransferIn,
+    TransactionIn,
+    TransactionListOut,
+    TransactionOut,
+    TransactionUpdate,
+)
 from app.services import fx
+
+TRANSFER_CATEGORY_FALLBACKS: tuple[str, ...] = ("Untrackable", "Other")
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -36,7 +44,7 @@ def _name_maps(db: Session, user_id: int) -> tuple[dict[int, str], dict[int, str
     return cats, srcs
 
 
-@router.get("", response_model=list[TransactionOut])
+@router.get("", response_model=TransactionListOut)
 def list_transactions(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -61,6 +69,7 @@ def list_transactions(
         stmt = stmt.filter(Transaction.source_id == source_id)
     if q:
         stmt = stmt.filter(Transaction.description.ilike(f"%{q}%"))
+    total = stmt.count()
     rows = (
         stmt.order_by(Transaction.occurred_at.desc(), Transaction.id.desc())
         .offset(offset)
@@ -68,7 +77,12 @@ def list_transactions(
         .all()
     )
     cats, srcs = _name_maps(db, user.id)
-    return [_to_out(t, cats, srcs) for t in rows]
+    return {
+        "items": [_to_out(t, cats, srcs) for t in rows],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.post("", response_model=TransactionOut, status_code=status.HTTP_201_CREATED)
@@ -102,9 +116,7 @@ def create_transfer(
     if from_src is None or to_src is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown source")
 
-    topup_cat = db.query(Category).filter_by(user_id=user.id, name="Top-up").one_or_none()
-    if topup_cat is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Top-up category not found")
+    transfer_cat = _transfer_category(db, user.id)
 
     rates = fx.get_rates_cached(db)
     amount_from = Decimal(payload.amount)
@@ -123,7 +135,7 @@ def create_transfer(
         user_id=user.id,
         occurred_at=payload.occurred_at,
         type="expense",
-        category_id=topup_cat.id,
+        category_id=transfer_cat.id,
         amount=amount_from,
         source_id=from_src.id,
         description=exp_desc,
@@ -134,7 +146,7 @@ def create_transfer(
         user_id=user.id,
         occurred_at=payload.occurred_at,
         type="income",
-        category_id=topup_cat.id,
+        category_id=transfer_cat.id,
         amount=amount_to,
         source_id=to_src.id,
         description=inc_desc,
@@ -205,3 +217,15 @@ def _validate_refs(db: Session, user_id: int, category_id: int, source_id: int) 
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown category")
     if db.query(Source).filter_by(id=source_id, user_id=user_id).first() is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown source")
+
+
+def _transfer_category(db: Session, user_id: int) -> Category:
+    for name in TRANSFER_CATEGORY_FALLBACKS:
+        cat = db.query(Category).filter_by(user_id=user_id, name=name).one_or_none()
+        if cat is not None:
+            return cat
+
+    cat = Category(user_id=user_id, name=TRANSFER_CATEGORY_FALLBACKS[0], is_default=False)
+    db.add(cat)
+    db.flush()
+    return cat

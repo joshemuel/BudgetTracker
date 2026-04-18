@@ -113,3 +113,10 @@ class TransactionOut(BaseModel):
     description: str | None
     transfer_group_id: UUID | None
     subscription_charge_id: int | None
+
+
+class TransactionListOut(BaseModel):
+    items: list[TransactionOut]
+    total: int
+    limit: int
+    offset: int

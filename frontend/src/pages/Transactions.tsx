@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Category, Source, Transaction, TxType } from "@/types";
+import type { Category, Source, Transaction, TransactionList, TxType } from "@/types";
 import { fmtCompactMoney, fmtDateTime, fmtMoney, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -22,6 +22,7 @@ export default function TransactionsPage() {
   const [categoryId, setCategoryId] = useState<number | "">("");
   const [sourceId, setSourceId] = useState<number | "">("");
   const [limit, setLimit] = useState(100);
+  const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [editOccurredAt, setEditOccurredAt] = useState("");
   const [editType, setEditType] = useState<TxType>("expense");
@@ -44,16 +45,28 @@ export default function TransactionsPage() {
   const qs = useMemo(() => {
     const p = new URLSearchParams();
     p.set("limit", String(limit));
+    p.set("offset", String((page - 1) * limit));
     if (categoryId) p.set("category_id", String(categoryId));
     if (sourceId) p.set("source_id", String(sourceId));
     if (q) p.set("q", q);
     return p.toString();
-  }, [q, categoryId, sourceId, limit]);
+  }, [q, categoryId, sourceId, limit, page]);
 
-  const { data: txs } = useQuery<Transaction[]>({
+  const { data } = useQuery<TransactionList>({
     queryKey: ["transactions", qs],
-    queryFn: () => api.get<Transaction[]>(`/transactions?${qs}`),
+    queryFn: () => api.get<TransactionList>(`/transactions?${qs}`),
   });
+  const txs = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const canPrev = page > 1;
+  const canNext = page < totalPages;
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const currencyBySource = useMemo(() => {
     const m: Record<number, CurrencyCode> = {};
@@ -105,7 +118,10 @@ export default function TransactionsPage() {
           <input
             type="text"
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
             placeholder="description…"
             className="mt-1 w-full bg-transparent border-b border-ink py-1"
           />
@@ -114,9 +130,10 @@ export default function TransactionsPage() {
           <span className="smallcaps text-ink-mute">Category</span>
           <select
             value={categoryId}
-            onChange={(e) =>
-              setCategoryId(e.target.value ? Number(e.target.value) : "")
-            }
+            onChange={(e) => {
+              setCategoryId(e.target.value ? Number(e.target.value) : "");
+              setPage(1);
+            }}
             className="mt-1 w-full bg-transparent border-b border-ink py-1"
           >
             <option value="">All</option>
@@ -131,9 +148,10 @@ export default function TransactionsPage() {
           <span className="smallcaps text-ink-mute">Source</span>
           <select
             value={sourceId}
-            onChange={(e) =>
-              setSourceId(e.target.value ? Number(e.target.value) : "")
-            }
+            onChange={(e) => {
+              setSourceId(e.target.value ? Number(e.target.value) : "");
+              setPage(1);
+            }}
             className="mt-1 w-full bg-transparent border-b border-ink py-1"
           >
             <option value="">All</option>
@@ -148,7 +166,10 @@ export default function TransactionsPage() {
           <span className="smallcaps text-ink-mute">Rows</span>
           <select
             value={limit}
-            onChange={(e) => setLimit(Number(e.target.value))}
+            onChange={(e) => {
+              setLimit(Number(e.target.value));
+              setPage(1);
+            }}
             className="mt-1 w-full bg-transparent border-b border-ink py-1"
           >
             {[50, 100, 250, 500].map((n) => (
@@ -173,7 +194,7 @@ export default function TransactionsPage() {
             </tr>
           </thead>
           <tbody>
-            {txs?.map((t) => (
+            {txs.map((t) => (
               <tr key={t.id}>
                 <td className="num text-ink-soft text-sm">{fmtDateTime(t.occurred_at)}</td>
                 <td className="font-[450]">
@@ -218,7 +239,7 @@ export default function TransactionsPage() {
                 </td>
               </tr>
             ))}
-            {txs && txs.length === 0 && (
+            {txs.length === 0 && (
               <tr>
                 <td colSpan={6} className="text-center text-ink-mute py-8">
                   Nothing to report.
@@ -228,6 +249,32 @@ export default function TransactionsPage() {
           </tbody>
         </table>
       </div>
+
+      {total > 0 && (
+        <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <p className="smallcaps text-ink-mute">
+            Page {page} of {totalPages} · {total} total
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => canPrev && setPage((p) => p - 1)}
+              disabled={!canPrev}
+              className="smallcaps px-3 py-1 border border-ink/30 rounded disabled:opacity-40"
+            >
+              Prev
+            </button>
+            <button
+              type="button"
+              onClick={() => canNext && setPage((p) => p + 1)}
+              disabled={!canNext}
+              className="smallcaps px-3 py-1 border border-ink/30 rounded disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
       {editing && (
         <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="modal-card w-full max-w-lg p-6">

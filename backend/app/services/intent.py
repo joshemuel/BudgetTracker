@@ -73,21 +73,22 @@ DATE RESOLUTION RULES:
 
 TIME INFERENCE RULES:
 - If user gives an explicit time ("at 3pm", "around 10am"), use it.
-- If no explicit time, INFER from meal/activity context:
-  - "breakfast", "morning coffee", "coffee", "nasi pagi" → "07:00:00"
-  - "lunch", "makan siang" → "12:00:00"
-  - "dinner", "makan malam" → "19:00:00"
-  - "snack", "jajanan" → "15:00:00"
+- If no explicit time, only infer when there is a clear temporal cue:
+  - "breakfast", "morning" → "07:00:00"
+  - "lunch", "noon", "makan siang" → "12:00:00"
+  - "dinner", "evening", "makan malam" → "19:00:00"
+  - "snack", "afternoon", "jajanan" → "15:00:00"
   - "midnight", "late night" → "23:00:00"
-- If the date is TODAY and no time can be inferred, return null (system will use current time).
-- If the date is a PAST DAY and no time can be inferred, return "00:00:00".
+- NEVER infer time from item/category words alone (example: "coffee" alone is not a time cue).
+- If the date is TODAY and no explicit time is given, return null (system will use current time).
+- If the date is a PAST DAY and no explicit time can be inferred, return "12:00:00".
 
 The message may contain MULTIPLE transactions. Return a JSON ARRAY of objects.
 Even if there is only one transaction, wrap it in an array.
 
-TRANSFER DETECTION: If the user says "transferred X from [Source A] to [Source B]" or "moved X from A to B" or "topup X from A to B", return TWO objects:
-  1. {{"type": "Expense", "category": "Top-up", "amount": X, "source": "[Source A]", "description": "Transfer to [Source B]", "date": ..., "time": ...}}
-  2. {{"type": "Income", "category": "Top-up", "amount": X, "source": "[Source B]", "description": "Transfer from [Source A]", "date": ..., "time": ...}}
+TRANSFER DETECTION: If the user says "transferred X from [Source A] to [Source B]", "moved X from A to B", "topup X from A to B", or "top up [Source B] for X", return TWO objects:
+  1. {{"type": "Expense", "category": "Untrackable", "amount": X, "source": "[Source A]" (or null if not specified), "description": "Transfer to [Source B]", "date": ..., "time": ..., "is_internal": true}}
+  2. {{"type": "Income", "category": "Untrackable", "amount": X, "source": "[Source B]", "description": "Transfer from [Source A]", "date": ..., "time": ..., "is_internal": true}}
 
 CREDIT CARD PAYMENT — THIS IS THE MOST IMPORTANT RULE:
 If the text mentions paying a credit card, credit card bill, credit payment, or paying off credit, it is a CREDIT PAYMENT, NOT a regular expense.
@@ -107,7 +108,7 @@ Each object:
 - "description": short description. Fix typos. Proper capitalization. No emojis.
 - "date": "dd/MM/yyyy". NEVER null — always resolve to an exact date.
 - "time": "HH:mm:ss" or null (only null if date is today and no time context).
-- "source": one of [{srcs}] or null. If no source mentioned, return null.
+- "source": source name explicitly mentioned by the user, or null if absent. It may be outside [{srcs}] when user mentions a new source.
 
 If no clear financial data, return an empty array [].
 """
@@ -150,10 +151,10 @@ IF LOGGING: a JSON ARRAY of transaction objects (even for single transaction).
 Each: {{"intent": "log", "type": "Income"|"Expense", "category": one of [{cats}], "amount": int, "description": str, "date": "dd/MM/yyyy", "time": "HH:mm:ss"|null, "source": one of [{srcs}]|null, "is_internal": bool}}
 
 DATE RULES: "yesterday" = subtract 1 day. "last Monday" = most recent Monday. Always return exact dd/MM/yyyy date. NEVER null.
-TIME RULES: Infer from context (breakfast→07:00, lunch→12:00, dinner→19:00). If today and no context, return null. If past day and no context, return "00:00:00".
+TIME RULES: Infer only from explicit temporal cues (breakfast/morning→07:00, lunch/noon→12:00, dinner/evening→19:00). Do not infer from words like "coffee" alone. If today and no time is specified, return null. If past day and no time context, return "12:00:00".
 
 CREDIT CARD PAYMENT: If paying credit card bill → Type: "Income", Category: "Credit Payment", Source: the credit card name, is_internal: true.
-TRANSFER: "transferred X from A to B" → two objects (Expense on A + Income on B, both category "Top-up", both is_internal: true).
+TRANSFER: "transferred X from A to B" / "top up B for X" → two objects (Expense on A + Income on B, both category "Untrackable", both is_internal: true).
 "40k"=40000. No emojis.
 If nothing financial, return [].
 """

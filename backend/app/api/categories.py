@@ -72,8 +72,6 @@ def delete_category(
     cat = db.query(Category).filter_by(id=category_id, user_id=user.id).one_or_none()
     if cat is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Category not found")
-    if cat.is_default:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Cannot delete default categories")
     in_use = (
         db.query(func.count(Transaction.id))
         .filter(Transaction.category_id == category_id, Transaction.deleted_at.is_(None))

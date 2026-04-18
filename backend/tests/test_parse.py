@@ -52,7 +52,7 @@ def test_resolve_occurred_at_today_uses_now():
     assert dt.tzinfo is not None
 
 
-def test_resolve_occurred_at_past_day_zeroes_time():
+def test_resolve_occurred_at_past_day_defaults_to_noon():
     now = datetime.now(tz())
     dt = resolve_occurred_at("01/01/2020", None, now)
-    assert dt.isoformat().endswith("00:00:00+07:00") or dt.hour == 0
+    assert dt.isoformat().endswith("12:00:00+07:00") or dt.hour == 12

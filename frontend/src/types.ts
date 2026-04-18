@@ -47,6 +47,13 @@ export type Transaction = {
   subscription_charge_id: number | null;
 };
 
+export type TransactionList = {
+  items: Transaction[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 export type BudgetStatus = "ahead" | "on_track" | "behind" | "over";
 
 export type OverviewBudget = {

@@ -33,7 +33,6 @@ DEFAULT_CATEGORIES: list[str] = [
     "Utilities",
     "Rent",
     "Education",
-    "Top-up",
     "Salary",
     "Freelance",
     "Gift",

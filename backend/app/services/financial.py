@@ -99,10 +99,15 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
         description: str|None,
         date: "dd/MM/yyyy"|None,
         time: "HH:mm:ss"|None }
-    Top-up pairs (same amount + date + category "Top-up", one Expense + one Income)
-    get linked via transfer_group_id.
+    Internal transfer-like pairs (same amount + date, one Expense + one Income)
+    are linked via transfer_group_id.
     """
     categories = db.query(Category).filter_by(user_id=user.id).all()
+    if not categories:
+        fallback = Category(user_id=user.id, name="Other", is_default=False)
+        db.add(fallback)
+        db.flush()
+        categories = [fallback]
     cat_by_name: dict[str, Category] = {c.name.lower(): c for c in categories}
     other_cat = cat_by_name.get("other") or categories[0]
 
@@ -201,7 +206,7 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
                     )
 
     # Transfer pair detection
-    _link_transfers(created, cat_by_name.get("top-up"))
+    _link_transfers(created)
 
     db.commit()
     for tx in created:
@@ -214,13 +219,15 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
     )
 
 
-def _link_transfers(created: list[Transaction], topup_cat: Category | None) -> None:
-    if topup_cat is None:
-        return
-    topups = [t for t in created if t.category_id == topup_cat.id]
+def _link_transfers(created: list[Transaction]) -> None:
+    def _looks_like_transfer(t: Transaction) -> bool:
+        d = (t.description or "").strip().lower()
+        return d.startswith("transfer to ") or d.startswith("transfer from ")
+
+    txs = [t for t in created if _looks_like_transfer(t)]
     # pair each Expense with an Income of same amount+date
     pending: dict[tuple, Transaction] = {}
-    for t in topups:
+    for t in txs:
         key = (float(t.amount), t.occurred_at.date())
         if t.type == "expense" and key not in pending:
             pending[key] = t

@@ -20,7 +20,7 @@ def test_balance_reset_logs_untrackable_without_description(auth_client: TestCli
 
         txs = auth_client.get(f"/transactions?source_id={src_id}&limit=20")
         assert txs.status_code == 200, txs.text
-        rows = txs.json()
+        rows = txs.json()["items"]
         assert rows, "expected at least one transaction after balance reset"
 
         t = rows[0]

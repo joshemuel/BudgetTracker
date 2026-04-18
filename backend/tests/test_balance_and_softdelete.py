@@ -94,7 +94,10 @@ def test_balance_reflects_transactions_and_soft_delete(auth_client: TestClient, 
     assert Decimal(src_after_delete["current_balance"]) == Decimal("1500.00")
 
     # Soft-deleted transaction should not appear in listings
-    listed_ids = [t["id"] for t in auth_client.get(f"/transactions?source_id={src_id}").json()]
+    listed_ids = [
+        t["id"]
+        for t in auth_client.get(f"/transactions?source_id={src_id}").json()["items"]
+    ]
     assert txn["id"] not in listed_ids
     assert income_txn["id"] in listed_ids
 

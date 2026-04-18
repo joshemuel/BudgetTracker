@@ -303,11 +303,30 @@ function CategoriesBlock() {
     queryFn: () => api.get<Category[]>("/categories"),
   });
   const [name, setName] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<Category | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const create = useMutation({
     mutationFn: () => api.post("/categories", { name }),
     onSuccess: () => {
       setName("");
+      setError(null);
       qc.invalidateQueries({ queryKey: ["categories"] });
+    },
+    onError: (e: Error) => setError(e.message || "Could not add category"),
+  });
+  const del = useMutation({
+    mutationFn: (id: number) => api.del(`/categories/${id}`),
+    onSuccess: () => {
+      setError(null);
+      setPendingDelete(null);
+      qc.invalidateQueries({ queryKey: ["categories"] });
+      qc.invalidateQueries({ queryKey: ["budgets"] });
+      qc.invalidateQueries({ queryKey: ["overview"] });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+    },
+    onError: (e: Error) => {
+      setPendingDelete(null);
+      setError(e.message || "Could not delete category");
     },
   });
 
@@ -319,9 +338,17 @@ function CategoriesBlock() {
           <li key={c.id} className="flex items-center gap-1">
             <span className="font-[450]">{c.name}</span>
             {c.is_default && <span className="smallcaps text-ink-mute">default</span>}
+            <button
+              type="button"
+              onClick={() => setPendingDelete(c)}
+              className="smallcaps text-ink-mute hover:text-accent inline-block p-1"
+            >
+              delete
+            </button>
           </li>
         ))}
       </ul>
+      {error && <p className="text-sm text-accent italic mb-4">{error}</p>}
       <form
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end"
         onSubmit={(e) => {
@@ -341,6 +368,19 @@ function CategoriesBlock() {
           Add
         </button>
       </form>
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`Delete ${pendingDelete?.name ?? "this category"}?`}
+        message="If this category still has transactions, deletion will be blocked."
+        confirmLabel="Delete"
+        busy={del.isPending}
+        onClose={() => {
+          if (!del.isPending) setPendingDelete(null);
+        }}
+        onConfirm={() => {
+          if (pendingDelete) del.mutate(pendingDelete.id);
+        }}
+      />
     </section>
   );
 }

@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.db.models import AppState, Category, Source, User
 from app.services import financial, intent, query, telegram
 from app.services.auth import verify_password
-from app.services.parse import now_local
+from app.services.parse import now_local, resolve_source_name
 
 log = logging.getLogger(__name__)
 
@@ -22,6 +24,7 @@ HELLO = (
 )
 LOGIN_PROMPT = "Send `/login <username> <password>` to connect this chat to your account."
 CREDIT_HELP_EMPTY = "No credit cards configured yet."
+PENDING_SOURCE_PREFIX = "PENDING_SOURCE_CREATE"
 
 
 def _user_for_chat(db: Session, chat_id: int | str) -> User | None:
@@ -69,6 +72,143 @@ def _names(db: Session, user_id: int) -> tuple[list[str], list[str]]:
     return cats, srcs
 
 
+def _pending_source_key(user_id: int) -> str:
+    return f"{PENDING_SOURCE_PREFIX}:{user_id}"
+
+
+def _pending_source_state(db: Session, user_id: int) -> AppState | None:
+    return db.query(AppState).filter_by(key=_pending_source_key(user_id)).one_or_none()
+
+
+def _set_pending_source_state(
+    db: Session,
+    user_id: int,
+    source_name: str,
+    original_text: str,
+) -> None:
+    payload = {
+        "source_name": source_name,
+        "original_text": original_text,
+    }
+    state = _pending_source_state(db, user_id)
+    if state is None:
+        db.add(AppState(key=_pending_source_key(user_id), value=payload))
+    else:
+        state.value = payload
+    db.commit()
+
+
+def _clear_pending_source_state(db: Session, user_id: int) -> None:
+    state = _pending_source_state(db, user_id)
+    if state is not None:
+        db.delete(state)
+        db.commit()
+
+
+def _is_yes(text: str) -> bool:
+    t = text.strip().lower()
+    return t in {"y", "yes", "ya", "yep", "ok", "oke", "create", "create it"}
+
+
+def _is_no(text: str) -> bool:
+    t = text.strip().lower()
+    return t in {"n", "no", "nope", "cancel", "skip"}
+
+
+def _is_transfer_like_item(item: dict[str, Any]) -> bool:
+    if item.get("is_internal") is True:
+        return True
+    desc = str(item.get("description") or "").strip().lower()
+    return desc.startswith("transfer to ") or desc.startswith("transfer from ")
+
+
+def _missing_sources(items: list[dict[str, Any]], known_sources: list[str]) -> list[str]:
+    known = {s.lower() for s in known_sources}
+    missing: list[str] = []
+    seen: set[str] = set()
+
+    for item in items:
+        if not _is_transfer_like_item(item):
+            continue
+        raw = str(item.get("source") or "").strip()
+        if not raw:
+            continue
+        resolved = resolve_source_name(raw, known_sources, raw)
+        if resolved.lower() in known:
+            continue
+        key = raw.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        missing.append(raw)
+    return missing
+
+
+def _missing_transfer_sources(items: list[dict[str, Any]], known_sources: list[str]) -> list[str]:
+    transfers = [item for item in items if _is_transfer_like_item(item)]
+    return _missing_sources(transfers, known_sources)
+
+
+def _contains_topup_phrase(text: str) -> bool:
+    return re.search(r"\btop\s*-?\s*up\b|\btopup\b", text.strip().lower()) is not None
+
+
+def _handle_pending_source_reply(
+    db: Session,
+    user: User,
+    chat_id: int | str,
+    text: str,
+) -> bool:
+    state = _pending_source_state(db, user.id)
+    if state is None:
+        return False
+
+    source_name = str(state.value.get("source_name") or "").strip()
+    original_text = str(state.value.get("original_text") or "").strip()
+    if not source_name or not original_text:
+        db.delete(state)
+        db.commit()
+        return False
+
+    if _is_no(text):
+        db.delete(state)
+        db.commit()
+        telegram.send_message(chat_id, "Got it, I won't create that source.")
+        return True
+
+    if not _is_yes(text):
+        telegram.send_message(
+            chat_id,
+            f"Create source '{source_name}'? Reply 'yes' to create or 'no' to cancel.",
+        )
+        return True
+
+    src = Source(
+        user_id=user.id,
+        name=source_name,
+        currency=(user.default_currency or "IDR").upper(),
+        starting_balance=0,
+        is_credit_card=False,
+        active=True,
+    )
+    db.add(src)
+    db.delete(state)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        _clear_pending_source_state(db, user.id)
+        telegram.send_message(
+            chat_id,
+            f"Source '{source_name}' already exists now. I'll use it.",
+        )
+    else:
+        telegram.send_message(chat_id, f"Created source '{source_name}'. Logging it now.")
+
+    _handle_text(db, user, chat_id, original_text)
+    return True
+
+
 def _handle_text(db: Session, user: User, chat_id: int | str, text: str) -> None:
     t = text.strip()
     if t == "/start" or t == "/help":
@@ -79,6 +219,10 @@ def _handle_text(db: Session, user: User, chat_id: int | str, text: str) -> None
         db.commit()
         telegram.send_message(chat_id, "Chat unbound. Send /login to reconnect.")
         return
+
+    if _handle_pending_source_reply(db, user, chat_id, t):
+        return
+
     cats, srcs = _names(db, user.id)
     itn = intent.classify(t, cats, srcs)
     kind = itn.get("type", "log")
@@ -125,6 +269,19 @@ def _handle_text(db: Session, user: User, chat_id: int | str, text: str) -> None
             "Leo couldn't find any financial data. Try 'spent 50k on food'.",
         )
         return
+
+    missing_sources = _missing_transfer_sources(items, srcs)
+    if not missing_sources and _contains_topup_phrase(t):
+        missing_sources = _missing_sources(items, srcs)
+    if missing_sources:
+        missing = missing_sources[0]
+        _set_pending_source_state(db, user.id, missing, t)
+        telegram.send_message(
+            chat_id,
+            f"I couldn't find source '{missing}'. Create it now? Reply 'yes' to create or 'no' to cancel.",
+        )
+        return
+
     outcome = financial.log_items(db, user, items)
     telegram.send_message(chat_id, outcome.as_message())
 
