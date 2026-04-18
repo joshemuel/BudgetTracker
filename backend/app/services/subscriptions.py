@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Category, Source, Subscription, SubscriptionCharge, Transaction, User
 from app.db.session import SessionLocal
+from app.services import fx
 from app.services import telegram
 from app.services.parse import format_number, now_local
 
@@ -116,6 +117,16 @@ def confirm_charge(db: Session, user: User, charge_id: int) -> Transaction | Non
     sub = db.get(Subscription, charge.subscription_id)
     if sub is None:
         return None
+    source = db.get(Source, sub.source_id)
+    if source is None:
+        return None
+
+    charge_amount = Decimal(sub.amount)
+    source_currency = source.currency or "IDR"
+    sub_currency = sub.currency or source_currency
+    if sub_currency != source_currency:
+        rates = fx.get_rates_cached(db)
+        charge_amount = fx.convert(charge_amount, sub_currency, source_currency, rates)
 
     occurred = datetime.combine(charge.due_date, datetime.min.time()).replace(tzinfo=timezone.utc)
     tx = Transaction(
@@ -123,7 +134,7 @@ def confirm_charge(db: Session, user: User, charge_id: int) -> Transaction | Non
         occurred_at=occurred,
         type="expense",
         category_id=sub.category_id,
-        amount=sub.amount,
+        amount=charge_amount,
         source_id=sub.source_id,
         description=f"{sub.name} (subscription)",
         subscription_charge_id=charge.id,

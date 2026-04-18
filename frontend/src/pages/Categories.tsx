@@ -61,6 +61,8 @@ export default function CategoriesPage() {
     name: r.category_name,
     value: toNumber(r.expense),
   }));
+  const pieInnerRadius = isMobile ? 46 : 70;
+  const pieOuterRadius = isMobile ? 86 : 130;
 
   return (
     <div>
@@ -88,15 +90,15 @@ export default function CategoriesPage() {
       </div>
 
       <div className="grid grid-cols-12 gap-8 mt-8">
-        <div className="col-span-12 md:col-span-5 h-[220px] sm:h-[320px]">
+        <div className="col-span-12 md:col-span-5 h-[260px] sm:h-[320px]">
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
+            <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
               <Pie
                 data={pieData}
                 dataKey="value"
                 nameKey="name"
-                innerRadius={70}
-                outerRadius={130}
+                innerRadius={pieInnerRadius}
+                outerRadius={pieOuterRadius}
                 stroke="#f5efe3"
                 strokeWidth={1}
               >

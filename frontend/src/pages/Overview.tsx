@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/api";
 import type { Me, Overview, Source } from "@/types";
 import { fmtCompactMoney, fmtMoney, fmtPct, monthName, toNumber } from "@/lib/format";
-import { Figure, SectionTitle, Pullquote } from "@/components/Figure";
+import { Figure, SectionTitle } from "@/components/Figure";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -33,9 +33,7 @@ function Bar({ pct, status }: { pct: number; status: string }) {
   return (
     <div className="w-full h-[3px] bg-paper-deep relative overflow-hidden">
       <div className={`absolute inset-y-0 left-0 ${color}`} style={{ width: `${capped * 100}%` }} />
-      {pct > 1 && (
-        <div className="absolute inset-y-0 right-0 w-[2px] bg-accent" />
-      )}
+      {pct > 1 && <div className="absolute inset-y-0 right-0 w-[2px] bg-accent" />}
     </div>
   );
 }
@@ -62,10 +60,11 @@ export default function OverviewPage() {
   const netTone = net >= 0 ? "gain" : "accent";
   const paceRatio = ov.today_day / ov.days_in_month;
   const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
+  const fmtAmount = (v: string | number) =>
+    isMobile ? fmtCompactMoney(v, ov.currency) : fmtMoney(v, ov.currency);
 
   return (
     <div className="grid grid-cols-12 gap-3 sm:gap-6 lg:gap-8">
-      {/* LEAD: a three-column editorial spread */}
       <section className="col-span-12">
         <p className="smallcaps text-ink-mute">
           {monthName(ov.month)} MMXXVI · Day {ov.today_day} of {ov.days_in_month}
@@ -78,29 +77,31 @@ export default function OverviewPage() {
       <section className="col-span-12 md:col-span-4 border-t border-ink pt-2">
         <Figure
           label="In"
-          value={fmtMoney(ov.totals.income, ov.currency)}
+          value={fmtAmount(ov.totals.income)}
           tone="gain"
           sub="Credits posted this month"
+          emphasize={isMobile}
         />
       </section>
       <section className="col-span-12 md:col-span-4 border-t border-ink pt-2">
         <Figure
           label="Out"
-          value={fmtMoney(ov.totals.expense, ov.currency)}
+          value={fmtAmount(ov.totals.expense)}
           tone="accent"
           sub="Debits posted this month"
+          emphasize={isMobile}
         />
       </section>
       <section className="col-span-12 md:col-span-4 border-t border-ink pt-2">
         <Figure
           label="Net"
-          value={fmtMoney(ov.totals.net, ov.currency)}
+          value={fmtAmount(ov.totals.net)}
           tone={netTone}
           sub={`Pace · ${fmtPct(paceRatio)} of month elapsed`}
+          emphasize={isMobile}
         />
       </section>
 
-      {/* Budget ledger */}
       <section className="col-span-12 lg:col-span-8 mt-4 sm:mt-6">
         <SectionTitle kicker="The running totals">By Category</SectionTitle>
         {ov.budgets.length === 0 ? (
@@ -116,69 +117,58 @@ export default function OverviewPage() {
             <table className="ledger-table w-full text-[11px] sm:text-[13px]">
               <thead>
                 <tr>
-                <th>Category</th>
-                <th className="text-right">Spent</th>
-                <th className="text-right">Limit</th>
-                <th className="text-right">Remaining</th>
-                <th className="w-[96px] sm:w-40">Pace</th>
-                <th className="text-right">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ov.budgets.map((b) => (
-                <tr key={b.category_id}>
-                  <td className="font-[450]">{b.category_name}</td>
-                  <td className="text-right num">
-                    {isMobile ? fmtCompactMoney(b.spent, ov.currency) : fmtMoney(b.spent, ov.currency)}
-                  </td>
-                  <td className="text-right num text-ink-mute">
-                    {isMobile ? fmtCompactMoney(b.limit, ov.currency) : fmtMoney(b.limit, ov.currency)}
-                  </td>
-                  <td
-                    className={`text-right num ${
-                      toNumber(b.remaining) < 0 ? "text-accent" : ""
-                    }`}
-                  >
-                    {isMobile
-                      ? fmtCompactMoney(b.remaining, ov.currency)
-                      : fmtMoney(b.remaining, ov.currency)}
-                  </td>
-                  <td>
-                    <Bar pct={b.pct_used} status={b.status} />
-                  </td>
-                  <td className={`text-right smallcaps ${STATUS_STYLE[b.status]}`}>
-                    {STATUS_LABEL[b.status]}
-                  </td>
+                  <th>Category</th>
+                  <th className="text-right">Spent</th>
+                  <th className="text-right">Limit</th>
+                  <th className="text-right">Remaining</th>
+                  <th className="w-[96px] sm:w-40">Pace</th>
+                  <th className="text-right">Status</th>
                 </tr>
-              ))}
-            </tbody>
+              </thead>
+              <tbody>
+                {ov.budgets.map((b) => (
+                  <tr key={b.category_id}>
+                    <td className="font-[450]">{b.category_name}</td>
+                    <td className="text-right num">{fmtAmount(b.spent)}</td>
+                    <td className="text-right num text-ink-mute">{fmtAmount(b.limit)}</td>
+                    <td
+                      className={`text-right num ${
+                        toNumber(b.remaining) < 0 ? "text-accent" : ""
+                      }`}
+                    >
+                      {fmtAmount(b.remaining)}
+                    </td>
+                    <td>
+                      <Bar pct={b.pct_used} status={b.status} />
+                    </td>
+                    <td className={`text-right smallcaps ${STATUS_STYLE[b.status]}`}>
+                      {STATUS_LABEL[b.status]}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
         )}
       </section>
 
-      {/* Credit + Accounts */}
       <aside className="col-span-12 lg:col-span-4 mt-6 space-y-10">
         <div className="border-t-2 border-ink pt-4">
           <p className="smallcaps text-ink-mute">Credit Card</p>
-          <p className="num text-3xl mt-1 text-accent">
-            {isMobile ? fmtCompactMoney(ov.credit.outstanding, ov.currency) : fmtMoney(ov.credit.outstanding, ov.currency)}
+          <p className="num text-4xl sm:text-3xl mt-1 text-accent">
+            {fmtAmount(ov.credit.outstanding)}
           </p>
           <p className="text-sm text-ink-soft mt-1">Outstanding balance (negative means payable)</p>
 
           <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
             <div>
               <p className="smallcaps text-ink-mute">This Month</p>
-              <p className="num text-accent">
-                {isMobile ? fmtCompactMoney(ov.credit.month_charges, ov.currency) : fmtMoney(ov.credit.month_charges, ov.currency)}
-              </p>
+              <p className="num text-accent">{fmtAmount(ov.credit.month_charges)}</p>
               <p className="text-ink-mute text-xs">charges</p>
             </div>
             <div>
               <p className="smallcaps text-ink-mute">Paid</p>
-              <p className="num text-gain">
-                {isMobile ? fmtCompactMoney(ov.credit.month_payments, ov.currency) : fmtMoney(ov.credit.month_payments, ov.currency)}
-              </p>
+              <p className="num text-gain">{fmtAmount(ov.credit.month_payments)}</p>
               <p className="text-ink-mute text-xs">payments</p>
             </div>
           </div>
@@ -193,12 +183,12 @@ export default function OverviewPage() {
                 <li key={s.id} className="py-2 flex justify-between items-baseline">
                   <span className="font-[450]">
                     {s.name}
-                    {s.is_credit_card && (
-                      <span className="ml-2 smallcaps text-accent">credit</span>
-                    )}
+                    {s.is_credit_card && <span className="ml-2 smallcaps text-accent">credit</span>}
                   </span>
                   <span
-                    className={`num ${s.is_credit_card ? "text-accent" : toNumber(s.current_balance) < 0 ? "text-accent" : ""}`}
+                    className={`num ${
+                      s.is_credit_card ? "text-accent" : toNumber(s.current_balance) < 0 ? "text-accent" : ""
+                    }`}
                   >
                     {new Intl.NumberFormat("de-DE", {
                       minimumFractionDigits: s.currency === "JPY" ? 0 : 2,
@@ -209,11 +199,6 @@ export default function OverviewPage() {
               ))}
           </ul>
         </div>
-
-        <Pullquote>
-          “To keep a ledger is to keep oneself honest — the pen does not lie about
-          a coffee at noon.”
-        </Pullquote>
       </aside>
     </div>
   );

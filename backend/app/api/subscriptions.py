@@ -88,9 +88,7 @@ def monthly_total(
 
 
 @router.get("", response_model=list[SubscriptionOut])
-def list_subscriptions(
-    user: User = Depends(get_current_user), db: Session = Depends(get_db)
-):
+def list_subscriptions(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = (
         db.query(Subscription)
         .filter_by(user_id=user.id)
@@ -108,6 +106,10 @@ def create_subscription(
     db: Session = Depends(get_db),
 ):
     _validate_refs(db, user.id, payload.category_id, payload.source_id)
+    source = db.query(Source).filter_by(id=payload.source_id, user_id=user.id).one_or_none()
+    if source is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown source")
+    sub_currency = payload.currency or source.currency or "IDR"
     next_billing = payload.next_billing_date or _first_billing_date(
         payload.start_date, payload.billing_day
     )
@@ -115,7 +117,7 @@ def create_subscription(
         user_id=user.id,
         name=payload.name,
         amount=payload.amount,
-        currency=payload.currency,
+        currency=sub_currency,
         source_id=payload.source_id,
         category_id=payload.category_id,
         billing_day=payload.billing_day,
@@ -202,15 +204,11 @@ def list_charges(
 
 
 @router.get("/charges/pending", response_model=list[ChargeOut])
-def list_pending(
-    user: User = Depends(get_current_user), db: Session = Depends(get_db)
-):
+def list_pending(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = (
         db.query(SubscriptionCharge, Subscription.name)
         .join(Subscription, Subscription.id == SubscriptionCharge.subscription_id)
-        .filter(
-            Subscription.user_id == user.id, SubscriptionCharge.status == "pending"
-        )
+        .filter(Subscription.user_id == user.id, SubscriptionCharge.status == "pending")
         .order_by(SubscriptionCharge.due_date)
         .all()
     )
@@ -254,9 +252,7 @@ def skip(
 
 
 @router.post("/_run_daily")
-def run_daily(
-    user: User = Depends(get_current_user), db: Session = Depends(get_db)
-):
+def run_daily(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Manual trigger (admin) — runs the same scan APScheduler runs at 07:00."""
     del user
     created = sub_svc.run_daily(db)

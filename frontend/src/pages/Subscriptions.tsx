@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Category, Me, Source, SubscriptionMonthlyTotal } from "@/types";
@@ -38,6 +38,14 @@ type Charge = {
   resolved_at: string | null;
 };
 
+function sourceCurrencyById(srcs: Source[] | undefined): Record<number, CurrencyCode> {
+  const byId: Record<number, CurrencyCode> = {};
+  (srcs ?? []).forEach((s) => {
+    byId[s.id] = s.currency as CurrencyCode;
+  });
+  return byId;
+}
+
 function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
   const { data: cats } = useQuery<Category[]>({
     queryKey: ["categories"],
@@ -51,11 +59,13 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
     queryKey: ["me"],
     queryFn: () => api.get<Me>("/auth/me"),
   });
+  const sourceCurrencyMap = useMemo(() => sourceCurrencyById(srcs), [srcs]);
   const userDefault = (me?.default_currency ?? "IDR") as CurrencyCode;
 
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<CurrencyCode>(userDefault);
+  const [customCurrency, setCustomCurrency] = useState(false);
   const [billingDay, setBillingDay] = useState(15);
   const [frequency, setFrequency] = useState<Frequency>("monthly");
   const [categoryId, setCategoryId] = useState<number | "">("");
@@ -63,8 +73,19 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
   const [startDate, setStartDate] = useState(todayISO());
 
   useEffect(() => {
-    setCurrency(userDefault);
-  }, [userDefault]);
+    if (!customCurrency) setCurrency(userDefault);
+  }, [userDefault, customCurrency]);
+
+  useEffect(() => {
+    if (sourceId === "") {
+      if (!customCurrency) setCurrency(userDefault);
+      return;
+    }
+    if (!customCurrency) {
+      const sourceCurrency = sourceCurrencyMap[sourceId];
+      if (sourceCurrency) setCurrency(sourceCurrency);
+    }
+  }, [sourceId, sourceCurrencyMap, customCurrency, userDefault]);
 
   const create = useMutation({
     mutationFn: () =>
@@ -78,7 +99,10 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
         frequency,
         start_date: startDate,
       }),
-    onSuccess: onDone,
+    onSuccess: () => {
+      setCustomCurrency(false);
+      onDone();
+    },
   });
 
   return (
@@ -111,7 +135,10 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
         <span className="smallcaps text-ink-mute block">Currency</span>
         <select
           value={currency}
-          onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
+          onChange={(e) => {
+            setCustomCurrency(true);
+            setCurrency(e.target.value as CurrencyCode);
+          }}
           className="bg-transparent border-b border-ink py-1 w-full"
         >
           {CURRENCIES.map((c) => (
@@ -120,6 +147,9 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
             </option>
           ))}
         </select>
+        <p className="text-xs text-ink-mute mt-1">
+          Defaults to source currency, editable anytime.
+        </p>
       </label>
       <label>
         <span className="smallcaps text-ink-mute block">Billing day</span>
@@ -417,11 +447,24 @@ function EditSubscriptionModal({
   const [currency, setCurrency] = useState<CurrencyCode>(
     (subscription.currency as CurrencyCode) || "IDR"
   );
+  const [customCurrency, setCustomCurrency] = useState(true);
   const [billingDay, setBillingDay] = useState(subscription.billing_day);
   const [frequency, setFrequency] = useState<Frequency>(subscription.frequency);
   const [categoryId, setCategoryId] = useState(subscription.category_id);
   const [sourceId, setSourceId] = useState(subscription.source_id);
   const [active, setActive] = useState(subscription.active);
+
+  const sourceCurrencyMap = useMemo(() => sourceCurrencyById(srcs), [srcs]);
+
+  useEffect(() => {
+    const sourceCurrency = sourceCurrencyMap[sourceId];
+    if (!sourceCurrency) return;
+    if (sourceCurrency === currency) {
+      setCustomCurrency(false);
+      return;
+    }
+    setCustomCurrency(true);
+  }, [sourceCurrencyMap, sourceId, currency]);
 
   const patch = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
@@ -459,7 +502,10 @@ function EditSubscriptionModal({
             <span className="smallcaps text-ink-mute block mb-1">Currency</span>
             <select
               value={currency}
-              onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
+              onChange={(e) => {
+                setCustomCurrency(true);
+                setCurrency(e.target.value as CurrencyCode);
+              }}
               className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
             >
               {CURRENCIES.map((c) => (
@@ -468,6 +514,7 @@ function EditSubscriptionModal({
                 </option>
               ))}
             </select>
+            <p className="text-xs text-ink-mute mt-1">Billing converts to source currency.</p>
           </label>
           <label>
             <span className="smallcaps text-ink-mute block mb-1">Billing day</span>
@@ -495,7 +542,14 @@ function EditSubscriptionModal({
             <span className="smallcaps text-ink-mute block mb-1">Source</span>
             <select
               value={sourceId}
-              onChange={(e) => setSourceId(Number(e.target.value))}
+              onChange={(e) => {
+                const nextSourceId = Number(e.target.value);
+                setSourceId(nextSourceId);
+                const sourceCurrency = sourceCurrencyMap[nextSourceId];
+                if (!customCurrency && sourceCurrency) {
+                  setCurrency(sourceCurrency);
+                }
+              }}
               className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
             >
               {srcs?.map((s) => (

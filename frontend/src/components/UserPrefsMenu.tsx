@@ -100,12 +100,16 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-8 h-8 rounded-full border border-ink text-ink hover:bg-ink hover:text-paper transition-colors flex items-center justify-center"
+        className="w-8 h-8 rounded-sm border border-ink text-ink hover:bg-ink hover:text-paper transition-colors flex items-center justify-center"
         title="Preferences"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <circle cx="12" cy="12" r="3.5" />
-          <path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a1.5 1.5 0 1 1-2.1 2.1l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V19a1.5 1.5 0 1 1-3 0v-.1a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a1.5 1.5 0 0 1-2.1-2.1l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H5a1.5 1.5 0 1 1 0-3h.1a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a1.5 1.5 0 1 1 2.1-2.1l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9V5a1.5 1.5 0 1 1 3 0v.1a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a1.5 1.5 0 1 1 2.1 2.1l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6H19a1.5 1.5 0 1 1 0 3h-.1a1 1 0 0 0-.9.6Z" />
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="square" strokeLinejoin="miter">
+          <path d="M4 8h16" />
+          <path d="M4 12h16" />
+          <path d="M4 16h16" />
+          <circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none" />
+          <circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none" />
+          <circle cx="11" cy="16" r="1.5" fill="currentColor" stroke="none" />
         </svg>
       </button>
 

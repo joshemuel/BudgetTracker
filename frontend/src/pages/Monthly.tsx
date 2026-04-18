@@ -30,6 +30,8 @@ export default function MonthlyPage() {
   const reportCurrency = data?.currency ?? currency;
 
   const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
+  const fmtAmount = (v: string | number) =>
+    isMobile ? fmtCompactMoney(v, reportCurrency) : fmtMoney(v, reportCurrency);
 
   const chartData =
     data?.months.map((m) => ({
@@ -74,15 +76,11 @@ export default function MonthlyPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 border-t border-ink pt-4">
         <div>
           <p className="smallcaps text-ink-mute">YTD In</p>
-          <p className="num text-2xl text-gain">
-            {isMobile ? fmtCompactMoney(totals.income, reportCurrency) : fmtMoney(totals.income, reportCurrency)}
-          </p>
+          <p className="num text-2xl text-gain">{fmtAmount(totals.income)}</p>
         </div>
         <div>
           <p className="smallcaps text-ink-mute">YTD Out</p>
-          <p className="num text-2xl text-accent">
-            {isMobile ? fmtCompactMoney(totals.expense, reportCurrency) : fmtMoney(totals.expense, reportCurrency)}
-          </p>
+          <p className="num text-2xl text-accent">{fmtAmount(totals.expense)}</p>
         </div>
         <div>
           <p className="smallcaps text-ink-mute">YTD Net</p>
@@ -91,9 +89,7 @@ export default function MonthlyPage() {
               totals.income - totals.expense >= 0 ? "text-gain" : "text-accent"
             }`}
           >
-            {isMobile
-              ? fmtCompactMoney(totals.income - totals.expense, reportCurrency)
-              : fmtMoney(totals.income - totals.expense, reportCurrency)}
+            {fmtAmount(totals.income - totals.expense)}
           </p>
         </div>
       </div>
@@ -144,14 +140,14 @@ export default function MonthlyPage() {
             {data?.months.map((m) => (
               <tr key={m.month}>
                 <td className="font-[450]">{monthName(m.month)}</td>
-                <td className="text-right num text-gain">{fmtMoney(m.income, reportCurrency)}</td>
-                <td className="text-right num text-accent">{fmtMoney(m.expense, reportCurrency)}</td>
+                <td className="text-right num text-gain">{fmtAmount(m.income)}</td>
+                <td className="text-right num text-accent">{fmtAmount(m.expense)}</td>
                 <td
                   className={`text-right num ${
                     toNumber(m.net) >= 0 ? "text-gain" : "text-accent"
                   }`}
                 >
-                  {fmtMoney(m.net, reportCurrency)}
+                  {fmtAmount(m.net)}
                 </td>
               </tr>
             ))}

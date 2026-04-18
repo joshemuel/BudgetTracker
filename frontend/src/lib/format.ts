@@ -11,10 +11,16 @@ const CURRENCY_SYMBOL: Record<string, string> = {
   TWD: "NT$",
 };
 
-const COMPACT = new Intl.NumberFormat("en-US", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
+function compactKM(n: number): string | null {
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) {
+    return `${(n / 1_000_000).toFixed(2)}M`;
+  }
+  if (abs >= 1_000) {
+    return `${(n / 1_000).toFixed(2)}k`;
+  }
+  return null;
+}
 
 export function toNumber(v: string | number | null | undefined): number {
   if (v == null || v === "") return 0;
@@ -44,23 +50,10 @@ export function fmtCompactMoney(
   currency: "IDR" | "SGD" | "JPY" | "AUD" | "TWD" = "IDR"
 ): string {
   const n = toNumber(v);
-  const abs = Math.abs(n);
-  let unit = "";
-  let value = n;
-  if (abs >= 1_000_000_000) {
-    value = n / 1_000_000_000;
-    unit = "b";
-  } else if (abs >= 1_000_000) {
-    value = n / 1_000_000;
-    unit = "m";
-  } else if (abs >= 1_000) {
-    value = n / 1_000;
-    unit = "k";
-  }
   const symbol = CURRENCY_SYMBOL[currency] ?? currency;
-  if (!unit) return fmtMoney(n, currency);
-  const shown = Number(value.toFixed(1));
-  return `${symbol} ${shown}${unit}`;
+  const compact = compactKM(n);
+  if (!compact) return fmtMoney(n, currency);
+  return `${symbol} ${compact}`;
 }
 
 export function fmtShort(
@@ -69,7 +62,15 @@ export function fmtShort(
 ): string {
   const n = toNumber(v);
   const symbol = CURRENCY_SYMBOL[currency] ?? currency;
-  return `${symbol} ${COMPACT.format(n)}`;
+  const compact = compactKM(n);
+  if (compact) return `${symbol} ${compact}`;
+
+  const fixedDecimals = currency === "JPY" ? 0 : 2;
+  const nf = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: fixedDecimals,
+    maximumFractionDigits: fixedDecimals,
+  });
+  return `${symbol} ${nf.format(n)}`;
 }
 
 export function fmtPct(v: number): string {
