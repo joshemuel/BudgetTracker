@@ -56,32 +56,59 @@ export default function DailyPage() {
   const isCurrentMonth = today.getFullYear() === year && today.getMonth() + 1 === month;
   const todayDay = isCurrentMonth ? today.getDate() : 0;
 
+  const previousDays = prevData?.days ?? [];
   const previousByDay = new Map<number, number>();
   let prevCum = 0;
-  for (const row of prevData?.days ?? []) {
+  for (const row of previousDays) {
     prevCum += toNumber(row.expense);
     previousByDay.set(row.day, prevCum);
   }
 
-  const projectedDailyAvg =
-    isCurrentMonth && todayDay > 0 ? cum / Math.max(1, todayDay) : 0;
+  const previousMonthLastDay = previousDays.length
+    ? previousDays[previousDays.length - 1].day
+    : 0;
+  const trailingCount = Math.min(7, previousDays.length);
+  const trailingExpenseAvg =
+    trailingCount > 0
+      ? previousDays
+          .slice(previousDays.length - trailingCount)
+          .reduce((sum, d) => sum + toNumber(d.expense), 0) / trailingCount
+      : 0;
+
+  const previousCumulativeAt = (day: number): number | null => {
+    if (previousMonthLastDay === 0) return null;
+    if (day <= previousMonthLastDay) {
+      return previousByDay.get(day) ?? null;
+    }
+    const last = previousByDay.get(previousMonthLastDay) ?? 0;
+    return last + trailingExpenseAvg * (day - previousMonthLastDay);
+  };
+
+  const todayCumulative =
+    isCurrentMonth && todayDay > 0
+      ? (chartData.find((row) => row.day === todayDay)?.Cumulative ?? cum)
+      : 0;
+  const prevAnchorCumulative =
+    isCurrentMonth && todayDay > 0 ? (previousCumulativeAt(todayDay) ?? 0) : 0;
 
   const chartDataWithGhost = chartData.map((row) => {
-    const prev = previousByDay.get(row.day);
-    const ghostPrev = isCurrentMonth && row.day > todayDay ? prev ?? null : null;
-    const ghostLinear =
-      isCurrentMonth && row.day > todayDay ? cum + projectedDailyAvg * (row.day - todayDay) : null;
+    let ghostProjection: number | null = null;
+    if (isCurrentMonth && todayDay > 0 && row.day >= todayDay) {
+      const prevAtDay = previousCumulativeAt(row.day);
+      if (prevAtDay != null) {
+        ghostProjection = todayCumulative + Math.max(0, prevAtDay - prevAnchorCumulative);
+      }
+    }
+
     return {
       ...row,
-      GhostPrevious: ghostPrev,
-      GhostProjection: ghostLinear,
+      GhostProjection: ghostProjection,
     };
   });
 
   const maxGhost = Math.max(
     1,
     ...chartDataWithGhost.map((d) => d.Cumulative),
-    ...chartDataWithGhost.map((d) => d.GhostPrevious ?? 0),
     ...chartDataWithGhost.map((d) => d.GhostProjection ?? 0)
   );
   const maxExp = Math.max(1, ...days.map((d) => toNumber(d.expense)));
@@ -145,8 +172,9 @@ export default function DailyPage() {
                 fontFamily: "Instrument Sans",
               }}
               formatter={(v: number, name: string) => {
-                if (name === "GhostPrevious") return [fmtMoney(v, reportCurrency), "Prev month pace"];
-                if (name === "GhostProjection") return [fmtMoney(v, reportCurrency), "Linear projection"];
+                if (name === "GhostProjection") {
+                  return [fmtMoney(v, reportCurrency), "Projected pace"];
+                }
                 if (name === "Cumulative") return [fmtMoney(v, reportCurrency), "Cumulative"];
                 return [fmtMoney(v, reportCurrency), name];
               }}
@@ -167,19 +195,10 @@ export default function DailyPage() {
             )}
             <Line
               type="monotone"
-              dataKey="GhostPrevious"
-              stroke="#877e6a"
-              strokeWidth={1.2}
-              strokeDasharray="5 4"
-              dot={false}
-              connectNulls={false}
-            />
-            <Line
-              type="monotone"
               dataKey="GhostProjection"
-              stroke="#b4721f"
-              strokeWidth={1.1}
-              strokeDasharray="2 4"
+              stroke="rgba(72, 129, 193, 0.68)"
+              strokeWidth={2}
+              strokeDasharray="6 4"
               dot={false}
               connectNulls={false}
             />
