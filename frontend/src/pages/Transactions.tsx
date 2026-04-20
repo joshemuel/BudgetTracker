@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Category, Source, Transaction, TransactionList, TxType } from "@/types";
 import { fmtCompactMoney, fmtDateTime, fmtMoney, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useAmountVisibility } from "@/lib/privacy";
 
 type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
 
@@ -18,6 +19,7 @@ function toLocalDateTimeInput(iso: string): string {
 
 export default function TransactionsPage() {
   const qc = useQueryClient();
+  const { showAmounts } = useAmountVisibility();
   const [q, setQ] = useState("");
   const [categoryId, setCategoryId] = useState<number | "">("");
   const [sourceId, setSourceId] = useState<number | "">("");
@@ -55,18 +57,20 @@ export default function TransactionsPage() {
   const { data } = useQuery<TransactionList>({
     queryKey: ["transactions", qs],
     queryFn: () => api.get<TransactionList>(`/transactions?${qs}`),
+    placeholderData: keepPreviousData,
   });
   const txs = data?.items ?? [];
   const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const totalPages = data ? Math.max(1, Math.ceil(total / limit)) : Math.max(1, page);
   const canPrev = page > 1;
   const canNext = page < totalPages;
 
   useEffect(() => {
+    if (!data) return;
     if (page > totalPages) {
       setPage(totalPages);
     }
-  }, [page, totalPages]);
+  }, [data, page, totalPages]);
 
   const currencyBySource = useMemo(() => {
     const m: Record<number, CurrencyCode> = {};
@@ -204,16 +208,24 @@ export default function TransactionsPage() {
                   )}
                 </td>
                 <td>{t.category_name}</td>
-                <td className="text-ink-soft">{t.source_name}</td>
+                <td className="text-ink-soft">
+                  {showAmounts ? t.source_name : <span className="masked-amount">••••••</span>}
+                </td>
                 <td
                   className={`text-right num ${
                     t.type === "expense" ? "text-accent" : "text-gain"
                   }`}
                 >
-                  {t.type === "expense" ? "−" : "+"}
-                  {isMobile
-                    ? fmtCompactMoney(toNumber(t.amount), currencyBySource[t.source_id] ?? "IDR")
-                    : fmtMoney(toNumber(t.amount), currencyBySource[t.source_id] ?? "IDR")}
+                  {showAmounts ? (
+                    <>
+                      {t.type === "expense" ? "−" : "+"}
+                      {isMobile
+                        ? fmtCompactMoney(toNumber(t.amount), currencyBySource[t.source_id] ?? "IDR")
+                        : fmtMoney(toNumber(t.amount), currencyBySource[t.source_id] ?? "IDR")}
+                    </>
+                  ) : (
+                    "••••••"
+                  )}
                 </td>
                 <td className="text-right whitespace-nowrap">
                   <button
@@ -258,17 +270,29 @@ export default function TransactionsPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => canPrev && setPage((p) => p - 1)}
+              onClick={(e) => {
+                e.preventDefault();
+                if (canPrev) {
+                  setPage((p) => p - 1);
+                  window.scrollTo({ top: document.body.scrollHeight, behavior: "instant" });
+                }
+              }}
               disabled={!canPrev}
-              className="smallcaps px-3 py-1 border border-ink/30 rounded disabled:opacity-40"
+              className="smallcaps px-3 py-1 disabled:opacity-40"
             >
               Prev
             </button>
             <button
               type="button"
-              onClick={() => canNext && setPage((p) => p + 1)}
+              onClick={(e) => {
+                e.preventDefault();
+                if (canNext) {
+                  setPage((p) => p + 1);
+                  window.scrollTo({ top: 0, behavior: "instant" });
+                }
+              }}
               disabled={!canNext}
-              className="smallcaps px-3 py-1 border border-ink/30 rounded disabled:opacity-40"
+              className="smallcaps px-3 py-1 disabled:opacity-40"
             >
               Next
             </button>

@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
@@ -17,7 +18,17 @@ from app.schemas.common import (
 )
 from app.services import fx
 
-TRANSFER_CATEGORY_FALLBACKS: tuple[str, ...] = ("Untrackable", "Other")
+SAVINGS_HINTS = {
+    "saving",
+    "savings",
+    "tabungan",
+    "invest",
+    "investment",
+    "reksadana",
+    "deposit",
+    "broker",
+    "emergency",
+}
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -116,7 +127,7 @@ def create_transfer(
     if from_src is None or to_src is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown source")
 
-    transfer_cat = _transfer_category(db, user.id)
+    transfer_cat = _transfer_category(db, user.id, to_src.name)
 
     rates = fx.get_rates_cached(db)
     amount_from = Decimal(payload.amount)
@@ -219,13 +230,18 @@ def _validate_refs(db: Session, user_id: int, category_id: int, source_id: int) 
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown source")
 
 
-def _transfer_category(db: Session, user_id: int) -> Category:
-    for name in TRANSFER_CATEGORY_FALLBACKS:
-        cat = db.query(Category).filter_by(user_id=user_id, name=name).one_or_none()
-        if cat is not None:
-            return cat
+def _is_savings_like(name: str) -> bool:
+    tokens = set(re.sub(r"[^a-z0-9]+", " ", name.lower()).strip().split())
+    return any(t in SAVINGS_HINTS for t in tokens)
 
-    cat = Category(user_id=user_id, name=TRANSFER_CATEGORY_FALLBACKS[0], is_default=False)
+
+def _transfer_category(db: Session, user_id: int, to_source_name: str) -> Category:
+    preferred = "Investment" if _is_savings_like(to_source_name) else "Top-up"
+    preferred_cat = db.query(Category).filter_by(user_id=user_id, name=preferred).one_or_none()
+    if preferred_cat is not None:
+        return preferred_cat
+
+    cat = Category(user_id=user_id, name=preferred, is_default=False)
     db.add(cat)
     db.flush()
     return cat

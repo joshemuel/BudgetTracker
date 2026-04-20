@@ -5,6 +5,7 @@ import { api } from "@/api";
 import type { Me, Overview, Source } from "@/types";
 import { fmtCompactMoney, fmtMoney, fmtPct, monthName, toNumber } from "@/lib/format";
 import { Figure, SectionTitle } from "@/components/Figure";
+import { useAmountVisibility } from "@/lib/privacy";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
 import { SYNC_EVENT } from "@/lib/sync";
 
@@ -40,7 +41,46 @@ function Bar({ pct, status }: { pct: number; status: string }) {
   );
 }
 
+function eyeButtonIcon(show: boolean) {
+  if (show) {
+    return (
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z" />
+        <circle cx="12" cy="12" r="2.5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 3l18 18" />
+      <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+      <path d="M9.4 5.3A10.2 10.2 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.3 3.9" />
+      <path d="M6.1 6.1C3.6 7.7 2 12 2 12s3.5 7 10 7c1.2 0 2.3-.2 3.3-.5" />
+    </svg>
+  );
+}
+
 export default function OverviewPage() {
+  const { showAmounts, toggleAmounts } = useAmountVisibility();
   const [freshPulse, setFreshPulse] = useState(false);
 
   useEffect(() => {
@@ -79,14 +119,32 @@ export default function OverviewPage() {
   const paceRatio = ov.today_day / ov.days_in_month;
   const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
   const fmtAmount = (v: string | number) =>
-    isMobile ? fmtCompactMoney(v, ov.currency) : fmtMoney(v, ov.currency);
+    showAmounts
+      ? isMobile
+        ? fmtCompactMoney(v, ov.currency)
+        : fmtMoney(v, ov.currency)
+      : "••••••";
+
+  const masked = (value: string) =>
+    showAmounts ? value : <span className="masked-amount">••••••</span>;
 
   return (
     <div className={"grid grid-cols-12 gap-3 sm:gap-6 lg:gap-8 transition-colors duration-500 " + (freshPulse ? "bg-highlight/35" : "") }>
       <section className="col-span-12">
-        <p className="smallcaps text-ink-mute">
-          {monthName(ov.month)} MMXXVI · Day {ov.today_day} of {ov.days_in_month}
-        </p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="smallcaps text-ink-mute">
+            {monthName(ov.month)} MMXXVI · Day {ov.today_day} of {ov.days_in_month}
+          </p>
+          <button
+            type="button"
+            onClick={toggleAmounts}
+            className="smallcaps text-ink-mute hover:text-accent inline-flex items-center gap-1"
+            title={showAmounts ? "Hide values" : "Show values"}
+          >
+            {eyeButtonIcon(showAmounts)}
+            {showAmounts ? "Hide" : "Show"}
+          </button>
+        </div>
         <h2 className="display text-2xl sm:text-3xl md:text-4xl lg:text-5xl mt-2">
           <span className="display-italic">A month</span>, in figures.
         </h2>
@@ -125,8 +183,8 @@ export default function OverviewPage() {
         {ov.budgets.length === 0 ? (
           <p className="text-ink-soft">
             No budgets set. Visit{" "}
-            <Link to="/settings" className="underline decoration-accent">
-              Settings
+            <Link to="/budgets" className="underline decoration-accent">
+              Budgets
             </Link>{" "}
             to draw your first limit.
           </p>
@@ -174,19 +232,19 @@ export default function OverviewPage() {
         <div className="border-t-2 border-ink pt-4">
           <p className="smallcaps text-ink-mute">Credit Card</p>
           <p className="num text-4xl sm:text-3xl mt-1 text-accent">
-            {fmtAmount(ov.credit.outstanding)}
+            {masked(fmtAmount(ov.credit.outstanding))}
           </p>
           <p className="text-sm text-ink-soft mt-1">Outstanding balance (negative means payable)</p>
 
           <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
             <div>
               <p className="smallcaps text-ink-mute">This Month</p>
-              <p className="num text-accent">{fmtAmount(ov.credit.month_charges)}</p>
+              <p className="num text-accent">{masked(fmtAmount(ov.credit.month_charges))}</p>
               <p className="text-ink-mute text-xs">charges</p>
             </div>
             <div>
               <p className="smallcaps text-ink-mute">Paid</p>
-              <p className="num text-gain">{fmtAmount(ov.credit.month_payments)}</p>
+              <p className="num text-gain">{masked(fmtAmount(ov.credit.month_payments))}</p>
               <p className="text-ink-mute text-xs">payments</p>
             </div>
           </div>
@@ -200,18 +258,28 @@ export default function OverviewPage() {
               .map((s) => (
                 <li key={s.id} className="py-2 flex justify-between items-baseline">
                   <span className="font-[450]">
-                    {s.name}
-                    {s.is_credit_card && <span className="ml-2 smallcaps text-accent">credit</span>}
+                    {showAmounts ? (
+                      <>
+                        {s.name}
+                        {s.is_credit_card && (
+                          <span className="ml-2 smallcaps text-accent">credit</span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="masked-amount">••••••</span>
+                    )}
                   </span>
                   <span
                     className={`num ${
                       s.is_credit_card ? "text-accent" : toNumber(s.current_balance) < 0 ? "text-accent" : ""
                     }`}
                   >
-                    {new Intl.NumberFormat("de-DE", {
-                      minimumFractionDigits: s.currency === "JPY" ? 0 : 2,
-                      maximumFractionDigits: s.currency === "JPY" ? 0 : 2,
-                    }).format(toNumber(s.current_balance))} {s.currency}
+                    {showAmounts
+                      ? `${new Intl.NumberFormat("de-DE", {
+                          minimumFractionDigits: s.currency === "JPY" ? 0 : 2,
+                          maximumFractionDigits: s.currency === "JPY" ? 0 : 2,
+                        }).format(toNumber(s.current_balance))} ${s.currency}`
+                      : "••••••"}
                   </span>
                 </li>
               ))}

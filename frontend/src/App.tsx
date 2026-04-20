@@ -5,6 +5,7 @@ import Overview from "@/pages/Overview";
 import Monthly from "@/pages/Monthly";
 import Daily from "@/pages/Daily";
 import Categories from "@/pages/Categories";
+import Budgets from "@/pages/Budgets";
 import Subscriptions from "@/pages/Subscriptions";
 import Transactions from "@/pages/Transactions";
 import Settings from "@/pages/Settings";
@@ -17,6 +18,7 @@ export default function App() {
         <Route index element={<Overview />} />
         <Route path="monthly" element={<Monthly />} />
         <Route path="daily" element={<Daily />} />
+        <Route path="budgets" element={<Budgets />} />
         <Route path="categories" element={<Categories />} />
         <Route path="subscriptions" element={<Subscriptions />} />
         <Route path="transactions" element={<Transactions />} />

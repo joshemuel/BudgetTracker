@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
+from typing import Any, Callable
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.exc import IntegrityError
@@ -26,6 +26,14 @@ LOGIN_PROMPT = "Send `/login <username> <password>` to connect this chat to your
 CREDIT_HELP_EMPTY = "No credit cards configured yet."
 PENDING_SOURCE_PREFIX = "PENDING_SOURCE_CREATE"
 PENDING_SOURCE_CHOICE_PREFIX = "PENDING_SOURCE_CHOICE"
+SendFn = Callable[[int | str, str], None]
+
+
+def _emit_message(chat_id: int | str, text: str, send_fn: SendFn | None = None) -> None:
+    if send_fn is not None:
+        send_fn(chat_id, text)
+        return
+    telegram.send_message(chat_id, text)
 
 
 def _user_for_chat(db: Session, chat_id: int | str) -> User | None:
@@ -33,15 +41,20 @@ def _user_for_chat(db: Session, chat_id: int | str) -> User | None:
     return db.query(User).filter_by(telegram_chat_id=str(chat_id)).one_or_none()
 
 
-def _handle_login(db: Session, chat_id: int | str, text: str) -> None:
+def _handle_login(
+    db: Session,
+    chat_id: int | str,
+    text: str,
+    send_fn: SendFn | None = None,
+) -> None:
     parts = text.strip().split()
     if len(parts) != 3:
-        telegram.send_message(chat_id, "Usage: /login <username> <password>")
+        _emit_message(chat_id, "Usage: /login <username> <password>", send_fn)
         return
     _, username, password = parts
     user = db.query(User).filter_by(username=username).one_or_none()
     if user is None or not verify_password(password, user.password_hash):
-        telegram.send_message(chat_id, "Invalid credentials.")
+        _emit_message(chat_id, "Invalid credentials.", send_fn)
         return
     cid = str(chat_id)
     # Evict any prior binding for this chat (different user) and for this user (different chat).
@@ -50,7 +63,7 @@ def _handle_login(db: Session, chat_id: int | str, text: str) -> None:
     )
     user.telegram_chat_id = cid
     db.commit()
-    telegram.send_message(chat_id, f"Logged in as {user.username}. {HELLO}")
+    _emit_message(chat_id, f"Logged in as {user.username}. {HELLO}", send_fn)
 
 
 def _ensure_update_new(db: Session, update_id: int) -> bool:
@@ -201,6 +214,27 @@ def _contains_credit_card_phrase(text: str) -> bool:
     )
 
 
+def _normalize_words(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
+
+
+def _source_name_in_text(source_name: str, text: str) -> bool:
+    s = _normalize_words(source_name)
+    t = _normalize_words(text)
+    if not s or not t:
+        return False
+    if s in t:
+        return True
+
+    s_tokens = [x for x in s.split() if len(x) > 1]
+    if not s_tokens:
+        return False
+    t_tokens = set(t.split())
+    overlap = sum(1 for tok in s_tokens if tok in t_tokens)
+    needed = min(2, len(s_tokens))
+    return overlap >= needed
+
+
 def _is_generic_credit_source_label(name: str) -> bool:
     tokens = re.sub(r"[^a-z0-9]+", " ", name.lower()).strip().split()
     if not tokens:
@@ -282,6 +316,7 @@ def _handle_pending_source_choice_reply(
     user: User,
     chat_id: int | str,
     text: str,
+    send_fn: SendFn | None = None,
 ) -> bool:
     state = _pending_source_choice_state(db, user.id)
     if state is None:
@@ -291,17 +326,17 @@ def _handle_pending_source_choice_reply(
     options = [str(x).strip() for x in (value.get("options") or []) if str(x).strip()]
     if len(options) < 2:
         _clear_pending_source_choice_state(db, user.id)
-        telegram.send_message(chat_id, "That card selection expired. Please resend the transaction.")
+        _emit_message(chat_id, "That card selection expired. Please resend the transaction.", send_fn)
         return True
 
     if _is_no(text):
         _clear_pending_source_choice_state(db, user.id)
-        telegram.send_message(chat_id, "Got it, I cancelled that credit-card log.")
+        _emit_message(chat_id, "Got it, I cancelled that credit-card log.", send_fn)
         return True
 
     chosen = _pick_source_from_reply(text, options)
     if chosen is None:
-        telegram.send_message(chat_id, _credit_choice_prompt(options))
+        _emit_message(chat_id, _credit_choice_prompt(options), send_fn)
         return True
 
     raw_items = value.get("items") or []
@@ -318,7 +353,7 @@ def _handle_pending_source_choice_reply(
 
     if not items or not targets:
         _clear_pending_source_choice_state(db, user.id)
-        telegram.send_message(chat_id, "That card selection expired. Please resend the transaction.")
+        _emit_message(chat_id, "That card selection expired. Please resend the transaction.", send_fn)
         return True
 
     for idx in targets:
@@ -328,11 +363,11 @@ def _handle_pending_source_choice_reply(
         outcome = financial.log_items(db, user, items)
     except Exception as e:
         log.exception("failed to log pending source choice: %s", e)
-        telegram.send_message(chat_id, "I couldn't finish that log. Please resend the transaction.")
+        _emit_message(chat_id, "I couldn't finish that log. Please resend the transaction.", send_fn)
         return True
 
     _clear_pending_source_choice_state(db, user.id)
-    telegram.send_message(chat_id, f"Using source '{chosen}'.\n\n{outcome.as_message()}")
+    _emit_message(chat_id, f"Using source '{chosen}'.\n\n{outcome.as_message()}", send_fn)
     return True
 
 
@@ -341,6 +376,7 @@ def _handle_pending_source_reply(
     user: User,
     chat_id: int | str,
     text: str,
+    send_fn: SendFn | None = None,
 ) -> bool:
     state = _pending_source_state(db, user.id)
     if state is None:
@@ -356,13 +392,14 @@ def _handle_pending_source_reply(
     if _is_no(text):
         db.delete(state)
         db.commit()
-        telegram.send_message(chat_id, "Got it, I won't create that source.")
+        _emit_message(chat_id, "Got it, I won't create that source.", send_fn)
         return True
 
     if not _is_yes(text):
-        telegram.send_message(
+        _emit_message(
             chat_id,
             f"Create source '{source_name}'? Reply 'yes' to create or 'no' to cancel.",
+            send_fn,
         )
         return True
 
@@ -381,63 +418,82 @@ def _handle_pending_source_reply(
     except IntegrityError:
         db.rollback()
         _clear_pending_source_state(db, user.id)
-        telegram.send_message(
+        _emit_message(
             chat_id,
             f"Source '{source_name}' already exists now. I'll use it.",
+            send_fn,
         )
     else:
-        telegram.send_message(chat_id, f"Created source '{source_name}'. Logging it now.")
+        _emit_message(chat_id, f"Created source '{source_name}'. Logging it now.", send_fn)
 
-    _handle_text(db, user, chat_id, original_text)
+    _handle_text(db, user, chat_id, original_text, send_fn=send_fn)
     return True
 
 
-def _handle_text(db: Session, user: User, chat_id: int | str, text: str) -> None:
+def _handle_text(
+    db: Session,
+    user: User,
+    chat_id: int | str,
+    text: str,
+    send_fn: SendFn | None = None,
+) -> None:
     t = text.strip()
     if t == "/start" or t == "/help":
-        telegram.send_message(chat_id, HELLO)
+        _emit_message(chat_id, HELLO, send_fn)
         return
     if t == "/logout":
         user.telegram_chat_id = None
         db.commit()
-        telegram.send_message(chat_id, "Chat unbound. Send /login to reconnect.")
+        _emit_message(chat_id, "Chat unbound. Send /login to reconnect.", send_fn)
         return
 
-    if _handle_pending_source_choice_reply(db, user, chat_id, t):
+    if _handle_pending_source_choice_reply(db, user, chat_id, t, send_fn=send_fn):
         return
 
-    if _handle_pending_source_reply(db, user, chat_id, t):
+    if _handle_pending_source_reply(db, user, chat_id, t, send_fn=send_fn):
         return
 
     cats, srcs = _names(db, user.id)
     itn = intent.classify(t, cats, srcs)
     kind = itn.get("type", "log")
 
+    default_src_name: str | None = None
+    if user.default_expense_source_id is not None:
+        default_src = (
+            db.query(Source)
+            .filter_by(id=user.default_expense_source_id, user_id=user.id, active=True)
+            .one_or_none()
+        )
+        if default_src is not None:
+            default_src_name = default_src.name
+
     if kind == "query":
         answer = query.answer(db, user, t)
-        telegram.send_message(chat_id, answer)
+        _emit_message(chat_id, answer, send_fn)
         return
 
     if kind == "show_credit":
         credit = query._credit_outstanding(db, user.id)
         if credit < 0:
-            telegram.send_message(
+            _emit_message(
                 chat_id,
                 f"Credit card outstanding: {int(credit):,}".replace(",", "."),
+                send_fn,
             )
         else:
-            telegram.send_message(chat_id, "No outstanding credit balance.")
+            _emit_message(chat_id, "No outstanding credit balance.", send_fn)
         return
 
     if kind == "delete_last":
         gone = financial.soft_delete_last(db, user)
         if gone is None:
-            telegram.send_message(chat_id, "Nothing to delete.")
+            _emit_message(chat_id, "Nothing to delete.", send_fn)
         else:
-            telegram.send_message(
+            _emit_message(
                 chat_id,
                 f"Removed last entry: {gone.type} of {int(gone.amount):,}".replace(",", ".")
                 + f" ({gone.description or '—'}).",
+                send_fn,
             )
         return
 
@@ -447,14 +503,32 @@ def _handle_text(db: Session, user: User, chat_id: int | str, text: str) -> None
         items = intent.extract_financial(t, cats, srcs, today)
     except Exception as e:
         log.exception("extract_financial failed: %s", e)
-        telegram.send_message(chat_id, "Leo hit a snag parsing that. Try again?")
+        _emit_message(chat_id, "Leo hit a snag parsing that. Try again?", send_fn)
         return
     if not items:
-        telegram.send_message(
+        _emit_message(
             chat_id,
             "Leo couldn't find any financial data. Try 'spent 50k on food'.",
+            send_fn,
         )
         return
+
+    if default_src_name:
+        for item in items:
+            if str(item.get("type") or "").strip().lower().startswith("inc"):
+                continue
+            raw_source = str(item.get("source") or "").strip()
+            if not raw_source:
+                item["source"] = default_src_name
+                continue
+
+            mentions_credit = _contains_credit_card_phrase(t)
+            source_is_credit = _contains_credit_card_phrase(raw_source)
+            if mentions_credit and source_is_credit:
+                continue
+
+            if not _source_name_in_text(raw_source, t):
+                item["source"] = default_src_name
 
     active_sources = db.query(Source).filter_by(user_id=user.id, active=True).order_by(Source.name).all()
     source_names = [s.name for s in active_sources]
@@ -475,7 +549,7 @@ def _handle_text(db: Session, user: User, chat_id: int | str, text: str) -> None
                 target_indexes=credit_targets,
                 options=credit_source_names,
             )
-            telegram.send_message(chat_id, _credit_choice_prompt(credit_source_names))
+            _emit_message(chat_id, _credit_choice_prompt(credit_source_names), send_fn)
             return
 
     missing_sources = _missing_transfer_sources(items, srcs)
@@ -484,37 +558,67 @@ def _handle_text(db: Session, user: User, chat_id: int | str, text: str) -> None
     if missing_sources:
         missing = missing_sources[0]
         _set_pending_source_state(db, user.id, missing, t)
-        telegram.send_message(
+        _emit_message(
             chat_id,
             f"I couldn't find source '{missing}'. Create it now? Reply 'yes' to create or 'no' to cancel.",
+            send_fn,
         )
         return
 
     outcome = financial.log_items(db, user, items)
-    telegram.send_message(chat_id, outcome.as_message())
+    _emit_message(chat_id, outcome.as_message(), send_fn)
 
 
-def _handle_media(db: Session, user: User, chat_id: int | str, file_id: str, mime: str) -> None:
-    b64 = telegram.download_file_b64(file_id)
-    if not b64:
-        telegram.send_message(chat_id, "Couldn't grab that file from Telegram.")
-        return
+def _handle_media_b64(
+    db: Session,
+    user: User,
+    chat_id: int | str,
+    b64: str,
+    mime: str,
+    send_fn: SendFn | None = None,
+) -> None:
     cats, srcs = _names(db, user.id)
     today = now_local().strftime("%d/%m/%Y")
     try:
         result = intent.extract_from_media(b64, mime, cats, srcs, today)
     except Exception as e:
         log.exception("extract_from_media failed: %s", e)
-        telegram.send_message(chat_id, "Leo got confused by that one.")
+        _emit_message(chat_id, "Leo got confused by that one.", send_fn)
         return
 
     if result["kind"] == "query":
-        telegram.send_message(chat_id, query.answer(db, user, result["question"]))
+        _emit_message(chat_id, query.answer(db, user, result["question"]), send_fn)
     elif result["kind"] == "log":
+        default_src_name: str | None = None
+        if user.default_expense_source_id is not None:
+            default_src = (
+                db.query(Source)
+                .filter_by(id=user.default_expense_source_id, user_id=user.id, active=True)
+                .one_or_none()
+            )
+            if default_src is not None:
+                default_src_name = default_src.name
+
+        if default_src_name:
+            for item in result["items"]:
+                if str(item.get("type") or "").strip().lower().startswith("inc"):
+                    continue
+                raw_source = str(item.get("source") or "").strip()
+                if not raw_source:
+                    item["source"] = default_src_name
+
         outcome = financial.log_items(db, user, result["items"])
-        telegram.send_message(chat_id, outcome.as_message())
+        _emit_message(chat_id, outcome.as_message(), send_fn)
     else:
-        telegram.send_message(chat_id, "Didn't catch anything financial in there.")
+        _emit_message(chat_id, "Didn't catch anything financial in there.", send_fn)
+
+
+def _handle_media(db: Session, user: User, chat_id: int | str, file_id: str, mime: str) -> None:
+    b64 = telegram.download_file_b64(file_id)
+    if not b64:
+        _emit_message(chat_id, "Couldn't grab that file from Telegram.")
+        return
+    _handle_media_b64(db, user, chat_id, b64, mime)
 
 
 def dispatch_update(db: Session, update: dict[str, Any]) -> None:
@@ -578,3 +682,32 @@ def set_webhook(payload: dict[str, str]):
     if not url:
         return {"ok": False, "error": "missing url"}
     return telegram.set_webhook(url)
+
+
+@router.post("/web_chat")
+async def web_chat(payload: dict[str, Any], db: Session = Depends(get_db)):
+    username = str(payload.get("username") or "").strip()
+    if not username:
+        return {"ok": False, "error": "missing username"}
+
+    user = db.query(User).filter_by(username=username).one_or_none()
+    if user is None:
+        return {"ok": False, "error": "unknown user"}
+
+    messages: list[str] = []
+
+    def _capture(_chat_id: int | str, text: str) -> None:
+        messages.append(text)
+
+    text = str(payload.get("text") or "").strip()
+    if text:
+        _handle_text(db, user, f"web:{user.id}", text, send_fn=_capture)
+        return {"ok": True, "messages": messages}
+
+    audio_b64 = payload.get("audio_b64")
+    mime = str(payload.get("audio_mime") or "audio/webm").strip() or "audio/webm"
+    if isinstance(audio_b64, str) and audio_b64.strip():
+        _handle_media_b64(db, user, f"web:{user.id}", audio_b64.strip(), mime, send_fn=_capture)
+        return {"ok": True, "messages": messages}
+
+    return {"ok": False, "error": "missing text or audio"}

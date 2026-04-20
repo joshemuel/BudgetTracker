@@ -27,7 +27,7 @@ def _clear_pending_source_state(user_id: int) -> None:
             db.commit()
 
 
-def test_transfer_endpoint_uses_non_topup_category(auth_client: TestClient):
+def test_transfer_endpoint_uses_top_up_for_regular_wallet_transfer(auth_client: TestClient):
     from_name = f"pytest_from_{uuid4().hex[:8]}"
     to_name = f"pytest_to_{uuid4().hex[:8]}"
     _hard_cleanup_sources(from_name, to_name)
@@ -48,7 +48,7 @@ def test_transfer_endpoint_uses_non_topup_category(auth_client: TestClient):
         assert r.status_code == 201, r.text
         rows = r.json()
         assert len(rows) == 2
-        assert all(row["category_name"] != "Top-up" for row in rows)
+        assert all(row["category_name"] == "Top-up" for row in rows)
     finally:
         _hard_cleanup_sources(from_name, to_name)
 

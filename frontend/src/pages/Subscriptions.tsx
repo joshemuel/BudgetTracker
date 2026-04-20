@@ -6,6 +6,7 @@ import { fmtCompactMoney, fmtMoney, todayISO } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
+import { useAmountVisibility } from "@/lib/privacy";
 
 type Frequency = "monthly" | "yearly";
 type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
@@ -230,6 +231,7 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
 
 export default function SubscriptionsPage() {
   const qc = useQueryClient();
+  const { showAmounts } = useAmountVisibility();
   const [adding, setAdding] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Subscription | null>(null);
   const [editing, setEditing] = useState<Subscription | null>(null);
@@ -279,11 +281,13 @@ export default function SubscriptionsPage() {
   });
 
   const totalDisplayCurrency = monthlyTotalData?.currency ?? userCurrency;
-  const totalDisplay = monthlyTotalData
-    ? (isMobile
-        ? fmtCompactMoney(monthlyTotalData.total, totalDisplayCurrency)
-        : fmtMoney(monthlyTotalData.total, totalDisplayCurrency))
-    : "—";
+  const totalDisplay = !showAmounts
+    ? "••••••"
+    : monthlyTotalData
+      ? (isMobile
+          ? fmtCompactMoney(monthlyTotalData.total, totalDisplayCurrency)
+          : fmtMoney(monthlyTotalData.total, totalDisplayCurrency))
+      : "—";
 
   return (
     <div className="space-y-10">
@@ -366,12 +370,16 @@ export default function SubscriptionsPage() {
               {(subs ?? []).map((s) => (
                 <tr key={s.id} className={s.active ? "" : "opacity-50"}>
                   <td className="font-[500]">{s.name}</td>
-                  <td className="text-ink-soft">{s.source_name}</td>
+                  <td className="text-ink-soft">
+                    {showAmounts ? s.source_name : <span className="masked-amount">••••••</span>}
+                  </td>
                   <td>{s.category_name}</td>
                   <td className="text-right num text-accent">
-                    {isMobile
-                      ? fmtCompactMoney(s.amount, (s.currency as CurrencyCode) || "IDR")
-                      : fmtMoney(s.amount, (s.currency as CurrencyCode) || "IDR")}
+                    {showAmounts
+                      ? isMobile
+                        ? fmtCompactMoney(s.amount, (s.currency as CurrencyCode) || "IDR")
+                        : fmtMoney(s.amount, (s.currency as CurrencyCode) || "IDR")
+                      : "••••••"}
                   </td>
                   <td className="smallcaps text-ink-mute">{s.frequency}</td>
                   <td className="num text-ink-soft">{s.next_billing_date}</td>

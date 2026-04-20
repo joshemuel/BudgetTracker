@@ -8,12 +8,13 @@ import {
   Tooltip,
 } from "recharts";
 import { api } from "@/api";
-import type { CategoryStats, Me } from "@/types";
+import type { CategoryStats, CurrencyCode, Me } from "@/types";
 import { fmtCompactMoney, fmtMoney, fmtPct, todayISO, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
+import { useAmountVisibility } from "@/lib/privacy";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
 
-const PALETTE = [
+export const PALETTE = [
   "#a02a1a",
   "#3f5d2e",
   "#b4721f",
@@ -31,16 +32,19 @@ function firstOfMonthISO(): string {
   return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
 }
 
-export default function CategoriesPage() {
-  const [from, setFrom] = useState(firstOfMonthISO());
-  const [to, setTo] = useState(todayISO());
+export function CategoriesBreakdown({
+  from,
+  to,
+  currency,
+  compact = false,
+}: {
+  from: string;
+  to: string;
+  currency: CurrencyCode;
+  compact?: boolean;
+}) {
+  const { showAmounts } = useAmountVisibility();
   const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
-
-  const { data: me } = useQuery<Me>({
-    queryKey: ["me"],
-    queryFn: () => api.get<Me>("/auth/me"),
-  });
-  const currency = preferredCurrency(me);
 
   const { data } = useQuery<CategoryStats>({
     queryKey: ["category-stats", from, to, currency],
@@ -51,18 +55,123 @@ export default function CategoriesPage() {
   });
   const reportCurrency = data?.currency ?? currency;
   const fmtAmount = (v: string | number) =>
-    isMobile ? fmtCompactMoney(v, reportCurrency) : fmtMoney(v, reportCurrency);
+    showAmounts
+      ? isMobile
+        ? fmtCompactMoney(v, reportCurrency)
+        : fmtMoney(v, reportCurrency)
+      : "••••••";
 
-  const rows = (data?.categories ?? []).filter(
-    (c) => toNumber(c.expense) > 0
-  );
+  const masked = (value: string) =>
+    showAmounts ? value : <span className="masked-amount">••••••</span>;
+
+  const rows = (data?.categories ?? []).filter((c) => toNumber(c.expense) > 0);
   const total = rows.reduce((a, r) => a + toNumber(r.expense), 0);
   const pieData = rows.slice(0, 10).map((r) => ({
     name: r.category_name,
     value: toNumber(r.expense),
   }));
-  const pieInnerRadius = isMobile ? 46 : 70;
-  const pieOuterRadius = isMobile ? 86 : 130;
+  const pieInnerRadius = compact ? (isMobile ? 38 : 54) : isMobile ? 46 : 70;
+  const pieOuterRadius = compact ? (isMobile ? 72 : 104) : isMobile ? 86 : 130;
+
+  if (rows.length === 0) {
+    return (
+      <p className="text-ink-mute text-sm py-6 text-center border-t border-paper-rule">
+        No spending recorded for this range.
+      </p>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-12 gap-6 sm:gap-8">
+      <div className={`col-span-12 md:col-span-5 ${compact ? "h-[220px] sm:h-[260px]" : "h-[260px] sm:h-[320px]"}`}>
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+            <Pie
+              data={pieData}
+              dataKey="value"
+              nameKey="name"
+              innerRadius={pieInnerRadius}
+              outerRadius={pieOuterRadius}
+              stroke="#f5efe3"
+              strokeWidth={1}
+            >
+              {pieData.map((_, i) => (
+                <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
+              ))}
+            </Pie>
+            <Tooltip
+              contentStyle={{
+                background: "#f5efe3",
+                border: "1px solid #19170f",
+                borderRadius: 0,
+                fontFamily: "Instrument Sans",
+              }}
+              formatter={(v: number) =>
+                showAmounts ? fmtMoney(v, reportCurrency) : "••••••"
+              }
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="col-span-12 md:col-span-7">
+        <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
+          <table className="ledger-table w-full text-[11px] sm:text-[13px]">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th className="text-right">Spent</th>
+                <th className="text-right">Share</th>
+                <th className="text-right">#</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => {
+                const share = total ? toNumber(r.expense) / total : 0;
+                return (
+                  <tr key={r.category_id}>
+                    <td className="font-[450] flex items-center gap-2">
+                      <span
+                        className="inline-block w-2 h-2"
+                        style={{ background: PALETTE[i % PALETTE.length] }}
+                      />
+                      {r.category_name}
+                    </td>
+                    <td className="text-right num text-accent">
+                      {masked(fmtAmount(r.expense))}
+                    </td>
+                    <td className="text-right num text-ink-mute">
+                      {fmtPct(share)}
+                    </td>
+                    <td className="text-right num text-ink-mute">
+                      {r.transactions}
+                    </td>
+                  </tr>
+                );
+              })}
+              <tr className="font-[500]">
+                <td className="smallcaps">Total</td>
+                <td className="text-right num">{masked(fmtAmount(total))}</td>
+                <td></td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function CategoriesPage() {
+  const [from, setFrom] = useState(firstOfMonthISO());
+  const [to, setTo] = useState(todayISO());
+
+  const { data: me } = useQuery<Me>({
+    queryKey: ["me"],
+    queryFn: () => api.get<Me>("/auth/me"),
+  });
+  const currency = preferredCurrency(me);
 
   return (
     <div>
@@ -89,81 +198,8 @@ export default function CategoriesPage() {
         </label>
       </div>
 
-      <div className="grid grid-cols-12 gap-8 mt-8">
-        <div className="col-span-12 md:col-span-5 h-[260px] sm:h-[320px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
-              <Pie
-                data={pieData}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={pieInnerRadius}
-                outerRadius={pieOuterRadius}
-                stroke="#f5efe3"
-                strokeWidth={1}
-              >
-                {pieData.map((_, i) => (
-                  <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{
-                  background: "#f5efe3",
-                  border: "1px solid #19170f",
-                  borderRadius: 0,
-                  fontFamily: "Instrument Sans",
-                }}
-                formatter={(v: number) => fmtMoney(v, reportCurrency)}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="col-span-12 md:col-span-7">
-          <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
-            <table className="ledger-table w-full text-[11px] sm:text-[13px]">
-              <thead>
-                <tr>
-                  <th>Category</th>
-                  <th className="text-right">Spent</th>
-                  <th className="text-right">Share</th>
-                  <th className="text-right">#</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r, i) => {
-                  const share = total ? toNumber(r.expense) / total : 0;
-                  return (
-                    <tr key={r.category_id}>
-                      <td className="font-[450] flex items-center gap-2">
-                        <span
-                          className="inline-block w-2 h-2"
-                          style={{ background: PALETTE[i % PALETTE.length] }}
-                        />
-                        {r.category_name}
-                      </td>
-                      <td className="text-right num text-accent">
-                        {fmtAmount(r.expense)}
-                      </td>
-                      <td className="text-right num text-ink-mute">
-                        {fmtPct(share)}
-                      </td>
-                      <td className="text-right num text-ink-mute">
-                        {r.transactions}
-                      </td>
-                    </tr>
-                  );
-                })}
-                <tr className="font-[500]">
-                  <td className="smallcaps">Total</td>
-                  <td className="text-right num">{fmtAmount(total)}</td>
-                  <td></td>
-                  <td></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+      <div className="mt-8">
+        <CategoriesBreakdown from={from} to={to} currency={currency} />
       </div>
     </div>
   );

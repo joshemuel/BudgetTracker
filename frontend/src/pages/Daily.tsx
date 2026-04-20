@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Area,
   AreaChart,
-  Line,
   ReferenceLine,
   CartesianGrid,
   ResponsiveContainer,
@@ -15,9 +14,17 @@ import { api } from "@/api";
 import type { Daily, Me } from "@/types";
 import { fmtMoney, fmtShort, monthName, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
+import { useAmountVisibility } from "@/lib/privacy";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
+import { CategoriesBreakdown } from "@/pages/Categories";
+
+function toISO(y: number, m: number, d: number): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${y}-${pad(m)}-${pad(d)}`;
+}
 
 export default function DailyPage() {
+  const { showAmounts } = useAmountVisibility();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -54,6 +61,9 @@ export default function DailyPage() {
 
   const today = new Date();
   const isCurrentMonth = today.getFullYear() === year && today.getMonth() + 1 === month;
+  const isFutureMonth =
+    year > today.getFullYear() ||
+    (year === today.getFullYear() && month > today.getMonth() + 1);
   const todayDay = isCurrentMonth ? today.getDate() : 0;
 
   const previousDays = prevData?.days ?? [];
@@ -92,6 +102,7 @@ export default function DailyPage() {
     isCurrentMonth && todayDay > 0 ? (previousCumulativeAt(todayDay) ?? 0) : 0;
 
   const chartDataWithGhost = chartData.map((row) => {
+    const isPastToday = isCurrentMonth && todayDay > 0 && row.day > todayDay;
     let ghostProjection: number | null = null;
     if (isCurrentMonth && todayDay > 0 && row.day >= todayDay) {
       const prevAtDay = previousCumulativeAt(row.day);
@@ -99,19 +110,28 @@ export default function DailyPage() {
         ghostProjection = todayCumulative + Math.max(0, prevAtDay - prevAnchorCumulative);
       }
     }
-
     return {
       ...row,
+      Cumulative: isPastToday ? null : row.Cumulative,
       GhostProjection: ghostProjection,
     };
   });
 
   const maxGhost = Math.max(
     1,
-    ...chartDataWithGhost.map((d) => d.Cumulative),
+    ...chartDataWithGhost.map((d) => d.Cumulative ?? 0),
     ...chartDataWithGhost.map((d) => d.GhostProjection ?? 0)
   );
   const maxExp = Math.max(1, ...days.map((d) => toNumber(d.expense)));
+
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const from = toISO(year, month, 1);
+  const to = isCurrentMonth
+    ? toISO(today.getFullYear(), today.getMonth() + 1, today.getDate())
+    : isFutureMonth
+      ? toISO(year, month, 1)
+      : toISO(year, month, daysInMonth);
+  const yAxisTick = (v: number) => (showAmounts ? fmtShort(v, reportCurrency) : "•••");
 
   return (
     <div>
@@ -121,7 +141,7 @@ export default function DailyPage() {
         </SectionTitle>
         <div className="flex gap-3 items-center w-full sm:w-auto justify-between sm:justify-start">
           <button
-            className="smallcaps text-ink-mute hover:text-accent"
+            className="smallcaps text-ink-mute hover:text-accent transition-colors px-2 py-1 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             onClick={() => {
               if (month === 1) {
                 setMonth(12);
@@ -132,7 +152,7 @@ export default function DailyPage() {
             ← Prev
           </button>
           <button
-            className="smallcaps text-ink-mute hover:text-accent"
+            className="smallcaps text-ink-mute hover:text-accent transition-colors px-2 py-1 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             onClick={() => {
               if (month === 12) {
                 setMonth(1);
@@ -145,6 +165,22 @@ export default function DailyPage() {
         </div>
       </div>
 
+      <div className="mt-2 flex items-center gap-4 smallcaps text-ink-mute">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block w-2.5 h-2.5" style={{ background: "#a02a1a" }} />
+          Cumulative
+        </span>
+        {isCurrentMonth && (
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              className="inline-block w-2.5 h-2.5"
+              style={{ background: "rgba(72, 129, 193, 0.55)" }}
+            />
+            Projected
+          </span>
+        )}
+      </div>
+
       <div className="h-[200px] sm:h-[280px] mt-4">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartDataWithGhost} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
@@ -153,12 +189,16 @@ export default function DailyPage() {
                 <stop offset="0%" stopColor="#a02a1a" stopOpacity={0.35} />
                 <stop offset="100%" stopColor="#a02a1a" stopOpacity={0} />
               </linearGradient>
+              <linearGradient id="projFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="rgba(72, 129, 193, 1)" stopOpacity={0.22} />
+                <stop offset="100%" stopColor="rgba(72, 129, 193, 1)" stopOpacity={0} />
+              </linearGradient>
             </defs>
             <CartesianGrid stroke="#d9cdb4" vertical={false} />
             <XAxis dataKey="day" stroke="#4a4437" tickLine={false} />
             <YAxis
               stroke="#4a4437"
-              tickFormatter={(v) => fmtShort(v, reportCurrency)}
+              tickFormatter={yAxisTick}
               tick={{ fontFamily: "JetBrains Mono", fontSize: 11 }}
               tickLine={false}
               width={72}
@@ -173,10 +213,12 @@ export default function DailyPage() {
               }}
               formatter={(v: number, name: string) => {
                 if (name === "GhostProjection") {
-                  return [fmtMoney(v, reportCurrency), "Projected pace"];
+                  return [showAmounts ? fmtMoney(v, reportCurrency) : "••••••", "Projected pace"];
                 }
-                if (name === "Cumulative") return [fmtMoney(v, reportCurrency), "Cumulative"];
-                return [fmtMoney(v, reportCurrency), name];
+                if (name === "Cumulative") {
+                  return [showAmounts ? fmtMoney(v, reportCurrency) : "••••••", "Cumulative"];
+                }
+                return [showAmounts ? fmtMoney(v, reportCurrency) : "••••••", name];
               }}
               labelFormatter={(d) => `${monthName(month, true)} ${d}`}
             />
@@ -193,14 +235,16 @@ export default function DailyPage() {
                 }}
               />
             )}
-            <Line
+            <Area
               type="monotone"
               dataKey="GhostProjection"
-              stroke="rgba(72, 129, 193, 0.68)"
-              strokeWidth={2}
-              strokeDasharray="6 4"
+              stroke="rgba(72, 129, 193, 0.65)"
+              strokeWidth={1.5}
+              strokeDasharray="3 3"
+              fill="url(#projFill)"
               dot={false}
               connectNulls={false}
+              isAnimationActive={false}
             />
             <Area
               type="monotone"
@@ -208,6 +252,7 @@ export default function DailyPage() {
               stroke="#a02a1a"
               strokeWidth={1.5}
               fill="url(#cumFill)"
+              connectNulls={false}
             />
           </AreaChart>
         </ResponsiveContainer>
@@ -224,7 +269,7 @@ export default function DailyPage() {
           return (
             <div
               key={d.day}
-              title={`${monthName(month, true)} ${d.day} · ${fmtMoney(d.expense, reportCurrency)}`}
+              title={`${monthName(month, true)} ${d.day} · ${showAmounts ? fmtMoney(d.expense, reportCurrency) : "••••••"}`}
               className="aspect-square relative border border-paper-rule p-1"
               style={{ backgroundColor: bg }}
             >
@@ -241,12 +286,17 @@ export default function DailyPage() {
                     ratio > 0.5 ? "text-paper" : "text-ink"
                   }`}
                 >
-                  {fmtShort(d.expense, reportCurrency).replace(/^\S+\s/, "")}
+                  {showAmounts ? fmtShort(d.expense, reportCurrency).replace(/^\S+\s/, "") : "••"}
                 </span>
               )}
             </div>
           );
         })}
+      </div>
+
+      <div className="mt-10">
+        <SectionTitle kicker="Where the rupiah went">By Category</SectionTitle>
+        <CategoriesBreakdown from={from} to={to} currency={reportCurrency} compact />
       </div>
     </div>
   );

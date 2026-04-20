@@ -26,6 +26,19 @@ from app.services.parse import (
 log = logging.getLogger(__name__)
 
 DEFAULT_SOURCE = "BCA"
+TRANSFER_TOP_UP = "Top-up"
+TRANSFER_INVESTMENT = "Investment"
+SAVINGS_HINTS = {
+    "saving",
+    "savings",
+    "tabungan",
+    "invest",
+    "investment",
+    "reksadana",
+    "deposit",
+    "broker",
+    "emergency",
+}
 
 
 @dataclass
@@ -129,6 +142,45 @@ def _resolve_category_name(parsed: str | None, valid: list[str], default: str) -
     return default
 
 
+def _looks_like_transfer(description: str | None, is_internal: bool) -> bool:
+    if is_internal:
+        return True
+    d = str(description or "").strip().lower()
+    return d.startswith("transfer to ") or d.startswith("transfer from ")
+
+
+def _is_savings_like(label: str | None) -> bool:
+    if not label:
+        return False
+    tokens = set(_norm_tokens(str(label)))
+    return any(t in SAVINGS_HINTS for t in tokens)
+
+
+def _transfer_category_for_item(
+    t_type: str,
+    source_name: str,
+    description: str | None,
+) -> str:
+    d = str(description or "").strip().lower()
+    if d.startswith("transfer to "):
+        target = d[len("transfer to ") :].strip()
+        if _is_savings_like(target):
+            return TRANSFER_INVESTMENT
+        return TRANSFER_TOP_UP
+
+    if d.startswith("transfer from "):
+        if _is_savings_like(source_name):
+            return TRANSFER_INVESTMENT
+        return TRANSFER_TOP_UP
+
+    if t_type == "income" and _is_savings_like(source_name):
+        return TRANSFER_INVESTMENT
+
+    if _is_savings_like(source_name):
+        return TRANSFER_INVESTMENT
+    return TRANSFER_TOP_UP
+
+
 def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcome:
     """Apply a batch of parsed transactions. Items shape:
       { type: "Income"|"Expense"|"expense"|"income",
@@ -149,6 +201,19 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
         categories = [fallback]
     cat_by_name: dict[str, Category] = {c.name.lower(): c for c in categories}
     valid_cat_names = [c.name for c in categories]
+
+    def _category_by_name(name: str) -> Category:
+        key = name.strip().lower()
+        existing = cat_by_name.get(key)
+        if existing is not None:
+            return existing
+        created = Category(user_id=user.id, name=name.strip(), is_default=False)
+        db.add(created)
+        db.flush()
+        cat_by_name[key] = created
+        valid_cat_names.append(created.name)
+        return created
+
     other_cat = cat_by_name.get("other") or categories[0]
 
     sources = db.query(Source).filter_by(user_id=user.id, active=True).all()
@@ -214,6 +279,10 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
             description = str(description).strip() or None
 
         is_internal = item.get("is_internal", False) is True
+        if _looks_like_transfer(description, is_internal):
+            transfer_category_name = _transfer_category_for_item(t_type, source.name, description)
+            category = _category_by_name(transfer_category_name)
+            is_internal = True
 
         tx = Transaction(
             user_id=user.id,

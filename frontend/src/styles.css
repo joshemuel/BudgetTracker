@@ -189,6 +189,31 @@ hr {
   background-size: 100% 32px;
 }
 
+.safe-chat-right {
+  right: max(0.75rem, env(safe-area-inset-right));
+  bottom: env(safe-area-inset-bottom);
+}
+
+.chat-docked {
+  box-shadow:
+    0 14px 28px rgba(25, 23, 15, 0.22),
+    0 1px 0 rgba(255, 255, 255, 0.45) inset;
+}
+
+.chat-fab {
+  box-shadow: 0 10px 30px -8px rgba(25, 23, 15, 0.45);
+}
+
+.chat-log {
+  scrollbar-gutter: stable;
+}
+
+.masked-amount {
+  letter-spacing: 0.08em;
+  font-family: var(--font-mono);
+  color: var(--color-ink-mute);
+}
+
 @media (max-width: 640px) {
   .smallcaps {
     letter-spacing: 0.08em;

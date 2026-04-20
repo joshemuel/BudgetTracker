@@ -4,23 +4,26 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Me } from "@/types";
 import { monthName } from "@/lib/format";
+import { useAmountVisibility } from "@/lib/privacy";
 import { startSyncPolling } from "@/lib/sync";
 import QuickLog from "@/components/QuickLog";
 import UserPrefsMenu from "@/components/UserPrefsMenu";
+import WebChat from "@/components/WebChat";
 
 const nav = [
   { to: "/", label: "Overview", end: true },
   { to: "/monthly", label: "Monthly" },
   { to: "/daily", label: "Daily" },
-  { to: "/categories", label: "Categories" },
   { to: "/subscriptions", label: "Subscriptions" },
   { to: "/transactions", label: "Transactions" },
+  { to: "/budgets", label: "Budgets" },
   { to: "/settings", label: "Settings" },
 ];
 
 function Masthead({ me, onLog }: { me: Me | undefined; onLog: () => void }) {
   const qc = useQueryClient();
   const nav = useNavigate();
+  const { showAmounts, toggleAmounts } = useAmountVisibility();
   const logout = useMutation({
     mutationFn: () => api.post("/auth/logout"),
     onSuccess: () => {
@@ -41,12 +44,32 @@ function Masthead({ me, onLog }: { me: Me | undefined; onLog: () => void }) {
     <header className="relative pt-5 sm:pt-7 md:pt-9 lg:pt-11 pb-6 sm:pb-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-baseline sm:justify-between smallcaps text-ink-mute border-t border-paper-rule pt-4 sm:pt-5">
         <span className="order-1">Beta Version</span>
-        <span className="order-3 sm:order-2 hidden md:inline">{dateStr}</span>
+        <span className="order-3 sm:order-2 hidden sm:inline">{dateStr}</span>
         <span className="order-2 sm:order-3 flex items-center gap-4 sm:gap-6 self-start sm:self-auto">
           <UserPrefsMenu me={me} />
           <button
+            onClick={toggleAmounts}
+            className="w-8 h-8 rounded-sm border border-ink text-ink hover:bg-ink hover:text-paper transition-colors flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            title={showAmounts ? "Hide numbers" : "Show numbers"}
+            aria-label={showAmounts ? "Hide numbers" : "Show numbers"}
+          >
+            {showAmounts ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z" />
+                <circle cx="12" cy="12" r="2.5" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 3l18 18" />
+                <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                <path d="M9.4 5.3A10.2 10.2 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.3 3.9" />
+                <path d="M6.1 6.1C3.6 7.7 2 12 2 12s3.5 7 10 7c1.2 0 2.3-.2 3.3-.5" />
+              </svg>
+            )}
+          </button>
+          <button
             onClick={onLog}
-            className="smallcaps px-2 py-1 border border-ink text-ink hover:bg-ink hover:text-paper transition-colors"
+            className="smallcaps px-3 py-1.5 border border-ink text-ink hover:bg-ink hover:text-paper transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             title="Press N"
           >
             + New entry
@@ -58,7 +81,7 @@ function Masthead({ me, onLog }: { me: Me | undefined; onLog: () => void }) {
           )}
           <button
             onClick={() => logout.mutate()}
-            className="hover:text-accent transition-colors"
+            className="hover:text-accent transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             Sign out
           </button>
@@ -159,6 +182,7 @@ export default function AppShell() {
         </span>
       </footer>
       <QuickLog open={logOpen} onClose={() => setLogOpen(false)} />
+      <WebChat />
     </div>
   );
 }
