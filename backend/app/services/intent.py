@@ -113,11 +113,17 @@ If wording is ambiguous, prefer NORMAL EXPENSE unless there is explicit bill/deb
 Each object:
 - "type": strictly "Income" or "Expense"
 - "category": one of [{cats}], pick closest match
-- "amount": raw integer. "40k" = 40000. "Rp. 21.900" = 21900. "1.5jt" = 1500000. "2jt" = 2000000.
+- "amount": raw number (integer or decimal). Rules:
+    * A plain decimal is LITERAL. "3.8" = 3.8. "0.5" = 0.5. "12.75" = 12.75. NEVER multiply a bare decimal by 1,000.
+    * Thousand/million SHORTHANDS are ONLY valid with an explicit suffix: "k", "rb", "ribu", "jt", "juta", "m".
+      "40k" = 40000. "3.8k" = 3800. "500rb" = 500000. "1.5jt" = 1500000. "2jt" = 2000000.
+    * Indonesian thousand separator with explicit "Rp" prefix keeps its digits: "Rp. 21.900" = 21900, "Rp 3.800" = 3800.
+    * Without "Rp" and without a k/jt/etc suffix, dots are decimal points. "3.8" stays 3.8. Never guess it to be 3,800.
 - "description": short description. Fix typos. Proper capitalization. No emojis.
 - "date": "dd/MM/yyyy". NEVER null — always resolve to an exact date.
 - "time": "HH:mm:ss" or null (only null if date is today and no time context).
 - "source": source name explicitly mentioned by the user, or null if absent. It may be outside [{srcs}] when user mentions a new source.
+    * When the user says just "credit" (or "kredit"), that's the credit card — return "credit card" as the source.
 
 If no clear financial data, return an empty array [].
 """
@@ -157,7 +163,7 @@ STEP 2 - Return JSON:
 IF QUESTION: {{"intent": "query", "question": "transcribed question here"}}
 
 IF LOGGING: a JSON ARRAY of transaction objects (even for single transaction).
-Each: {{"intent": "log", "type": "Income"|"Expense", "category": one of [{cats}], "amount": int, "description": str, "date": "dd/MM/yyyy", "time": "HH:mm:ss"|null, "source": one of [{srcs}]|null, "is_internal": bool}}
+Each: {{"intent": "log", "type": "Income"|"Expense", "category": one of [{cats}], "amount": number (int or decimal), "description": str, "date": "dd/MM/yyyy", "time": "HH:mm:ss"|null, "source": one of [{srcs}]|null, "is_internal": bool}}
 
 DATE RULES: "yesterday" = subtract 1 day. "last Monday" = most recent Monday. Always return exact dd/MM/yyyy date. NEVER null.
 TIME RULES: Infer only from explicit temporal cues (breakfast/morning→07:00, lunch/noon→12:00, dinner/evening→19:00). Do not infer from words like "coffee" alone. If today and no time is specified, return null. If past day and no time context, return "12:00:00".
@@ -167,7 +173,10 @@ CREDIT CARD PAYMENT vs PURCHASE:
 - Purchase using credit card ("spent/bought/paid ... with credit card") → normal "Expense", normal category, source = card, is_internal: false.
 - If unclear, default to normal expense.
 TRANSFER: "transferred X from A to B" / "top up B for X" → two objects (Expense on A + Income on B, both category "Untrackable", both is_internal: true).
-"40k"=40000. No emojis.
+
+AMOUNT: plain decimals are LITERAL ("3.8" = 3.8, never 3800). Thousand shorthands only with explicit suffix: "40k"=40000, "3.8k"=3800, "500rb"=500000, "1.5jt"=1500000. Indonesian thousand separator with explicit "Rp" ("Rp 21.900" = 21900) is fine; without Rp/k/jt, a dot is a decimal point.
+SOURCE: if user says just "credit"/"kredit", treat it as the credit card.
+No emojis.
 If nothing financial, return [].
 """
     raw = llm.call_with_media(prompt, base64_data, mime_type)

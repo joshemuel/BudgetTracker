@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /* === Ledger: a warm, editorial palette === */
 @theme {
@@ -18,6 +19,27 @@
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
   --radius-card: 2px;
+}
+
+/* === Night mode: warm ink background, paper text. Same editorial feel, inverted. === */
+:root[data-theme="dark"] {
+  --color-paper: #14110a;
+  --color-paper-deep: #1c1810;
+  --color-paper-rule: #39321f;
+  --color-ink: #efe7d3;
+  --color-ink-soft: #c4bba5;
+  --color-ink-mute: #8e8673;
+  --color-accent: #e27355;
+  --color-gain: #9cbb76;
+  --color-warn: #d9a057;
+  --color-highlight: #2a2415;
+}
+
+:root {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 html, body, #root {
@@ -50,6 +72,17 @@ body::after {
   opacity: 0.35;
   mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0.10  0 0 0 0 0.09  0 0 0 0 0.06  0 0 0 0.055 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+:root[data-theme="dark"] body::before {
+  background-image:
+    radial-gradient(ellipse at 10% 0%, rgba(226, 115, 85, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 90% 100%, rgba(239, 231, 211, 0.04) 0%, transparent 45%);
+}
+:root[data-theme="dark"] body::after {
+  opacity: 0.22;
+  mix-blend-mode: screen;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0.65  0 0 0 0 0.60  0 0 0 0 0.48  0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
 #root { position: relative; z-index: 1; }
@@ -168,14 +201,18 @@ hr {
 
 .modal-card {
   position: relative;
-  background: rgba(245, 239, 227, 0.98);
-  border: 1px solid rgba(25, 23, 15, 0.2);
+  background: color-mix(in srgb, var(--color-paper) 96%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-ink) 20%, transparent);
   border-radius: 4px;
   max-height: calc(100dvh - 2rem);
   overflow-y: auto;
   box-shadow:
-    0 20px 44px rgba(25, 23, 15, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    0 20px 44px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 color-mix(in srgb, var(--color-ink) 6%, transparent);
+}
+
+:root[data-theme="dark"] .modal-backdrop {
+  background: rgba(0, 0, 0, 0.64);
 }
 
 .modal-card::before {
@@ -185,7 +222,7 @@ hr {
   pointer-events: none;
   border-radius: inherit;
   background-image:
-    linear-gradient(transparent 31px, rgba(135, 126, 106, 0.07) 32px);
+    linear-gradient(transparent 31px, color-mix(in srgb, var(--color-ink-mute) 14%, transparent) 32px);
   background-size: 100% 32px;
 }
 
