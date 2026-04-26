@@ -12,7 +12,7 @@ from app.api.deps import get_db
 from app.db.models import AppState, Category, Source, User
 from app.services import financial, intent, query, telegram
 from app.services.auth import verify_password
-from app.services.parse import now_local, resolve_source_name
+from app.services.parse import correct_inflated_decimal_amounts, now_local, resolve_source_name
 
 log = logging.getLogger(__name__)
 
@@ -505,6 +505,7 @@ def _handle_text(
         log.exception("extract_financial failed: %s", e)
         _emit_message(chat_id, "Leo hit a snag parsing that. Try again?", send_fn)
         return
+    correct_inflated_decimal_amounts(items, t)
     if not items:
         _emit_message(
             chat_id,
