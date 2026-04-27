@@ -192,19 +192,23 @@ def handle_callback(db: Session, user: User, cb: dict[str, Any]) -> None:
             telegram.answer_callback_query(cb["id"], "Charge already resolved.")
             return
         telegram.answer_callback_query(cb["id"], "Confirmed.")
+        confirm_text = f"✓ Charged {format_number(Decimal(tx.amount))} to your books."
+        edited = False
         if chat_id and message_id:
-            telegram.edit_message_text(
-                chat_id,
-                message_id,
-                f"✓ Charged {format_number(Decimal(tx.amount))} to your books.",
-            )
+            edited = telegram.edit_message_text(chat_id, message_id, confirm_text)
+        if chat_id and not edited:
+            telegram.send_message(chat_id, confirm_text)
     elif action == "skip":
         out = skip_charge(db, user, charge_id)
         if out is None:
             telegram.answer_callback_query(cb["id"], "Charge already resolved.")
             return
         telegram.answer_callback_query(cb["id"], "Skipped.")
+        skip_text = "— Skipped this billing."
+        edited = False
         if chat_id and message_id:
-            telegram.edit_message_text(chat_id, message_id, "— Skipped this billing.")
+            edited = telegram.edit_message_text(chat_id, message_id, skip_text)
+        if chat_id and not edited:
+            telegram.send_message(chat_id, skip_text)
     else:
         telegram.answer_callback_query(cb["id"], "Unknown action.")

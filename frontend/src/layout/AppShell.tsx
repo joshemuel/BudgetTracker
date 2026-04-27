@@ -4,7 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Me } from "@/types";
 import { monthName } from "@/lib/format";
+import { useIsMobile } from "@/lib/mediaQuery";
 import { useAmountVisibility } from "@/lib/privacy";
+import { usePwaInstall } from "@/lib/pwaInstall";
 import { useTheme } from "@/lib/theme";
 import { startSyncPolling } from "@/lib/sync";
 import QuickLog from "@/components/QuickLog";
@@ -21,7 +23,15 @@ const nav = [
   { to: "/settings", label: "Settings" },
 ];
 
-function Masthead({ me, onLog }: { me: Me | undefined; onLog: () => void }) {
+function Masthead({
+  me,
+  onLog,
+  install,
+}: {
+  me: Me | undefined;
+  onLog: () => void;
+  install: { onInstall: () => void } | null;
+}) {
   const qc = useQueryClient();
   const nav = useNavigate();
   const { showAmounts, toggleAmounts } = useAmountVisibility();
@@ -90,6 +100,14 @@ function Masthead({ me, onLog }: { me: Me | undefined; onLog: () => void }) {
               </svg>
             )}
           </button>
+          {install && (
+            <button
+              onClick={install.onInstall}
+              className="smallcaps px-3 py-1.5 border border-ink text-ink hover:bg-ink hover:text-paper transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              Install
+            </button>
+          )}
           <button
             onClick={onLog}
             className="smallcaps px-3 py-1.5 border border-ink text-ink hover:bg-ink hover:text-paper transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -128,6 +146,28 @@ function Masthead({ me, onLog }: { me: Me | undefined; onLog: () => void }) {
   );
 }
 
+function IosInstallHelp({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+  return (
+    <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center p-4">
+      <div className="modal-card w-full max-w-sm p-5">
+        <h3 className="font-semibold">Install on iPhone</h3>
+        <p className="text-sm text-ink-soft mt-2">
+          Open this page in Safari, tap the Share button, then choose Add to Home Screen.
+        </p>
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={onClose}
+            className="smallcaps px-3 py-1 border border-ink/30 rounded"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SectionNav() {
   return (
     <nav className="py-3 border-b border-paper-rule overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
@@ -155,6 +195,8 @@ function SectionNav() {
 
 export default function AppShell() {
   const qc = useQueryClient();
+  const isMobile = useIsMobile();
+  const pwaInstall = usePwaInstall();
   const { data: me, isLoading, isError } = useQuery<Me>({
     queryKey: ["me"],
     queryFn: () => api.get<Me>("/auth/me"),
@@ -191,9 +233,18 @@ export default function AppShell() {
     return <Navigate to="/login" replace />;
   }
 
+  const installCta =
+    isMobile && pwaInstall.shouldShowInstall
+      ? {
+          onInstall: () => {
+            void pwaInstall.requestInstall();
+          },
+        }
+      : null;
+
   return (
     <div className="max-w-[1160px] lg:max-w-[1220px] mx-auto px-3 sm:px-4 md:px-5 lg:px-6 xl:px-8">
-      <Masthead me={me} onLog={() => setLogOpen(true)} />
+      <Masthead me={me} onLog={() => setLogOpen(true)} install={installCta} />
       <SectionNav />
       <main className="py-7 sm:py-10 md:py-12 lg:py-14">
         <Outlet />
@@ -206,6 +257,10 @@ export default function AppShell() {
       </footer>
       <QuickLog open={logOpen} onClose={() => setLogOpen(false)} />
       <WebChat />
+      <IosInstallHelp
+        open={isMobile && pwaInstall.showIosInstructions}
+        onClose={pwaInstall.closeIosInstructions}
+      />
     </div>
   );
 }

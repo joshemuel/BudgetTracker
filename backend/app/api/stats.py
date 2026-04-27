@@ -36,6 +36,16 @@ def _month_bounds(year: int, month: int) -> tuple[datetime, datetime]:
     return start, end
 
 
+def _excluded_untracked_category_ids(db: Session, user_id: int) -> set[int]:
+    rows = db.execute(
+        select(Category.id).where(
+            Category.user_id == user_id,
+            func.lower(Category.name).in_(("untrackable", "untracked")),
+        )
+    ).all()
+    return {int(category_id) for category_id, in rows}
+
+
 def _category_spent(
     db: Session,
     user_id: int,
@@ -43,18 +53,23 @@ def _category_spent(
     end: datetime,
     rates: fx.FxRates,
     report_currency: str,
+    excluded_category_ids: set[int],
 ) -> dict[int, Decimal]:
+    conditions = [
+        Transaction.user_id == user_id,
+        Transaction.deleted_at.is_(None),
+        Transaction.type == "expense",
+        Transaction.is_internal.is_(False),
+        Transaction.occurred_at >= start,
+        Transaction.occurred_at < end,
+    ]
+    if excluded_category_ids:
+        conditions.append(~Transaction.category_id.in_(excluded_category_ids))
+
     rows = db.execute(
         select(Transaction.category_id, Transaction.amount, Source.currency)
         .join(Source, Source.id == Transaction.source_id)
-        .where(
-            Transaction.user_id == user_id,
-            Transaction.deleted_at.is_(None),
-            Transaction.type == "expense",
-            Transaction.is_internal.is_(False),
-            Transaction.occurred_at >= start,
-            Transaction.occurred_at < end,
-        )
+        .where(*conditions)
     ).all()
     out: dict[int, Decimal] = {}
     for category_id, amount, currency in rows:
@@ -71,6 +86,7 @@ def _credit_summary(
     end: datetime,
     rates: fx.FxRates,
     report_currency: str,
+    excluded_category_ids: set[int],
 ) -> dict:
     cc_sources = db.query(Source).filter_by(user_id=user_id, is_credit_card=True).all()
     if not cc_sources:
@@ -91,11 +107,16 @@ def _credit_summary(
             rates,
         )
 
+    all_conditions = [
+        Transaction.user_id == user_id,
+        Transaction.source_id.in_(cc_ids),
+        Transaction.deleted_at.is_(None),
+    ]
+    if excluded_category_ids:
+        all_conditions.append(~Transaction.category_id.in_(excluded_category_ids))
+
     all_rows = db.execute(
-        select(Transaction.source_id, Transaction.type, Transaction.amount).where(
-            Transaction.source_id.in_(cc_ids),
-            Transaction.deleted_at.is_(None),
-        )
+        select(Transaction.source_id, Transaction.type, Transaction.amount).where(*all_conditions)
     ).all()
     for source_id, t_type, amount in all_rows:
         amount_report = fx.convert(
@@ -109,13 +130,13 @@ def _credit_summary(
         else:
             outstanding -= amount_report
 
+    month_conditions = [
+        *all_conditions,
+        Transaction.occurred_at >= start,
+        Transaction.occurred_at < end,
+    ]
     month_rows = db.execute(
-        select(Transaction.source_id, Transaction.type, Transaction.amount).where(
-            Transaction.source_id.in_(cc_ids),
-            Transaction.deleted_at.is_(None),
-            Transaction.occurred_at >= start,
-            Transaction.occurred_at < end,
-        )
+        select(Transaction.source_id, Transaction.type, Transaction.amount).where(*month_conditions)
     ).all()
     month_charges = Decimal("0")
     month_payments = Decimal("0")
@@ -155,13 +176,16 @@ def overview(
     report_currency = _report_currency(user, currency)
     start, end = _month_bounds(y, m)
     rates = fx.get_rates_cached(db)
+    excluded_category_ids = _excluded_untracked_category_ids(db, user.id)
 
     # days in month and day-of-month for pacing
     days_in_month = (end - start).days
     today_day = today.day if (today.year == y and today.month == m) else days_in_month
 
     # Per-category spent in selected reporting currency
-    spent_by_cat = _category_spent(db, user.id, start, end, rates, report_currency)
+    spent_by_cat = _category_spent(
+        db, user.id, start, end, rates, report_currency, excluded_category_ids
+    )
     cats = {c.id: c.name for c in db.query(Category).filter_by(user_id=user.id).all()}
     budgets = db.query(Budget).filter_by(user_id=user.id).all()
     budget_rows = []
@@ -193,16 +217,20 @@ def overview(
         )
 
     # Totals this month (exclude internal transfers/credit payments) in report currency
+    totals_conditions = [
+        Transaction.user_id == user.id,
+        Transaction.deleted_at.is_(None),
+        Transaction.is_internal.is_(False),
+        Transaction.occurred_at >= start,
+        Transaction.occurred_at < end,
+    ]
+    if excluded_category_ids:
+        totals_conditions.append(~Transaction.category_id.in_(excluded_category_ids))
+
     totals_rows = db.execute(
         select(Transaction.type, Transaction.amount, Source.currency)
         .join(Source, Source.id == Transaction.source_id)
-        .where(
-            Transaction.user_id == user.id,
-            Transaction.deleted_at.is_(None),
-            Transaction.is_internal.is_(False),
-            Transaction.occurred_at >= start,
-            Transaction.occurred_at < end,
-        )
+        .where(*totals_conditions)
     ).all()
 
     month_income = Decimal("0")
@@ -226,7 +254,9 @@ def overview(
             "net": str(_round_currency(month_income - month_expense, report_currency)),
         },
         "budgets": budget_rows,
-        "credit": _credit_summary(db, user.id, start, end, rates, report_currency),
+        "credit": _credit_summary(
+            db, user.id, start, end, rates, report_currency, excluded_category_ids
+        ),
     }
 
 
@@ -243,17 +273,22 @@ def monthly(
     year_start = datetime(year, 1, 1, tzinfo=timezone.utc)
     year_end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
     rates = fx.get_rates_cached(db)
+    excluded_category_ids = _excluded_untracked_category_ids(db, user.id)
+
+    conditions = [
+        Transaction.user_id == user.id,
+        Transaction.deleted_at.is_(None),
+        Transaction.is_internal.is_(False),
+        Transaction.occurred_at >= year_start,
+        Transaction.occurred_at < year_end,
+    ]
+    if excluded_category_ids:
+        conditions.append(~Transaction.category_id.in_(excluded_category_ids))
 
     rows = db.execute(
         select(Transaction.occurred_at, Transaction.type, Transaction.amount, Source.currency)
         .join(Source, Source.id == Transaction.source_id)
-        .where(
-            Transaction.user_id == user.id,
-            Transaction.deleted_at.is_(None),
-            Transaction.is_internal.is_(False),
-            Transaction.occurred_at >= year_start,
-            Transaction.occurred_at < year_end,
-        )
+        .where(*conditions)
     ).all()
 
     by_month: dict[int, dict[str, Decimal]] = {
@@ -294,17 +329,22 @@ def daily(
     start, end = _month_bounds(y, m)
     days_in_month = (end - start).days
     rates = fx.get_rates_cached(db)
+    excluded_category_ids = _excluded_untracked_category_ids(db, user.id)
+
+    conditions = [
+        Transaction.user_id == user.id,
+        Transaction.deleted_at.is_(None),
+        Transaction.is_internal.is_(False),
+        Transaction.occurred_at >= start,
+        Transaction.occurred_at < end,
+    ]
+    if excluded_category_ids:
+        conditions.append(~Transaction.category_id.in_(excluded_category_ids))
 
     rows = db.execute(
         select(Transaction.occurred_at, Transaction.type, Transaction.amount, Source.currency)
         .join(Source, Source.id == Transaction.source_id)
-        .where(
-            Transaction.user_id == user.id,
-            Transaction.deleted_at.is_(None),
-            Transaction.is_internal.is_(False),
-            Transaction.occurred_at >= start,
-            Transaction.occurred_at < end,
-        )
+        .where(*conditions)
     ).all()
 
     by_day: dict[int, dict[str, Decimal]] = {
@@ -350,6 +390,17 @@ def categories_stats(
     )
     report_currency = _report_currency(user, currency)
     rates = fx.get_rates_cached(db)
+    excluded_category_ids = _excluded_untracked_category_ids(db, user.id)
+
+    conditions = [
+        Transaction.user_id == user.id,
+        Transaction.deleted_at.is_(None),
+        Transaction.is_internal.is_(False),
+        Transaction.occurred_at >= start_dt,
+        Transaction.occurred_at < end_dt,
+    ]
+    if excluded_category_ids:
+        conditions.append(~Transaction.category_id.in_(excluded_category_ids))
 
     rows = db.execute(
         select(
@@ -359,13 +410,7 @@ def categories_stats(
             Source.currency,
         )
         .join(Source, Source.id == Transaction.source_id)
-        .where(
-            Transaction.user_id == user.id,
-            Transaction.deleted_at.is_(None),
-            Transaction.is_internal.is_(False),
-            Transaction.occurred_at >= start_dt,
-            Transaction.occurred_at < end_dt,
-        )
+        .where(*conditions)
     ).all()
     cat_names = {c.id: c.name for c in db.query(Category).filter_by(user_id=user.id).all()}
     agg: dict[int, dict[str, Decimal | int]] = {}
