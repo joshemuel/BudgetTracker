@@ -42,23 +42,56 @@ SAVINGS_HINTS = {
 
 
 @dataclass
+class TxSummary:
+    tx_id: int
+    t_type: str  # "expense" or "income"
+    amount: Decimal
+    category: str
+    source: str
+    currency: str
+    date: str
+    description: str | None
+
+
+@dataclass
 class LogOutcome:
-    confirmations: list[str]
+    summaries: list[TxSummary]
     budget_notes: list[str]
-    transaction_ids: list[int]
+
+    @property
+    def transaction_ids(self) -> list[int]:
+        return [s.tx_id for s in self.summaries]
 
     def as_message(self) -> str:
-        if not self.confirmations:
+        if not self.summaries:
             return "Got the message, but couldn't extract any amounts. Try again?"
-        if len(self.confirmations) == 1:
-            msg = f"Logged: {self.confirmations[0]}."
+
+        def _fmt(s: TxSummary) -> str:
+            prefix = "Rp " if s.currency.upper() == "IDR" else f"{s.currency.upper()} "
+            lines = [
+                f"Type: {'Expense' if s.t_type == 'expense' else 'Income'}",
+                f"Amount: {prefix}{format_number(s.amount)}",
+                f"Category: {s.category}",
+                f"Source: {s.source}",
+                f"Date: {s.date}",
+            ]
+            if s.description:
+                lines.append(f"Note: {s.description}")
+            return "\n".join(lines)
+
+        parts: list[str] = []
+        if len(self.summaries) == 1:
+            parts.append("Logged\n")
+            parts.append(_fmt(self.summaries[0]))
         else:
-            msg = f"Logged {len(self.confirmations)} transactions:\n" + "\n".join(
-                f"{i + 1}. {c}" for i, c in enumerate(self.confirmations)
-            )
+            parts.append(f"Logged {len(self.summaries)} transactions\n")
+            for i, s in enumerate(self.summaries, 1):
+                parts.append(f"#{i}\n{_fmt(s)}")
+
         if self.budget_notes:
-            msg += "\n\n" + "\n".join(self.budget_notes)
-        return msg.strip()
+            parts.append("\n".join(self.budget_notes))
+
+        return "\n\n".join(parts)
 
 
 def _monthly_status(
@@ -240,9 +273,9 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
         raise RuntimeError("User has no sources defined")
 
     now = now_local()
-    confirmations: list[str] = []
     budget_notes: list[str] = []
     created: list[Transaction] = []
+    _summary_data: list[dict] = []
 
     for item in items:
         amount_raw = item.get("amount")
@@ -269,7 +302,6 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
             fallback_name = sources[0].name
         resolved_name = resolve_source_name(raw_src, valid_names, fallback_name)
         source = src_by_name.get(resolved_name.lower(), default_src)
-        used_default = not raw_src
 
         occurred = resolve_occurred_at(item.get("date"), item.get("time"), now)
         date_str = ensure_date(item.get("date"), now).strftime("%d/%m/%Y")
@@ -296,13 +328,17 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
         )
         db.add(tx)
         created.append(tx)
-
-        conf = (
-            f"{'Expense' if t_type == 'expense' else 'Income'} of "
-            f"{format_number(amount)} for {category.name} on {date_str} "
-            f"(source: {source.name}{' by default' if used_default else ''})"
+        _summary_data.append(
+            dict(
+                t_type=t_type,
+                amount=amount,
+                category=category.name,
+                source=source.name,
+                currency=source.currency or "IDR",
+                date=date_str,
+                description=description,
+            )
         )
-        confirmations.append(conf)
 
         if t_type == "expense":
             db.flush()
@@ -312,8 +348,8 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
                 if limit > 0:
                     pct = int(round(float(spent / limit) * 100))
                     budget_notes.append(
-                        f"{category.name} Budget: {format_number(spent)} of "
-                        f"{format_number(limit)} used ({pct}%) - {status}"
+                        f"Budget — {category.name}: {format_number(spent)} / "
+                        f"{format_number(limit)} ({pct}%) — {status}"
                     )
 
     # Transfer pair detection
@@ -323,11 +359,12 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
     for tx in created:
         db.refresh(tx)
 
-    return LogOutcome(
-        confirmations=confirmations,
-        budget_notes=budget_notes,
-        transaction_ids=[t.id for t in created],
-    )
+    summaries = [
+        TxSummary(tx_id=tx.id, **data)
+        for tx, data in zip(created, _summary_data)
+    ]
+
+    return LogOutcome(summaries=summaries, budget_notes=budget_notes)
 
 
 def _link_transfers(created: list[Transaction]) -> None:

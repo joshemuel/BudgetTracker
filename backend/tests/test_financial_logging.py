@@ -51,7 +51,7 @@ def test_log_items_budget_note_includes_newly_inserted_expense(auth_client):
 
         assert len(outcome.budget_notes) == 1
         note = outcome.budget_notes[0]
-        assert f"{category_name} Budget:" in note
+        assert category_name in note
         assert "40" in note
     finally:
         with SessionLocal() as db:

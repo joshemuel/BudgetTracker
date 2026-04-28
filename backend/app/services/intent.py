@@ -111,7 +111,7 @@ For card purchases:
 If wording is ambiguous, prefer NORMAL EXPENSE unless there is explicit bill/debt payment language.
 
 Each object:
-- "type": strictly "Income" or "Expense"
+- "type": strictly "Income" or "Expense". DEFAULT to "Expense" unless there is a clear income indicator in the message (received, earned, income, gaji, masuk, dapat, terima, salary, freelance, profit, revenue, refund, cashback).
 - "category": one of [{cats}], pick closest match
 - "amount": raw number (integer or decimal). Rules:
     * A plain decimal is LITERAL. "3.8" = 3.8. "0.5" = 0.5. "12.75" = 12.75. NEVER multiply a bare decimal by 1,000.

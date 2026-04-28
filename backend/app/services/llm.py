@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
 import httpx
@@ -26,11 +27,23 @@ def _url() -> str:
     return f"{get_settings().llm_base_url}/chat/completions"
 
 
+def _clean_llm_text(text: str) -> str:
+    """Strip <think> blocks and stray markdown code fences that Qwen models inject."""
+    # Remove reasoning blocks
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+    # Remove opening code fence (```json, ```, etc.)
+    text = re.sub(r"^```(?:json|python|text)?\s*\n?", "", text, flags=re.IGNORECASE).strip()
+    # Remove trailing code fence
+    text = re.sub(r"\s*```\s*$", "", text).strip()
+    return text
+
+
 def _extract_text(body: dict[str, Any]) -> str:
     if "error" in body:
         raise LLMError(body["error"].get("message", "LLM API error"))
     try:
-        return body["choices"][0]["message"]["content"]
+        content = body["choices"][0]["message"]["content"]
+        return _clean_llm_text(content)
     except (KeyError, IndexError, TypeError) as e:
         raise LLMError("Empty LLM response") from e
 

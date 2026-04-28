@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any, Callable
 
 from fastapi import APIRouter, Depends
@@ -9,10 +11,16 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.db.models import AppState, Category, Source, User
+from app.db.models import AppState, Category, Source, Transaction, User
 from app.services import financial, intent, query, telegram
 from app.services.auth import verify_password
-from app.services.parse import correct_inflated_decimal_amounts, now_local, resolve_source_name
+from app.services.parse import (
+    correct_inflated_decimal_amounts,
+    format_number,
+    now_local,
+    parse_amount,
+    resolve_source_name,
+)
 
 log = logging.getLogger(__name__)
 
@@ -26,14 +34,20 @@ LOGIN_PROMPT = "Send `/login <username> <password>` to connect this chat to your
 CREDIT_HELP_EMPTY = "No credit cards configured yet."
 PENDING_SOURCE_PREFIX = "PENDING_SOURCE_CREATE"
 PENDING_SOURCE_CHOICE_PREFIX = "PENDING_SOURCE_CHOICE"
+PENDING_TX_EDIT_PREFIX = "PENDING_TX_EDIT"
 SendFn = Callable[[int | str, str], None]
 
 
-def _emit_message(chat_id: int | str, text: str, send_fn: SendFn | None = None) -> None:
+def _emit_message(
+    chat_id: int | str,
+    text: str,
+    send_fn: SendFn | None = None,
+    reply_markup: dict | None = None,
+) -> None:
     if send_fn is not None:
         send_fn(chat_id, text)
         return
-    telegram.send_message(chat_id, text)
+    telegram.send_message(chat_id, text, reply_markup=reply_markup)
 
 
 def _user_for_chat(db: Session, chat_id: int | str) -> User | None:
@@ -154,6 +168,55 @@ def _clear_pending_source_choice_state(db: Session, user_id: int) -> None:
     if state is not None:
         db.delete(state)
         db.commit()
+
+
+def _pending_tx_edit_key(user_id: int) -> str:
+    return f"{PENDING_TX_EDIT_PREFIX}:{user_id}"
+
+
+def _pending_tx_edit_state(db: Session, user_id: int) -> AppState | None:
+    return db.query(AppState).filter_by(key=_pending_tx_edit_key(user_id)).one_or_none()
+
+
+def _set_pending_tx_edit_state(db: Session, user_id: int, tx_id: int) -> None:
+    state = _pending_tx_edit_state(db, user_id)
+    payload = {"tx_id": tx_id}
+    if state is None:
+        db.add(AppState(key=_pending_tx_edit_key(user_id), value=payload))
+    else:
+        state.value = payload
+    db.commit()
+
+
+def _clear_pending_tx_edit_state(db: Session, user_id: int) -> None:
+    state = _pending_tx_edit_state(db, user_id)
+    if state is not None:
+        db.delete(state)
+        db.commit()
+
+
+def _tx_keyboard(summaries: list) -> dict:
+    if not summaries:
+        return {"inline_keyboard": []}
+    if len(summaries) == 1:
+        tx_id = summaries[0].tx_id
+        return {
+            "inline_keyboard": [
+                [
+                    {"text": "✏️ Edit", "callback_data": f"tx:edit:{tx_id}"},
+                    {"text": "🗑️ Delete", "callback_data": f"tx:delete:{tx_id}"},
+                ]
+            ]
+        }
+    rows = []
+    for i, s in enumerate(summaries, 1):
+        rows.append(
+            [
+                {"text": f"✏️ Edit #{i}", "callback_data": f"tx:edit:{s.tx_id}"},
+                {"text": f"🗑️ Delete #{i}", "callback_data": f"tx:delete:{s.tx_id}"},
+            ]
+        )
+    return {"inline_keyboard": rows}
 
 
 def _is_yes(text: str) -> bool:
@@ -367,7 +430,13 @@ def _handle_pending_source_choice_reply(
         return True
 
     _clear_pending_source_choice_state(db, user.id)
-    _emit_message(chat_id, f"Using source '{chosen}'.\n\n{outcome.as_message()}", send_fn)
+    keyboard = _tx_keyboard(outcome.summaries) if send_fn is None else None
+    _emit_message(
+        chat_id,
+        f"Using source '{chosen}'.\n\n{outcome.as_message()}",
+        send_fn,
+        reply_markup=keyboard,
+    )
     return True
 
 
@@ -430,6 +499,179 @@ def _handle_pending_source_reply(
     return True
 
 
+_TX_EDIT_PROMPT = (
+    "What do you want to change? Reply with one of:\n"
+    "amount [value]   (e.g. amount 50k)\n"
+    "category [name]  (e.g. category Food)\n"
+    "source [name]    (e.g. source BCA Debit)\n"
+    "description [text]\n\n"
+    "Reply 'cancel' to abort."
+)
+
+
+def _handle_pending_tx_edit_reply(
+    db: Session,
+    user: User,
+    chat_id: int | str,
+    text: str,
+    send_fn: SendFn | None = None,
+) -> bool:
+    state = _pending_tx_edit_state(db, user.id)
+    if state is None:
+        return False
+
+    value = state.value if isinstance(state.value, dict) else {}
+    tx_id = value.get("tx_id")
+    if tx_id is None:
+        _clear_pending_tx_edit_state(db, user.id)
+        return False
+
+    t = text.strip()
+
+    if _is_no(t) or t.lower() == "cancel":
+        _clear_pending_tx_edit_state(db, user.id)
+        _emit_message(chat_id, "Edit cancelled.", send_fn)
+        return True
+
+    tx = (
+        db.query(Transaction)
+        .filter_by(id=int(tx_id), user_id=user.id)
+        .filter(Transaction.deleted_at.is_(None))
+        .one_or_none()
+    )
+    if tx is None:
+        _clear_pending_tx_edit_state(db, user.id)
+        _emit_message(chat_id, "Transaction not found or already deleted.", send_fn)
+        return True
+
+    m_amount = re.match(r"^amount\s+(.+)$", t, re.IGNORECASE)
+    m_category = re.match(r"^category\s+(.+)$", t, re.IGNORECASE)
+    m_source = re.match(r"^source\s+(.+)$", t, re.IGNORECASE)
+    m_desc = re.match(r"^(?:description|note)\s+(.*)$", t, re.IGNORECASE)
+
+    if m_amount:
+        try:
+            new_amount = parse_amount(m_amount.group(1).strip())
+            if new_amount <= 0:
+                raise ValueError
+        except Exception:
+            _emit_message(chat_id, "Couldn't parse that amount. Try e.g. amount 50k.", send_fn)
+            return True
+        tx.amount = new_amount
+        db.commit()
+        _clear_pending_tx_edit_state(db, user.id)
+        _emit_message(chat_id, f"Updated: amount changed to {format_number(new_amount)}.", send_fn)
+        return True
+
+    if m_category:
+        raw = m_category.group(1).strip()
+        cats = [c.name for c in db.query(Category).filter_by(user_id=user.id).all()]
+        resolved = resolve_source_name(raw, cats, "")
+        cat = db.query(Category).filter_by(user_id=user.id, name=resolved).one_or_none()
+        if cat is None:
+            _emit_message(
+                chat_id,
+                f"Category '{raw}' not found. Known: {', '.join(cats[:12])}",
+                send_fn,
+            )
+            return True
+        tx.category_id = cat.id
+        db.commit()
+        _clear_pending_tx_edit_state(db, user.id)
+        _emit_message(chat_id, f"Updated: category changed to {cat.name}.", send_fn)
+        return True
+
+    if m_source:
+        raw = m_source.group(1).strip()
+        srcs = [s.name for s in db.query(Source).filter_by(user_id=user.id, active=True).all()]
+        resolved = resolve_source_name(raw, srcs, "")
+        src = db.query(Source).filter_by(user_id=user.id, name=resolved, active=True).one_or_none()
+        if src is None:
+            _emit_message(
+                chat_id,
+                f"Source '{raw}' not found. Known: {', '.join(srcs[:12])}",
+                send_fn,
+            )
+            return True
+        tx.source_id = src.id
+        db.commit()
+        _clear_pending_tx_edit_state(db, user.id)
+        _emit_message(chat_id, f"Updated: source changed to {src.name}.", send_fn)
+        return True
+
+    if m_desc:
+        new_desc = m_desc.group(1).strip() or None
+        tx.description = new_desc
+        db.commit()
+        _clear_pending_tx_edit_state(db, user.id)
+        _emit_message(chat_id, f"Updated: description set to '{new_desc or '—'}'.", send_fn)
+        return True
+
+    _emit_message(chat_id, _TX_EDIT_PROMPT, send_fn)
+    return True
+
+
+def _handle_tx_callback(db: Session, user: User, cb: dict[str, Any]) -> None:
+    data = cb.get("data", "")
+    message = cb.get("message", {})
+    chat_id = message.get("chat", {}).get("id")
+    message_id = message.get("message_id")
+
+    parts = data.split(":")
+    if len(parts) != 3:
+        telegram.answer_callback_query(cb["id"], "Unknown action.")
+        return
+    _, action, raw_id = parts
+    try:
+        tx_id = int(raw_id)
+    except ValueError:
+        telegram.answer_callback_query(cb["id"], "Bad transaction ID.")
+        return
+
+    tx = (
+        db.query(Transaction)
+        .filter_by(id=tx_id, user_id=user.id)
+        .filter(Transaction.deleted_at.is_(None))
+        .one_or_none()
+    )
+
+    if action == "delete":
+        if tx is None:
+            telegram.answer_callback_query(cb["id"], "Transaction not found.")
+            return
+        tx.deleted_at = datetime.now(timezone.utc)
+        db.commit()
+        telegram.answer_callback_query(cb["id"], "Deleted.")
+        done_text = "Transaction deleted."
+        edited = False
+        if chat_id and message_id:
+            edited = telegram.edit_message_text(chat_id, message_id, done_text)
+        if chat_id and not edited:
+            telegram.send_message(chat_id, done_text)
+
+    elif action == "edit":
+        if tx is None:
+            telegram.answer_callback_query(cb["id"], "Transaction not found.")
+            return
+        category = db.get(Category, tx.category_id)
+        source = db.get(Source, tx.source_id)
+        current = (
+            f"Current values:\n"
+            f"Amount: {format_number(Decimal(tx.amount))}\n"
+            f"Category: {category.name if category else '?'}\n"
+            f"Source: {source.name if source else '?'}\n"
+            f"Description: {tx.description or '—'}\n\n"
+            f"{_TX_EDIT_PROMPT}"
+        )
+        _set_pending_tx_edit_state(db, user.id, tx_id)
+        telegram.answer_callback_query(cb["id"], "Tell me what to change.")
+        if chat_id:
+            telegram.send_message(chat_id, current)
+
+    else:
+        telegram.answer_callback_query(cb["id"], "Unknown action.")
+
+
 def _handle_text(
     db: Session,
     user: User,
@@ -451,6 +693,9 @@ def _handle_text(
         return
 
     if _handle_pending_source_reply(db, user, chat_id, t, send_fn=send_fn):
+        return
+
+    if _handle_pending_tx_edit_reply(db, user, chat_id, t, send_fn=send_fn):
         return
 
     cats, srcs = _names(db, user.id)
@@ -567,7 +812,8 @@ def _handle_text(
         return
 
     outcome = financial.log_items(db, user, items)
-    _emit_message(chat_id, outcome.as_message(), send_fn)
+    keyboard = _tx_keyboard(outcome.summaries) if send_fn is None else None
+    _emit_message(chat_id, outcome.as_message(), send_fn, reply_markup=keyboard)
 
 
 def _handle_media_b64(
@@ -609,7 +855,8 @@ def _handle_media_b64(
                     item["source"] = default_src_name
 
         outcome = financial.log_items(db, user, result["items"])
-        _emit_message(chat_id, outcome.as_message(), send_fn)
+        keyboard = _tx_keyboard(outcome.summaries) if send_fn is None else None
+        _emit_message(chat_id, outcome.as_message(), send_fn, reply_markup=keyboard)
     else:
         _emit_message(chat_id, "Didn't catch anything financial in there.", send_fn)
 
@@ -626,14 +873,17 @@ def dispatch_update(db: Session, update: dict[str, Any]) -> None:
     """Shared dispatch for both webhook and polling paths."""
     cb = update.get("callback_query")
     if cb:
-        from app.services import subscriptions  # lazy to avoid import cycles
-
         chat_id = cb["message"]["chat"]["id"]
         user = _user_for_chat(db, chat_id)
         if user is None:
             telegram.answer_callback_query(cb["id"], "Please /login first.")
             return
-        subscriptions.handle_callback(db, user, cb)
+        data = cb.get("data", "")
+        if data.startswith("tx:"):
+            _handle_tx_callback(db, user, cb)
+        else:
+            from app.services import subscriptions  # lazy to avoid import cycles
+            subscriptions.handle_callback(db, user, cb)
         return
 
     msg = update.get("message")
@@ -697,7 +947,7 @@ async def web_chat(payload: dict[str, Any], db: Session = Depends(get_db)):
 
     messages: list[str] = []
 
-    def _capture(_chat_id: int | str, text: str) -> None:
+    def _capture(__: int | str, text: str) -> None:
         messages.append(text)
 
     text = str(payload.get("text") or "").strip()
