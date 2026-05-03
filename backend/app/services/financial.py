@@ -297,9 +297,6 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
 
         raw_src = item.get("source")
         fallback_name = default_src.name
-        # For incomes, prefer explicit source or first active; for expenses use preferred default.
-        if t_type == "income" and not raw_src and sources:
-            fallback_name = sources[0].name
         resolved_name = resolve_source_name(raw_src, valid_names, fallback_name)
         source = src_by_name.get(resolved_name.lower(), default_src)
 
