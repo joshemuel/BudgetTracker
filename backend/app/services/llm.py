@@ -24,11 +24,11 @@ def _headers() -> dict[str, str]:
 
 
 def _url() -> str:
-    return f"{get_settings().llm_base_url}/chat/completions"
+    return f"{get_settings().llm_base_url.rstrip('/')}/chat/completions"
 
 
 def _clean_llm_text(text: str) -> str:
-    """Strip <think> blocks and stray markdown code fences that Qwen models inject."""
+    """Strip reasoning blocks and stray markdown fences some models return."""
     # Remove reasoning blocks
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
     # Remove opening code fence (```json, ```, etc.)
@@ -49,7 +49,7 @@ def _extract_text(body: dict[str, Any]) -> str:
 
 
 def call(prompt: str, json_mode: bool = True, timeout: float = 45.0) -> str:
-    """Default model (qwen3.5-omni-flash) — used for intent classification and extraction."""
+    """Default model (Gemini Flash-Lite) for intent classification and extraction."""
     payload: dict[str, Any] = {
         "model": get_settings().llm_model,
         "messages": [{"role": "user", "content": prompt}],
@@ -65,7 +65,7 @@ def call(prompt: str, json_mode: bool = True, timeout: float = 45.0) -> str:
 
 
 def call_query(prompt: str, timeout: float = 45.0) -> str:
-    """Uses qwen-plus — for natural language queries about finances."""
+    """Uses Gemini Flash for natural language questions about finances."""
     payload: dict[str, Any] = {
         "model": get_settings().llm_query_model,
         "messages": [{"role": "user", "content": prompt}],
@@ -79,23 +79,29 @@ def call_query(prompt: str, timeout: float = 45.0) -> str:
 
 
 def call_with_media(prompt: str, base64_data: str, mime_type: str, timeout: float = 60.0) -> str:
-    """Uses qwen3.5-omni-flash — handles audio and image input."""
+    """Uses Gemini Flash-Lite for everyday audio and image logging."""
     is_audio = mime_type.startswith("audio")
+    media: dict[str, Any]
+    if is_audio:
+        subtype = mime_type.split("/", 1)[1].split(";", 1)[0].lower()
+        media = {
+            "type": "input_audio",
+            "input_audio": {
+                "data": base64_data,
+                "format": {"mpeg": "mp3", "x-wav": "wav"}.get(subtype, subtype),
+            },
+        }
+    else:
+        media = {
+            "type": "image_url",
+            "image_url": {"url": f"data:{mime_type};base64,{base64_data}"},
+        }
     payload: dict[str, Any] = {
         "model": get_settings().llm_model,
         "messages": [
             {
                 "role": "user",
-                "content": [
-                    {
-                        "type": "input_audio" if is_audio else "image_url",
-                        "input_audio" if is_audio else "image_url": {
-                            "data": f"data:{mime_type};base64,{base64_data}",
-                            "format": mime_type.split("/")[1],
-                        },
-                    },
-                    {"type": "text", "text": prompt},
-                ],
+                "content": [media, {"type": "text", "text": prompt}],
             }
         ],
         "response_format": {"type": "json_object"},

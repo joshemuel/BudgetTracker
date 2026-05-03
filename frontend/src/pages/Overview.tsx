@@ -145,27 +145,27 @@ export default function OverviewPage() {
             {showAmounts ? "Hide" : "Show"}
           </button>
         </div>
-        <h2 className="display text-2xl sm:text-3xl md:text-4xl lg:text-5xl mt-2">
+        <h2 className="display text-xl sm:text-2xl md:text-3xl lg:text-4xl mt-2">
           <span className="display-italic">A month</span>, in figures.
         </h2>
       </section>
 
       <section className="col-span-12 md:col-span-4 border-t border-ink pt-2">
         <Figure
-          label="In"
+          label="Income"
           value={fmtAmount(ov.totals.income)}
           tone="gain"
           sub="Credits posted this month"
-          emphasize={isMobile}
+          emphasize
         />
       </section>
       <section className="col-span-12 md:col-span-4 border-t border-ink pt-2">
         <Figure
-          label="Out"
+          label="Expenditure"
           value={fmtAmount(ov.totals.expense)}
           tone="accent"
           sub="Debits posted this month"
-          emphasize={isMobile}
+          emphasize
         />
       </section>
       <section className="col-span-12 md:col-span-4 border-t border-ink pt-2">
@@ -190,7 +190,7 @@ export default function OverviewPage() {
           </p>
         ) : (
           <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
-            <table className="ledger-table w-full text-[11px] sm:text-[13px]">
+            <table className="ledger-table w-full text-[10px] sm:text-xs">
               <thead>
                 <tr>
                   <th>Category</th>
@@ -228,15 +228,15 @@ export default function OverviewPage() {
         )}
       </section>
 
-      <aside className="col-span-12 lg:col-span-4 mt-6 space-y-10">
+      <aside className="col-span-12 lg:col-span-4 mt-6 space-y-8 text-sm">
         <div className="border-t-2 border-ink pt-4">
           <p className="smallcaps text-ink-mute">Credit Card</p>
-          <p className="num text-4xl sm:text-3xl mt-1 text-accent">
+          <p className="num text-2xl sm:text-3xl mt-1 text-accent break-words">
             {masked(fmtAmount(ov.credit.outstanding))}
           </p>
-          <p className="text-sm text-ink-soft mt-1">Outstanding balance (negative means payable)</p>
+          <p className="text-xs text-ink-soft mt-1">Outstanding balance (negative means payable)</p>
 
-          <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+          <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
             <div>
               <p className="smallcaps text-ink-mute">This Month</p>
               <p className="num text-accent">{masked(fmtAmount(ov.credit.month_charges))}</p>

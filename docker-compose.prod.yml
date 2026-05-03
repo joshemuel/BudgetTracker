@@ -27,10 +27,10 @@ services:
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
       TELEGRAM_CHAT_ID: ""
       TELEGRAM_POLLING: "false"
-      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY}
-      LLM_BASE_URL: ${LLM_BASE_URL}
-      LLM_MODEL: ${LLM_MODEL}
-      LLM_QUERY_MODEL: ${LLM_QUERY_MODEL}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      LLM_BASE_URL: https://generativelanguage.googleapis.com/v1beta/openai
+      LLM_MODEL: gemini-2.5-flash-lite
+      LLM_QUERY_MODEL: gemini-2.5-flash
       TZ: ${TZ}
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:

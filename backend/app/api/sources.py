@@ -191,7 +191,7 @@ def delete_source(
     # If source has history, soft-delete by deactivating it.
     txn_count = (
         db.query(func.count(Transaction.id))
-        .filter(Transaction.source_id == source_id, Transaction.deleted_at.is_(None))
+        .filter(Transaction.source_id == source_id)
         .scalar()
     )
     if txn_count:

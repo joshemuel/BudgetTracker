@@ -1,7 +1,11 @@
 from functools import lru_cache
 
+from pydantic import AliasChoices
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+GEMINI_OPENAI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
 
 
 class Settings(BaseSettings):
@@ -16,13 +20,16 @@ class Settings(BaseSettings):
     telegram_token: str = Field(default="", alias="TELEGRAM_TOKEN")
     telegram_chat_id: str = Field(default="", alias="TELEGRAM_CHAT_ID")
 
-    llm_api_key: str = Field(default="", alias="DASHSCOPE_API_KEY")
+    llm_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("GEMINI_API_KEY", "DASHSCOPE_API_KEY"),
+    )
     llm_base_url: str = Field(
-        default="https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        default=GEMINI_OPENAI_BASE_URL,
         alias="LLM_BASE_URL",
     )
-    llm_model: str = Field(default="qwen3.5-omni-flash", alias="LLM_MODEL")
-    llm_query_model: str = Field(default="qwen-plus", alias="LLM_QUERY_MODEL")
+    llm_model: str = Field(default="gemini-2.5-flash-lite", alias="LLM_MODEL")
+    llm_query_model: str = Field(default="gemini-2.5-flash", alias="LLM_QUERY_MODEL")
 
     tz: str = Field(default="Asia/Jakarta", alias="TZ")
 

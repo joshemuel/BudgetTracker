@@ -92,7 +92,7 @@ body::after {
   font-family: var(--font-display);
   font-weight: 500;
   font-variation-settings: "opsz" 144, "SOFT" 25, "WONK" 0;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1.02;
 }
 .display-italic {
@@ -262,12 +262,8 @@ hr {
   }
 
   .display {
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     line-height: 1;
-  }
-
-  .num {
-    font-size: 0.82em;
   }
 
   .ledger-table th,
