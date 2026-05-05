@@ -40,7 +40,6 @@ DEFAULT_CATEGORIES: list[str] = [
     "Groceries",
     "Other",
     "Investment",
-    "Credit Payment",
     "Untrackable",
 ]
 

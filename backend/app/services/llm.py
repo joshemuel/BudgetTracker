@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import logging
 import re
+import shutil
+import subprocess
 from typing import Any
 
 import httpx
@@ -14,6 +18,53 @@ log = logging.getLogger(__name__)
 
 class LLMError(Exception):
     pass
+
+
+_GEMINI_SAFE_AUDIO_FORMATS = {"mp3", "wav"}
+
+
+def _transcode_audio_to_mp3(b64_in: str, mime_type: str) -> str:
+    """Transcode any browser/Telegram audio payload to base64-encoded MP3.
+
+    Browser MediaRecorder (webm/opus) and Telegram voice notes (ogg/opus) are
+    not natively accepted by Gemini's OpenAI-compatible audio input. We pipe
+    everything through ffmpeg to land on a known-good mp3 stream.
+    """
+    if not shutil.which("ffmpeg"):
+        raise LLMError("ffmpeg is not available for audio transcoding")
+    try:
+        raw = base64.b64decode(b64_in, validate=False)
+    except (binascii.Error, ValueError) as e:
+        raise LLMError(f"Invalid base64 audio payload: {e}") from e
+    proc = subprocess.run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            "pipe:0",
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            "24000",
+            "-codec:a",
+            "libmp3lame",
+            "-q:a",
+            "5",
+            "-f",
+            "mp3",
+            "pipe:1",
+        ],
+        input=raw,
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode != 0 or not proc.stdout:
+        err = proc.stderr.decode("utf-8", errors="replace")[:400]
+        raise LLMError(f"ffmpeg transcode failed (mime={mime_type}): {err}")
+    return base64.b64encode(proc.stdout).decode("ascii")
 
 
 def _headers() -> dict[str, str]:
@@ -84,11 +135,15 @@ def call_with_media(prompt: str, base64_data: str, mime_type: str, timeout: floa
     media: dict[str, Any]
     if is_audio:
         subtype = mime_type.split("/", 1)[1].split(";", 1)[0].lower()
+        normalized = {"mpeg": "mp3", "x-wav": "wav"}.get(subtype, subtype)
+        if normalized not in _GEMINI_SAFE_AUDIO_FORMATS:
+            base64_data = _transcode_audio_to_mp3(base64_data, mime_type)
+            normalized = "mp3"
         media = {
             "type": "input_audio",
             "input_audio": {
                 "data": base64_data,
-                "format": {"mpeg": "mp3", "x-wav": "wav"}.get(subtype, subtype),
+                "format": normalized,
             },
         }
     else:

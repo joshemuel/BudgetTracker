@@ -324,11 +324,18 @@ def _credit_source_targets(
     targets: list[int] = []
 
     for idx, item in enumerate(items):
-        if _is_transfer_like_item(item):
-            continue
-
+        is_transfer = _is_transfer_like_item(item)
+        t_type = str(item.get("type") or "").strip().lower()
         category = str(item.get("category") or "").strip().lower()
         raw_source = str(item.get("source") or "").strip()
+
+        if is_transfer:
+            # For transfer-shape credit payments, the Income leg's source must
+            # resolve to a real credit card. Only the income leg gets routed
+            # to the card, never the paying-side expense leg.
+            if t_type.startswith("inc") and raw_source and _is_generic_credit_source_label(raw_source):
+                targets.append(idx)
+            continue
 
         if raw_source:
             raw_generic = _is_generic_credit_source_label(raw_source)
@@ -343,7 +350,7 @@ def _credit_source_targets(
                 targets.append(idx)
             continue
 
-        if category == "credit payment" or (has_credit_phrase and len(items) == 1):
+        if category == "credit payment" or has_credit_phrase:
             targets.append(idx)
 
     return sorted(set(targets))
@@ -760,15 +767,18 @@ def _handle_text(
         return
 
     if default_src_name:
+        mentions_credit = _contains_credit_card_phrase(t)
         for item in items:
             if str(item.get("type") or "").strip().lower().startswith("inc"):
                 continue
             raw_source = str(item.get("source") or "").strip()
             if not raw_source:
+                if mentions_credit:
+                    # Leave empty so _credit_source_targets routes to the credit card.
+                    continue
                 item["source"] = default_src_name
                 continue
 
-            mentions_credit = _contains_credit_card_phrase(t)
             source_is_credit = _contains_credit_card_phrase(raw_source)
             if mentions_credit and source_is_credit:
                 continue

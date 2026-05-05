@@ -93,16 +93,20 @@ export default function MonthlyPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 border-t border-ink pt-4">
         <div>
           <p className="smallcaps text-ink-mute">YTD In</p>
-          <p className="num text-2xl text-gain">{masked(fmtAmount(totals.income))}</p>
+          <p className="num text-[2.5rem] leading-[0.95] sm:text-2xl sm:leading-none mt-1 break-words text-gain">
+            {masked(fmtAmount(totals.income))}
+          </p>
         </div>
         <div>
           <p className="smallcaps text-ink-mute">YTD Out</p>
-          <p className="num text-2xl text-accent">{masked(fmtAmount(totals.expense))}</p>
+          <p className="num text-[2.5rem] leading-[0.95] sm:text-2xl sm:leading-none mt-1 break-words text-accent">
+            {masked(fmtAmount(totals.expense))}
+          </p>
         </div>
         <div>
           <p className="smallcaps text-ink-mute">YTD Net</p>
           <p
-            className={`num text-2xl ${
+            className={`num text-[2.5rem] leading-[0.95] sm:text-2xl sm:leading-none mt-1 break-words ${
               totals.income - totals.expense >= 0 ? "text-gain" : "text-accent"
             }`}
           >

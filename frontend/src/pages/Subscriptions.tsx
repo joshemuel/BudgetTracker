@@ -295,7 +295,7 @@ export default function SubscriptionsPage() {
         <SectionTitle kicker="Recurring charges">Subscriptions</SectionTitle>
         <div className="text-right">
           <p className="smallcaps text-ink-mute">Monthly total</p>
-          <p className="num text-2xl">{totalDisplay}</p>
+          <p className="num text-[2rem] leading-[0.95] sm:text-2xl sm:leading-none break-words">{totalDisplay}</p>
         </div>
       </div>
 
