@@ -14,6 +14,7 @@ def _clear_llm_env(monkeypatch) -> None:
         "GEMINI_API_KEY",
         "DASHSCOPE_API_KEY",
         "LLM_BASE_URL",
+        "LLM_LOG_MODEL",
         "LLM_MODEL",
         "LLM_QUERY_MODEL",
     ):
@@ -80,6 +81,19 @@ def test_call_uses_gemini_flash_lite_for_everyday_logging(monkeypatch):
     assert call["headers"]["Authorization"] == "Bearer gemini-test-key"
     assert call["json"]["model"] == "gemini-2.5-flash-lite"
     assert call["json"]["response_format"] == {"type": "json_object"}
+
+
+def test_call_logging_uses_dedicated_flash_lite_model(monkeypatch):
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("GEMINI_API_KEY", "gemini-test-key")
+    monkeypatch.setenv("LLM_MODEL", "gemini-2.5-flash")
+    monkeypatch.setenv("LLM_LOG_MODEL", "gemini-2.5-flash-lite")
+    monkeypatch.setattr(llm.httpx, "Client", _FakeClient)
+    _FakeClient.calls = []
+
+    llm.call_logging("Log 8.50 coffee")
+
+    assert _FakeClient.calls[0]["json"]["model"] == "gemini-2.5-flash-lite"
 
 
 def test_call_query_uses_gemini_flash_for_questions(monkeypatch):

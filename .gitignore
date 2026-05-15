@@ -25,3 +25,6 @@ frontend/tsconfig.tsbuildinfo
 # Local recovery artifacts
 *.root-owned.bak/
 *.root-owned.bak.tmp/
+
+# graphify local output
+graphify-out/

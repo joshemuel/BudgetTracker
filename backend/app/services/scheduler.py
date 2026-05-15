@@ -7,6 +7,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from app.config import get_settings
 from app.services import subscriptions as sub_svc
+from app.services import weekly_report
 
 log = logging.getLogger(__name__)
 
@@ -23,6 +24,14 @@ def start() -> None:
         sub_svc.run_daily,
         trigger=CronTrigger(hour=7, minute=0),
         id="subscriptions_daily",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    _scheduler.add_job(
+        weekly_report.send_weekly_reports,
+        trigger=CronTrigger(day_of_week="sun", hour=18, minute=0),
+        id="weekly_reports",
         replace_existing=True,
         max_instances=1,
         coalesce=True,

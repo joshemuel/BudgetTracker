@@ -30,6 +30,38 @@ def _to_decimal_map(raw: dict) -> dict[str, Decimal]:
     return out
 
 
+def _fallback_rates() -> FxRates:
+    one = Decimal("1")
+    return FxRates(
+        rates_per_usd={
+            "USD": one,
+            "IDR": one,
+            "SGD": one,
+            "JPY": one,
+            "AUD": one,
+            "TWD": one,
+        },
+        fetched_at=datetime.now(timezone.utc),
+    )
+
+
+def get_cached_rates(db) -> FxRates | None:
+    state = db.get(AppState, STATE_KEY)
+    if not state:
+        return None
+    try:
+        ts = datetime.fromisoformat(state.value["fetched_at"])
+        rates = _to_decimal_map(state.value["rates"])
+        return FxRates(rates_per_usd=rates, fetched_at=ts)
+    except Exception:
+        log.warning("Invalid cached FX rates")
+        return None
+
+
+def get_cached_rates_or_fallback(db) -> FxRates:
+    return get_cached_rates(db) or _fallback_rates()
+
+
 def _fetch_latest_rates(timeout: float = 8.0) -> FxRates:
     # Free, no-key endpoint. Example response has rates where base=USD.
     url = "https://open.er-api.com/v6/latest/USD"
@@ -46,15 +78,11 @@ def _fetch_latest_rates(timeout: float = 8.0) -> FxRates:
 def get_rates_cached(db) -> FxRates:
     state = db.get(AppState, STATE_KEY)
     stale: FxRates | None = None
-    if state:
-        try:
-            ts = datetime.fromisoformat(state.value["fetched_at"])
-            rates = _to_decimal_map(state.value["rates"])
-            stale = FxRates(rates_per_usd=rates, fetched_at=ts)
-            if datetime.now(timezone.utc) - ts < timedelta(hours=12):
-                return stale
-        except Exception:
-            log.warning("Invalid cached FX rates, refetching")
+    cached = get_cached_rates(db)
+    if cached is not None:
+        stale = cached
+        if datetime.now(timezone.utc) - cached.fetched_at < timedelta(hours=12):
+            return cached
 
     try:
         fresh = _fetch_latest_rates()
@@ -63,18 +91,7 @@ def get_rates_cached(db) -> FxRates:
         if stale is not None:
             return stale
         # Last-resort fallback: no conversion (1:1) so API remains available.
-        one = Decimal("1")
-        return FxRates(
-            rates_per_usd={
-                "USD": one,
-                "IDR": one,
-                "SGD": one,
-                "JPY": one,
-                "AUD": one,
-                "TWD": one,
-            },
-            fetched_at=datetime.now(timezone.utc),
-        )
+        return _fallback_rates()
 
     payload = {
         "fetched_at": fresh.fetched_at.isoformat(),

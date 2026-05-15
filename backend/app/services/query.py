@@ -33,7 +33,7 @@ def _tx_csv(db: Session, user_id: int) -> str:
         local = r.occurred_at.astimezone(z)
         desc = (r.description or "").replace(",", " ")
         buf.write(
-            f"{local.strftime('%d/%m/%Y')},"
+            f"{local.strftime('%m/%d/%Y')},"
             f"{local.strftime('%H:%M:%S')},"
             f"{'Expense' if r.type == 'expense' else 'Income'},"
             f"{cats.get(r.category_id, '')},"
@@ -97,7 +97,7 @@ def _credit_outstanding(db: Session, user_id: int) -> Decimal:
 
 def answer(db: Session, user: User, question: str) -> str:
     now = now_local()
-    today_str = now.strftime("%d/%m/%Y")
+    today_str = now.strftime("%m/%d/%Y")
     dow = now.strftime("%A")
     tx = _tx_csv(db, user.id)
     src = _sources_csv(db, user.id)
@@ -109,7 +109,7 @@ def answer(db: Session, user: User, question: str) -> str:
     You are Leo, a cheerful and concise personal budget assistant on Telegram.
     Keep responses short. No emojis. No bullet points. Conversational.
 
-    Today is {dow}, {today_str}. Date format dd/MM/yyyy.
+    Today is {dow}, {today_str}. Date format MM/DD/yyyy (US-style, month first).
 
     User's transactions (Date,Time,Type,Category,Amount,Source,Description):
     {tx}

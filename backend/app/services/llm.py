@@ -100,9 +100,25 @@ def _extract_text(body: dict[str, Any]) -> str:
 
 
 def call(prompt: str, json_mode: bool = True, timeout: float = 45.0) -> str:
-    """Default model (Gemini Flash-Lite) for intent classification and extraction."""
+    """Default model for general JSON calls."""
     payload: dict[str, Any] = {
         "model": get_settings().llm_model,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
+    with httpx.Client(timeout=timeout) as c:
+        r = c.post(_url(), json=payload, headers=_headers())
+        if r.status_code == 429:
+            raise LLMError("Hit the API rate limit. Try again later.")
+        r.raise_for_status()
+        return _extract_text(r.json())
+
+
+def call_logging(prompt: str, json_mode: bool = True, timeout: float = 25.0) -> str:
+    """Dedicated Flash-Lite path for intent classification and transaction extraction."""
+    payload: dict[str, Any] = {
+        "model": get_settings().llm_log_model,
         "messages": [{"role": "user", "content": prompt}],
     }
     if json_mode:
@@ -129,7 +145,7 @@ def call_query(prompt: str, timeout: float = 45.0) -> str:
         return _extract_text(r.json())
 
 
-def call_with_media(prompt: str, base64_data: str, mime_type: str, timeout: float = 60.0) -> str:
+def call_with_media(prompt: str, base64_data: str, mime_type: str, timeout: float = 45.0) -> str:
     """Uses Gemini Flash-Lite for everyday audio and image logging."""
     is_audio = mime_type.startswith("audio")
     media: dict[str, Any]
@@ -152,7 +168,7 @@ def call_with_media(prompt: str, base64_data: str, mime_type: str, timeout: floa
             "image_url": {"url": f"data:{mime_type};base64,{base64_data}"},
         }
     payload: dict[str, Any] = {
-        "model": get_settings().llm_model,
+        "model": get_settings().llm_log_model,
         "messages": [
             {
                 "role": "user",

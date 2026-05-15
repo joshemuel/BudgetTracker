@@ -36,7 +36,7 @@ def classify(text: str, categories: list[str], sources: list[str]) -> dict[str, 
     - delete_last: {{"type": "delete_last"}}
     """
     try:
-        raw = llm.call(prompt, json_mode=True)
+        raw = llm.call_logging(prompt, json_mode=True)
         parsed = llm.parse_json(raw)
         if isinstance(parsed, dict) and "type" in parsed:
             return parsed
@@ -59,8 +59,9 @@ def extract_financial(
 Extract financial data from this text: "{text}"
 Today is {today_dow}, {today_ddmmyyyy}. Use this to resolve ALL relative dates.
 
-CRITICAL: All dates MUST be in dd/MM/yyyy format. Day comes FIRST, then month, then year.
-Example: March 11, 2026 = "11/03/2026". NOT "03/11/2026".
+CRITICAL: All dates MUST be in MM/DD/yyyy format (US style). Month comes FIRST, then day, then year.
+Example: March 11, 2026 = "03/11/2026". NOT "11/03/2026".
+Example: today ({today_ddmmyyyy}) is already in MM/DD/yyyy.
 
 DATE RESOLUTION RULES:
 - "yesterday" = subtract 1 day from today
@@ -69,7 +70,7 @@ DATE RESOLUTION RULES:
 - "last week" = 7 days ago
 - "this week" = the Monday of the current week
 - "last month" = same day last month
-- Always return an EXACT date in dd/MM/yyyy. NEVER return null for date.
+- Always return an EXACT date in MM/DD/yyyy. NEVER return null for date.
 
 TIME INFERENCE RULES:
 - If user gives an explicit time ("at 3pm", "around 10am"), use it.
@@ -110,7 +111,7 @@ For card purchases:
 If wording is ambiguous, prefer NORMAL EXPENSE unless there is explicit bill/debt payment language.
 
 Each object:
-- "type": strictly "Income" or "Expense". DEFAULT to "Expense" unless there is a clear income indicator in the message (received, earned, income, gaji, masuk, dapat, terima, salary, freelance, profit, revenue, refund, cashback).
+- "type": strictly "Income" or "Expense". STRONG DEFAULT is "Expense". Only return "Income" if the message contains an EXPLICIT income verb/noun: received, earned, income, gaji, masuk, dapat, terima, salary, freelance, profit, revenue, refund, cashback, bonus, dividend, payout. A bare amount + item ("35k on coffee", "50k bensin", "120k makan", "Rp 200.000 grocery") is ALWAYS an Expense — never Income. When in doubt, choose Expense.
 - "category": one of [{cats}], pick closest match
 - "amount": raw number (integer or decimal). Rules:
     * A plain decimal is LITERAL. "3.8" = 3.8. "0.5" = 0.5. "12.75" = 12.75. NEVER multiply a bare decimal by 1,000.
@@ -119,14 +120,14 @@ Each object:
     * Indonesian thousand separator with explicit "Rp" prefix keeps its digits: "Rp. 21.900" = 21900, "Rp 3.800" = 3800.
     * Without "Rp" and without a k/jt/etc suffix, dots are decimal points. "3.8" stays 3.8. Never guess it to be 3,800.
 - "description": short description. Fix typos. Proper capitalization. No emojis.
-- "date": "dd/MM/yyyy". NEVER null — always resolve to an exact date.
+- "date": "MM/DD/yyyy" (US-style, month first). NEVER null — always resolve to an exact date.
 - "time": "HH:mm:ss" or null (only null if date is today and no time context).
 - "source": source name explicitly mentioned by the user, or null if absent. It may be outside [{srcs}] when user mentions a new source.
     * When the user says just "credit" (or "kredit"), that's the credit card — return "credit card" as the source.
 
 If no clear financial data, return an empty array [].
 """
-    raw = llm.call(prompt, json_mode=True)
+    raw = llm.call_logging(prompt, json_mode=True)
     parsed = llm.parse_json(raw)
     if isinstance(parsed, dict):
         return [parsed] if parsed else []
@@ -162,9 +163,10 @@ STEP 2 - Return JSON:
 IF QUESTION: {{"intent": "query", "question": "transcribed question here"}}
 
 IF LOGGING: a JSON ARRAY of transaction objects (even for single transaction).
-Each: {{"intent": "log", "type": "Income"|"Expense", "category": one of [{cats}], "amount": number (int or decimal), "description": str, "date": "dd/MM/yyyy", "time": "HH:mm:ss"|null, "source": one of [{srcs}]|null, "is_internal": bool}}
+Each: {{"intent": "log", "type": "Income"|"Expense", "category": one of [{cats}], "amount": number (int or decimal), "description": str, "date": "MM/DD/yyyy", "time": "HH:mm:ss"|null, "source": one of [{srcs}]|null, "is_internal": bool}}
 
-DATE RULES: "yesterday" = subtract 1 day. "last Monday" = most recent Monday. Always return exact dd/MM/yyyy date. NEVER null.
+TYPE: STRONG DEFAULT is "Expense". Only choose "Income" if there is an EXPLICIT income word (received, earned, salary, gaji, masuk, dapat, terima, freelance, refund, cashback, bonus, dividend, payout). A bare amount + item ("35k on coffee") is ALWAYS Expense.
+DATE RULES: US-style MM/DD/yyyy — month FIRST. Example March 11, 2026 = "03/11/2026". "yesterday" = subtract 1 day. "last Monday" = most recent Monday. Always return exact MM/DD/yyyy date. NEVER null.
 TIME RULES: Infer only from explicit temporal cues (breakfast/morning→07:00, lunch/noon→12:00, dinner/evening→19:00). Do not infer from words like "coffee" alone. If today and no time is specified, return null. If past day and no time context, return "12:00:00".
 
 CREDIT CARD PAYMENT vs PURCHASE:

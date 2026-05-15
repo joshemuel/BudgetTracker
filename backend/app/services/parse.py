@@ -175,13 +175,13 @@ def format_number(num: Decimal | int | float) -> str:
 _DATE_RE = re.compile(r"^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$")
 
 
-def parse_date_dmy(text: str | None) -> date | None:
+def parse_date_mdy(text: str | None) -> date | None:
     if not text:
         return None
     m = _DATE_RE.match(text.strip())
     if not m:
         return None
-    d, mo, y = (int(x) for x in m.groups())
+    mo, d, y = (int(x) for x in m.groups())
     try:
         return date(y, mo, d)
     except ValueError:
@@ -189,7 +189,7 @@ def parse_date_dmy(text: str | None) -> date | None:
 
 
 def ensure_date(text: str | None, fallback: datetime) -> date:
-    return parse_date_dmy(text) or fallback.astimezone(tz()).date()
+    return parse_date_mdy(text) or fallback.astimezone(tz()).date()
 
 
 def parse_time_hms(text: str | None) -> time | None:
@@ -210,7 +210,7 @@ def resolve_occurred_at(
 ) -> datetime:
     """Port of resolveTime — today with no time = now, other day = 12:00:00."""
     z = tz()
-    d = parse_date_dmy(parsed_date) or now.astimezone(z).date()
+    d = parse_date_mdy(parsed_date) or now.astimezone(z).date()
     t = parse_time_hms(parsed_time)
     if t is None:
         if d == now.astimezone(z).date():

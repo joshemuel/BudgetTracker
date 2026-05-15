@@ -11,16 +11,18 @@ from decimal import Decimal
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import Budget, Category, Source, Transaction, User
+from app.services import fx
 from app.services.parse import (
     ensure_date,
     format_number,
     now_local,
     resolve_occurred_at,
     resolve_source_name,
+    tz,
 )
 
 log = logging.getLogger(__name__)
@@ -94,38 +96,71 @@ class LogOutcome:
         return "\n\n".join(parts)
 
 
-def _monthly_status(
-    db: Session, user_id: int, category_id: int
-) -> tuple[Decimal, Decimal, str] | None:
-    now = now_local()
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    if now.month == 12:
-        next_month = month_start.replace(year=now.year + 1, month=1)
+def _month_bounds_for(occurred_at: datetime) -> tuple[datetime, datetime]:
+    local = occurred_at.astimezone(tz()) if occurred_at.tzinfo else occurred_at.replace(tzinfo=tz())
+    start = local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if start.month == 12:
+        end = start.replace(year=start.year + 1, month=1)
     else:
-        next_month = month_start.replace(month=now.month + 1)
+        end = start.replace(month=start.month + 1)
+    return start, end
 
+
+def _status_day_for(month_start: datetime, next_month: datetime) -> int:
+    now = now_local()
+    if now.year == month_start.year and now.month == month_start.month:
+        return now.day
+    return (next_month - month_start).days
+
+
+def _monthly_status(
+    db: Session, user_id: int, category_id: int, occurred_at: datetime
+) -> tuple[Decimal, Decimal, str] | None:
     b = db.query(Budget).filter_by(user_id=user_id, category_id=category_id).one_or_none()
     if b is None:
         return None
 
-    spent = db.execute(
-        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+    cat = db.get(Category, category_id)
+    if cat is not None and cat.name.strip().lower() in {"untrackable", "untracked"}:
+        return None
+
+    month_start, next_month = _month_bounds_for(occurred_at)
+    rows = db.execute(
+        select(Transaction.amount, Source.currency)
+        .join(Source, Source.id == Transaction.source_id)
+        .where(
             Transaction.user_id == user_id,
             Transaction.deleted_at.is_(None),
             Transaction.type == "expense",
+            Transaction.is_internal.is_(False),
             Transaction.category_id == category_id,
             Transaction.occurred_at >= month_start,
             Transaction.occurred_at < next_month,
         )
-    ).scalar_one()
-    spent = Decimal(spent)
+    ).all()
+
+    budget_currency = (b.currency or "IDR").upper()
+    rates = (
+        fx.get_cached_rates_or_fallback(db)
+        if any((c or "IDR").upper() != budget_currency for _, c in rows)
+        else None
+    )
+    spent = Decimal("0")
+    for amount, source_currency in rows:
+        amount_dec = Decimal(amount)
+        source_cur = (source_currency or "IDR").upper()
+        if source_cur == budget_currency or rates is None:
+            spent += amount_dec
+        else:
+            spent += fx.convert(amount_dec, source_cur, budget_currency, rates)
+
     limit = Decimal(b.monthly_limit)
     if limit == 0:
         return spent, limit, "On Track"
 
     days_in_month = (next_month - month_start).days
     pct = float(spent / limit) * 100
-    expected = (now.day / days_in_month) * 100
+    expected = (_status_day_for(month_start, next_month) / days_in_month) * 100
     if pct > 100:
         status = "Over"
     elif pct > expected + 10:
@@ -221,7 +256,7 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
         amount: int/str,
         source: str|None,
         description: str|None,
-        date: "dd/MM/yyyy"|None,
+        date: "MM/DD/yyyy"|None,
         time: "HH:mm:ss"|None }
     Internal transfer-like pairs (same amount + date, one Expense + one Income)
     are linked via transfer_group_id.
@@ -301,7 +336,7 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
         source = src_by_name.get(resolved_name.lower(), default_src)
 
         occurred = resolve_occurred_at(item.get("date"), item.get("time"), now)
-        date_str = ensure_date(item.get("date"), now).strftime("%d/%m/%Y")
+        date_str = ensure_date(item.get("date"), now).strftime("%m/%d/%Y")
 
         description = item.get("description")
         if description is not None:
@@ -339,7 +374,7 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
 
         if t_type == "expense":
             db.flush()
-            ms = _monthly_status(db, user.id, category.id)
+            ms = None if is_internal else _monthly_status(db, user.id, category.id, occurred)
             if ms is not None:
                 spent, limit, status = ms
                 if limit > 0:

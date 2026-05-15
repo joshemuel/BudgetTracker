@@ -1,8 +1,29 @@
+from datetime import datetime, timezone
 from uuid import uuid4
 
-from app.db.models import Budget, Category, Source, Transaction, User
+from app.db.models import AppState, Budget, Category, Source, Transaction, User
 from app.db.session import SessionLocal
-from app.services import financial
+from app.services import financial, fx
+
+
+def _seed_fx_rates(db) -> None:
+    payload = {
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "rates": {
+            "USD": "1",
+            "IDR": "16000",
+            "SGD": "1",
+            "JPY": "150",
+            "AUD": "1.5",
+            "TWD": "32",
+        },
+    }
+    state = db.get(AppState, fx.STATE_KEY)
+    if state is None:
+        db.add(AppState(key=fx.STATE_KEY, value=payload))
+    else:
+        state.value = payload
+    db.commit()
 
 
 def test_log_items_budget_note_includes_newly_inserted_expense(auth_client):
@@ -61,6 +82,72 @@ def test_log_items_budget_note_includes_newly_inserted_expense(auth_client):
             db.query(Source).filter(Source.id == source.json()["id"]).delete(synchronize_session=False)
             db.query(Category).filter(Category.id == category["id"]).delete(synchronize_session=False)
             db.commit()
+
+
+def test_log_items_budget_note_uses_transaction_month_and_budget_currency(auth_client):
+    me = auth_client.get("/auth/me").json()
+    user_id = int(me["id"])
+    original_currency = me.get("default_currency", "IDR")
+
+    category_name = f"pytest_budget_fx_cat_{uuid4().hex[:8]}"
+    created_cat = auth_client.post("/categories", json={"name": category_name})
+    assert created_cat.status_code == 201, created_cat.text
+    category = created_cat.json()
+
+    src_name = f"pytest_budget_fx_src_{uuid4().hex[:8]}"
+    created_source = auth_client.post(
+        "/sources",
+        json={"name": src_name, "starting_balance": "0", "currency": "SGD"},
+    )
+    assert created_source.status_code == 201, created_source.text
+
+    budget_id: int | None = None
+    tx_id: int | None = None
+    try:
+        auth_client.patch("/auth/me", json={"default_currency": "IDR"})
+        created_budget = auth_client.post(
+            "/budgets",
+            json={"category_id": category["id"], "monthly_limit": "160000"},
+        )
+        assert created_budget.status_code == 201, created_budget.text
+        budget_id = created_budget.json()["id"]
+
+        with SessionLocal() as db:
+            _seed_fx_rates(db)
+            user = db.query(User).filter_by(id=user_id).one()
+            outcome = financial.log_items(
+                db,
+                user,
+                [
+                    {
+                        "type": "Expense",
+                        "category": category_name,
+                        "amount": 10,
+                        "source": src_name,
+                        "description": "backdated-fx-budget-check",
+                        "date": "15/04/2026",
+                        "time": "12:00:00",
+                    }
+                ],
+            )
+            tx_id = outcome.transaction_ids[0]
+
+        assert len(outcome.budget_notes) == 1
+        note = outcome.budget_notes[0]
+        assert category_name in note
+        assert "160.000 / 160.000 (100%)" in note
+    finally:
+        with SessionLocal() as db:
+            if tx_id is not None:
+                db.query(Transaction).filter(Transaction.id == tx_id).delete(synchronize_session=False)
+            if budget_id is not None:
+                db.query(Budget).filter(Budget.id == budget_id).delete(synchronize_session=False)
+            db.query(Source).filter(Source.id == created_source.json()["id"]).delete(
+                synchronize_session=False
+            )
+            db.query(Category).filter(Category.id == category["id"]).delete(synchronize_session=False)
+            db.commit()
+        auth_client.patch("/auth/me", json={"default_currency": original_currency})
 
 
 def test_log_items_maps_grocery_to_groceries_category(auth_client):

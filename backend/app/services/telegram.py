@@ -57,12 +57,20 @@ def answer_callback_query(callback_query_id: str, text: str | None = None) -> bo
     )
 
 
-def edit_message_text(chat_id: int | str, message_id: int, text: str) -> bool:
+def edit_message_text(
+    chat_id: int | str,
+    message_id: int,
+    text: str,
+    reply_markup: dict | None = None,
+) -> bool:
     if not get_settings().telegram_token:
         return False
+    payload: dict = {"chat_id": chat_id, "message_id": message_id, "text": text}
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
     return _post_json(
         "editMessageText",
-        {"chat_id": chat_id, "message_id": message_id, "text": text},
+        payload,
         timeout=10.0,
     )
 

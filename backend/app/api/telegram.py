@@ -178,9 +178,20 @@ def _pending_tx_edit_state(db: Session, user_id: int) -> AppState | None:
     return db.query(AppState).filter_by(key=_pending_tx_edit_key(user_id)).one_or_none()
 
 
-def _set_pending_tx_edit_state(db: Session, user_id: int, tx_id: int) -> None:
+def _set_pending_tx_edit_state(
+    db: Session,
+    user_id: int,
+    tx_id: int,
+    chat_id: int | str | None = None,
+    message_id: int | None = None,
+    message_tx_ids: list[int] | None = None,
+) -> None:
     state = _pending_tx_edit_state(db, user_id)
-    payload = {"tx_id": tx_id}
+    payload: dict[str, Any] = {"tx_id": tx_id}
+    if chat_id is not None and message_id is not None:
+        payload["chat_id"] = str(chat_id)
+        payload["message_id"] = int(message_id)
+        payload["message_tx_ids"] = message_tx_ids or [tx_id]
     if state is None:
         db.add(AppState(key=_pending_tx_edit_key(user_id), value=payload))
     else:
@@ -217,6 +228,85 @@ def _tx_keyboard(summaries: list) -> dict:
             ]
         )
     return {"inline_keyboard": rows}
+
+
+def _tx_ids_from_message(message: dict[str, Any], fallback_tx_id: int) -> list[int]:
+    ids: list[int] = []
+    keyboard = (message.get("reply_markup") or {}).get("inline_keyboard") or []
+    for row in keyboard:
+        for button in (row if isinstance(row, list) else []):
+            data = str((button or {}).get("callback_data") or "")
+            parts = data.split(":")
+            if len(parts) != 3 or parts[0] != "tx":
+                continue
+            try:
+                tx_id = int(parts[2])
+            except ValueError:
+                continue
+            if tx_id not in ids:
+                ids.append(tx_id)
+    return ids or [fallback_tx_id]
+
+
+def _summary_from_tx(db: Session, tx: Transaction) -> financial.TxSummary:
+    category = db.get(Category, tx.category_id)
+    source = db.get(Source, tx.source_id)
+    occurred = tx.occurred_at
+    if occurred.tzinfo is not None:
+        occurred = occurred.astimezone(now_local().tzinfo)
+    return financial.TxSummary(
+        tx_id=tx.id,
+        t_type=tx.type,
+        amount=Decimal(tx.amount),
+        category=category.name if category else "?",
+        source=source.name if source else "?",
+        currency=(source.currency if source else "IDR") or "IDR",
+        date=occurred.strftime("%m/%d/%Y"),
+        description=tx.description,
+    )
+
+
+def _message_for_tx_ids(
+    db: Session, user: User, tx_ids: list[int]
+) -> tuple[str | None, dict | None]:
+    summaries: list[financial.TxSummary] = []
+    for tx_id in tx_ids:
+        tx = (
+            db.query(Transaction)
+            .filter_by(id=int(tx_id), user_id=user.id)
+            .filter(Transaction.deleted_at.is_(None))
+            .one_or_none()
+        )
+        if tx is not None:
+            summaries.append(_summary_from_tx(db, tx))
+    if not summaries:
+        return None, None
+    outcome = financial.LogOutcome(summaries=summaries, budget_notes=[])
+    return outcome.as_message(), _tx_keyboard(summaries)
+
+
+def _restore_pending_tx_message(db: Session, user: User, value: dict[str, Any]) -> None:
+    chat_id = value.get("chat_id")
+    message_id = value.get("message_id")
+    if chat_id is None or message_id is None:
+        return
+    try:
+        msg_id = int(message_id)
+    except (TypeError, ValueError):
+        return
+    tx_ids = []
+    for raw in value.get("message_tx_ids") or [value.get("tx_id")]:
+        try:
+            tx_ids.append(int(raw))
+        except (TypeError, ValueError):
+            continue
+    text, keyboard = _message_for_tx_ids(db, user, tx_ids)
+    if text:
+        telegram.edit_message_text(chat_id, msg_id, text, reply_markup=keyboard)
+
+
+def _format_edit_update(field: str, before: str, after: str) -> str:
+    return f"Updated {field} from {before} to {after}!"
 
 
 def _is_yes(text: str) -> bool:
@@ -536,6 +626,7 @@ def _handle_pending_tx_edit_reply(
     t = text.strip()
 
     if _is_no(t) or t.lower() == "cancel":
+        _restore_pending_tx_message(db, user, value)
         _clear_pending_tx_edit_state(db, user.id)
         _emit_message(chat_id, "Edit cancelled.", send_fn)
         return True
@@ -547,6 +638,7 @@ def _handle_pending_tx_edit_reply(
         .one_or_none()
     )
     if tx is None:
+        _restore_pending_tx_message(db, user, value)
         _clear_pending_tx_edit_state(db, user.id)
         _emit_message(chat_id, "Transaction not found or already deleted.", send_fn)
         return True
@@ -557,6 +649,7 @@ def _handle_pending_tx_edit_reply(
     m_desc = re.match(r"^(?:description|note)\s+(.*)$", t, re.IGNORECASE)
 
     if m_amount:
+        before = format_number(Decimal(tx.amount))
         try:
             new_amount = parse_amount(m_amount.group(1).strip())
             if new_amount <= 0:
@@ -566,8 +659,14 @@ def _handle_pending_tx_edit_reply(
             return True
         tx.amount = new_amount
         db.commit()
+        if send_fn is None:
+            _restore_pending_tx_message(db, user, value)
         _clear_pending_tx_edit_state(db, user.id)
-        _emit_message(chat_id, f"Updated: amount changed to {format_number(new_amount)}.", send_fn)
+        _emit_message(
+            chat_id,
+            _format_edit_update("amount", before, format_number(new_amount)),
+            send_fn,
+        )
         return True
 
     if m_category:
@@ -582,10 +681,14 @@ def _handle_pending_tx_edit_reply(
                 send_fn,
             )
             return True
+        old_cat = db.get(Category, tx.category_id)
+        before = old_cat.name if old_cat else "?"
         tx.category_id = cat.id
         db.commit()
+        if send_fn is None:
+            _restore_pending_tx_message(db, user, value)
         _clear_pending_tx_edit_state(db, user.id)
-        _emit_message(chat_id, f"Updated: category changed to {cat.name}.", send_fn)
+        _emit_message(chat_id, _format_edit_update("category", before, cat.name), send_fn)
         return True
 
     if m_source:
@@ -600,18 +703,29 @@ def _handle_pending_tx_edit_reply(
                 send_fn,
             )
             return True
+        old_src = db.get(Source, tx.source_id)
+        before = old_src.name if old_src else "?"
         tx.source_id = src.id
         db.commit()
+        if send_fn is None:
+            _restore_pending_tx_message(db, user, value)
         _clear_pending_tx_edit_state(db, user.id)
-        _emit_message(chat_id, f"Updated: source changed to {src.name}.", send_fn)
+        _emit_message(chat_id, _format_edit_update("source", before, src.name), send_fn)
         return True
 
     if m_desc:
+        before = tx.description or "-"
         new_desc = m_desc.group(1).strip() or None
         tx.description = new_desc
         db.commit()
+        if send_fn is None:
+            _restore_pending_tx_message(db, user, value)
         _clear_pending_tx_edit_state(db, user.id)
-        _emit_message(chat_id, f"Updated: description set to '{new_desc or '—'}'.", send_fn)
+        _emit_message(
+            chat_id,
+            _format_edit_update("description", before, new_desc or "-"),
+            send_fn,
+        )
         return True
 
     _emit_message(chat_id, _TX_EDIT_PROMPT, send_fn)
@@ -670,8 +784,11 @@ def _handle_tx_callback(db: Session, user: User, cb: dict[str, Any]) -> None:
             f"Description: {tx.description or '—'}\n\n"
             f"{_TX_EDIT_PROMPT}"
         )
-        _set_pending_tx_edit_state(db, user.id, tx_id)
+        message_tx_ids = _tx_ids_from_message(message, tx_id)
+        _set_pending_tx_edit_state(db, user.id, tx_id, chat_id, message_id, message_tx_ids)
         telegram.answer_callback_query(cb["id"], "Tell me what to change.")
+        if chat_id and message_id:
+            telegram.edit_message_text(chat_id, message_id, "Editing...")
         if chat_id:
             telegram.send_message(chat_id, current)
 
@@ -750,7 +867,7 @@ def _handle_text(
         return
 
     # Default: log
-    today = now_local().strftime("%d/%m/%Y")
+    today = now_local().strftime("%m/%d/%Y")
     try:
         items = intent.extract_financial(t, cats, srcs, today)
     except Exception as e:
@@ -835,7 +952,7 @@ def _handle_media_b64(
     send_fn: SendFn | None = None,
 ) -> None:
     cats, srcs = _names(db, user.id)
-    today = now_local().strftime("%d/%m/%Y")
+    today = now_local().strftime("%m/%d/%Y")
     try:
         result = intent.extract_from_media(b64, mime, cats, srcs, today)
     except Exception as e:

@@ -93,9 +93,9 @@ def test_format_number():
     assert format_number(Decimal("45000")) == "45.000"
 
 
-def test_ensure_date_accepts_dmy():
+def test_ensure_date_accepts_mdy():
     fallback = datetime(2026, 4, 17, tzinfo=timezone.utc)
-    assert ensure_date("11/03/2026", fallback).isoformat() == "2026-03-11"
+    assert ensure_date("03/11/2026", fallback).isoformat() == "2026-03-11"
     assert ensure_date(None, fallback).isoformat() == "2026-04-17"
     assert ensure_date("not-a-date", fallback).isoformat() == "2026-04-17"
 

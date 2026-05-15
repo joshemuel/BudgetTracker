@@ -29,6 +29,7 @@ class Settings(BaseSettings):
         alias="LLM_BASE_URL",
     )
     llm_model: str = Field(default="gemini-2.5-flash-lite", alias="LLM_MODEL")
+    llm_log_model: str = Field(default="gemini-2.5-flash-lite", alias="LLM_LOG_MODEL")
     llm_query_model: str = Field(default="gemini-2.5-flash", alias="LLM_QUERY_MODEL")
 
     tz: str = Field(default="Asia/Jakarta", alias="TZ")
