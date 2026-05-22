@@ -17,6 +17,7 @@ htmlcov/
 # Local artifacts
 BudgetTracker.xlsx
 QWEN.md
+.worktrees/
 
 # TypeScript build outputs in source tree
 frontend/src/**/*.js
