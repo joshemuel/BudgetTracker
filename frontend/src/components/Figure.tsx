@@ -22,7 +22,7 @@ export function Figure({
       ? "text-warn"
       : "text-ink";
   const size = emphasize
-    ? "text-[3.4rem] sm:text-[3.5rem] md:text-[3.15rem] lg:text-[4.35rem] xl:text-[4.75rem] leading-[0.9]"
+    ? "text-2xl sm:text-3xl md:text-2xl lg:text-3xl xl:text-4xl leading-tight"
     : "text-[2.4rem] leading-[0.95] sm:text-xl sm:leading-none md:text-2xl lg:text-3xl";
   return (
     <div className="py-3 sm:py-4">
