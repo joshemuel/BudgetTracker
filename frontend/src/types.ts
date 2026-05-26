@@ -45,6 +45,7 @@ export type Transaction = {
   description: string | null;
   transfer_group_id: string | null;
   subscription_charge_id: number | null;
+  fx_rate: string | null;
 };
 
 export type TransactionList = {

@@ -167,6 +167,7 @@ class Transaction(Base):
     )
     transfer_group_id: Mapped[UUID | None] = mapped_column(SqlUUID(as_uuid=True))
     is_internal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    fx_rate: Mapped[Decimal | None] = mapped_column(Numeric(20, 10))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

@@ -129,8 +129,20 @@ function Masthead({
         </span>
       </div>
 
-      <div className="mt-6 sm:mt-8 md:mt-10 anim-in">
-        <h1 className="display text-[28px] sm:text-[52px] md:text-[76px] lg:text-[94px] xl:text-[106px] leading-[0.92] text-ink">
+      <div className="mt-4 sm:mt-6 anim-in flex items-center gap-3 sm:gap-4">
+        <svg
+          viewBox="0 0 32 32"
+          aria-hidden="true"
+          className="w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 text-ink shrink-0"
+          fill="none"
+        >
+          <rect x="2.5" y="2.5" width="27" height="27" stroke="currentColor" strokeWidth="1.4" />
+          <line x1="6" y1="12" x2="26" y2="12" stroke="currentColor" strokeWidth="0.9" opacity="0.55" />
+          <line x1="6" y1="20" x2="26" y2="20" stroke="currentColor" strokeWidth="0.9" opacity="0.55" />
+          <path d="M7 24 L13 17 L18.5 21.5 L25 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="25" cy="8" r="1.6" fill="currentColor" />
+        </svg>
+        <h1 className="display text-[20px] sm:text-[28px] md:text-[36px] lg:text-[44px] leading-[0.95] text-ink">
           Budget <span className="display-italic text-accent">Tracker</span>
         </h1>
       </div>

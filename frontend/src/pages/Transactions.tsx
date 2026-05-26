@@ -206,6 +206,11 @@ export default function TransactionsPage() {
                   {t.transfer_group_id && (
                     <span className="ml-2 smallcaps text-ink-mute">transfer</span>
                   )}
+                  {t.fx_rate && (
+                    <span className="ml-2 smallcaps text-ink-mute whitespace-nowrap">
+                      fx {Number(t.fx_rate).toPrecision(4)}
+                    </span>
+                  )}
                 </td>
                 <td>{t.category_name}</td>
                 <td className="text-ink-soft">

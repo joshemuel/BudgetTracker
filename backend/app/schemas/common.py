@@ -113,6 +113,7 @@ class TransactionOut(BaseModel):
     description: str | None
     transfer_group_id: UUID | None
     subscription_charge_id: int | None
+    fx_rate: Decimal | None = None
 
 
 class TransactionListOut(BaseModel):

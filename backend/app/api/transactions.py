@@ -16,7 +16,7 @@ from app.schemas.common import (
     TransactionOut,
     TransactionUpdate,
 )
-from app.services import fx
+from app.services import fx_historical
 
 SAVINGS_HINTS = {
     "saving",
@@ -46,6 +46,7 @@ def _to_out(t: Transaction, cats: dict[int, str], srcs: dict[int, str]) -> Trans
         description=t.description,
         transfer_group_id=t.transfer_group_id,
         subscription_charge_id=t.subscription_charge_id,
+        fx_rate=t.fx_rate,
     )
 
 
@@ -129,13 +130,18 @@ def create_transfer(
 
     transfer_cat = _transfer_category(db, user.id, to_src.name)
 
-    rates = fx.get_rates_cached(db)
     amount_from = Decimal(payload.amount)
-    amount_to = (
-        amount_from
-        if from_src.currency == to_src.currency
-        else fx.convert(amount_from, from_src.currency, to_src.currency, rates)
-    )
+    fx_rate: Decimal | None = None
+    if from_src.currency == to_src.currency:
+        amount_to = amount_from
+    else:
+        amount_to, fx_rate = fx_historical.convert(
+            db,
+            amount_from,
+            payload.occurred_at.date(),
+            from_src.currency,
+            to_src.currency,
+        )
 
     gid = uuid4()
     desc = payload.description.strip() if payload.description else None
@@ -163,6 +169,7 @@ def create_transfer(
         description=inc_desc,
         transfer_group_id=gid,
         is_internal=True,
+        fx_rate=fx_rate,
     )
     db.add(expense)
     db.add(income)

@@ -21,6 +21,22 @@ Dashboard: `http://localhost:5173` · API: `http://localhost:8000` · DB: `local
 
 Press **N** anywhere on the dashboard to open the quick-log drawer.
 
+### Working in worktrees
+
+The compose stack binds host ports `5432`/`8000`/`5173` by default, so running compose from a
+second git worktree will collide with the main stack. Put a `.env` in each worktree that
+remaps the host ports and sets a distinct project name, e.g.:
+
+```
+POSTGRES_PORT=5533
+BACKEND_PORT=8100
+FRONTEND_PORT=5273
+COMPOSE_PROJECT_NAME=budgettracker-<branch>
+```
+
+The frontend talks to the backend container-to-container, so no frontend code change is
+required when remapping host ports.
+
 ## Layout
 
 ```

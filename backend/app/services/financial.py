@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import Budget, Category, Source, Transaction, User
-from app.services import fx
+from app.services import fx, fx_historical
 from app.services.parse import (
     ensure_date,
     format_number,
@@ -53,6 +53,8 @@ class TxSummary:
     currency: str
     date: str
     description: str | None
+    fx_rate: Decimal | None = None
+    fx_from_currency: str | None = None
 
 
 @dataclass
@@ -79,6 +81,11 @@ class LogOutcome:
             ]
             if s.description:
                 lines.append(f"Note: {s.description}")
+            if s.fx_rate is not None and s.fx_from_currency:
+                lines.append(
+                    f"FX: 1 {s.fx_from_currency.upper()} ≈ "
+                    f"{s.fx_rate.normalize():f} {s.currency.upper()}"
+                )
             return "\n".join(lines)
 
         parts: list[str] = []
@@ -384,8 +391,9 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
                         f"{format_number(limit)} ({pct}%) — {status}"
                     )
 
-    # Transfer pair detection
-    _link_transfers(created)
+    # Transfer pair detection (also applies historical FX for cross-currency pairs)
+    src_by_id = {s.id: s for s in sources}
+    _link_transfers(db, created, _summary_data, src_by_id)
 
     db.commit()
     for tx in created:
@@ -399,25 +407,107 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
     return LogOutcome(summaries=summaries, budget_notes=budget_notes)
 
 
-def _link_transfers(created: list[Transaction]) -> None:
-    def _looks_like_transfer(t: Transaction) -> bool:
+_TRANSFER_TO_RE = re.compile(r"^transfer\s+to\s+(.+)$", re.IGNORECASE)
+_TRANSFER_FROM_RE = re.compile(r"^transfer\s+from\s+(.+)$", re.IGNORECASE)
+
+
+def _transfer_target(desc: str | None) -> str | None:
+    if not desc:
+        return None
+    m = _TRANSFER_TO_RE.match(desc.strip())
+    return m.group(1).strip().lower() if m else None
+
+
+def _transfer_source(desc: str | None) -> str | None:
+    if not desc:
+        return None
+    m = _TRANSFER_FROM_RE.match(desc.strip())
+    return m.group(1).strip().lower() if m else None
+
+
+def _name_matches(a: str, b: str) -> bool:
+    a = (a or "").strip().lower()
+    b = (b or "").strip().lower()
+    if not a or not b:
+        return False
+    return a == b or a in b or b in a
+
+
+def _link_transfers(
+    db: Session,
+    created: list[Transaction],
+    summary_data: list[dict],
+    src_by_id: dict[int, Source],
+) -> None:
+    # Index created transactions with their summary slot for amount/currency mutation.
+    indexed = list(enumerate(created))
+
+    def _is_transfer(t: Transaction) -> bool:
         d = (t.description or "").strip().lower()
         return d.startswith("transfer to ") or d.startswith("transfer from ")
 
-    txs = [t for t in created if _looks_like_transfer(t)]
-    # pair each Expense with an Income of same amount+date
-    pending: dict[tuple, Transaction] = {}
-    for t in txs:
-        key = (float(t.amount), t.occurred_at.date())
-        if t.type == "expense" and key not in pending:
-            pending[key] = t
-        elif t.type == "income" and key in pending:
-            other = pending.pop(key)
+    expenses = [t for _, t in indexed if t.type == "expense" and _is_transfer(t)]
+    incomes = [
+        (i, t) for i, t in indexed
+        if t.type == "income" and _is_transfer(t)
+    ]
+
+    used_incomes: set[int] = set()
+    for exp in expenses:
+        exp_src = src_by_id.get(exp.source_id)
+        if exp_src is None:
+            continue
+        target_name = _transfer_target(exp.description)
+        if target_name is None:
+            continue
+        for inc_i, inc in incomes:
+            if inc_i in used_incomes:
+                continue
+            if inc.occurred_at.date() != exp.occurred_at.date():
+                continue
+            inc_src = src_by_id.get(inc.source_id)
+            if inc_src is None:
+                continue
+            # income's source should match expense's "Transfer to <X>"
+            if not _name_matches(inc_src.name, target_name):
+                continue
+            # if income carries "Transfer from <Y>", Y should match expense source
+            from_name = _transfer_source(inc.description)
+            if from_name is not None and not _name_matches(exp_src.name, from_name):
+                continue
+
             gid = uuid4()
-            other.transfer_group_id = gid
-            t.transfer_group_id = gid
-            other.is_internal = True
-            t.is_internal = True
+            exp.transfer_group_id = gid
+            inc.transfer_group_id = gid
+            exp.is_internal = True
+            inc.is_internal = True
+
+            # Cross-currency: convert the income leg using the rate for the
+            # expense's occurred date. Same-currency: leave amounts alone.
+            exp_ccy = (exp_src.currency or "IDR").upper()
+            inc_ccy = (inc_src.currency or "IDR").upper()
+            if exp_ccy != inc_ccy:
+                try:
+                    new_amount, rate = fx_historical.convert(
+                        db,
+                        exp.amount,
+                        exp.occurred_at.date(),
+                        exp_ccy,
+                        inc_ccy,
+                    )
+                except Exception as e:
+                    log.warning("FX conversion failed for transfer pair: %s", e)
+                    rate = None
+                    new_amount = inc.amount
+                if rate is not None:
+                    inc.amount = new_amount
+                    inc.fx_rate = rate
+                    summary_data[inc_i]["amount"] = new_amount
+                    summary_data[inc_i]["fx_rate"] = rate
+                    summary_data[inc_i]["fx_from_currency"] = exp_ccy
+
+            used_incomes.add(inc_i)
+            break
 
 
 def soft_delete_last(db: Session, user: User) -> Transaction | None:
