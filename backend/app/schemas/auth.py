@@ -12,6 +12,7 @@ class UserOut(BaseModel):
     telegram_chat_id: str | None = None
     default_currency: str = "IDR"
     default_expense_source_id: int | None = None
+    sources_enabled: bool = True
 
     model_config = {"from_attributes": True}
 
@@ -19,6 +20,7 @@ class UserOut(BaseModel):
 class UserPreferencesUpdate(BaseModel):
     default_currency: str | None = None
     default_expense_source_id: int | None = None
+    sources_enabled: bool | None = None
 
 
 class ChangePasswordRequest(BaseModel):

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from decimal import Decimal
 from io import StringIO
 
@@ -27,7 +26,7 @@ def _tx_csv(db: Session, user_id: int) -> str:
     cats = {c.id: c.name for c in db.query(Category).filter_by(user_id=user_id).all()}
     srcs = {s.id: s.name for s in db.query(Source).filter_by(user_id=user_id).all()}
     buf = StringIO()
-    buf.write("Date,Time,Type,Category,Amount,Source,Description\n")
+    buf.write("Date,Time,Type,Category,Amount,Currency,Source,Description\n")
     z = tz()
     for r in rows:
         local = r.occurred_at.astimezone(z)
@@ -38,6 +37,7 @@ def _tx_csv(db: Session, user_id: int) -> str:
             f"{'Expense' if r.type == 'expense' else 'Income'},"
             f"{cats.get(r.category_id, '')},"
             f"{int(r.amount)},"
+            f"{r.currency},"
             f"{srcs.get(r.source_id, '')},"
             f"{desc}\n"
         )
@@ -111,7 +111,7 @@ def answer(db: Session, user: User, question: str) -> str:
 
     Today is {dow}, {today_str}. Date format MM/DD/yyyy (US-style, month first).
 
-    User's transactions (Date,Time,Type,Category,Amount,Source,Description):
+    User's transactions (Date,Time,Type,Category,Amount,Currency,Source,Description):
     {tx}
 
     Money sources:

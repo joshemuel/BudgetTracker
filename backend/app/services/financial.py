@@ -24,6 +24,7 @@ from app.services.parse import (
     resolve_source_name,
     tz,
 )
+from app.services.currency_mode import default_source_for_currency, resolve_entry_currency
 
 log = logging.getLogger(__name__)
 
@@ -133,8 +134,7 @@ def _monthly_status(
 
     month_start, next_month = _month_bounds_for(occurred_at)
     rows = db.execute(
-        select(Transaction.amount, Source.currency)
-        .join(Source, Source.id == Transaction.source_id)
+        select(Transaction.amount, Transaction.currency)
         .where(
             Transaction.user_id == user_id,
             Transaction.deleted_at.is_(None),
@@ -294,8 +294,8 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
     sources = db.query(Source).filter_by(user_id=user.id, active=True).all()
     src_by_name: dict[str, Source] = {s.name.lower(): s for s in sources}
     valid_names = [s.name for s in sources]
-    preferred_src = None
-    if user.default_expense_source_id is not None:
+    preferred_src = default_source_for_currency(db, user, user.default_currency or "IDR")
+    if preferred_src is None and user.default_expense_source_id is not None:
         preferred_src = next((s for s in sources if s.id == user.default_expense_source_id), None)
     currency_src = next(
         (
@@ -311,7 +311,7 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
         or src_by_name.get(DEFAULT_SOURCE.lower())
         or (sources[0] if sources else None)
     )
-    if default_src is None:
+    if default_src is None and user.sources_enabled:
         raise RuntimeError("User has no sources defined")
 
     now = now_local()
@@ -338,9 +338,30 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
         category = cat_by_name.get(resolved_cat_name.lower(), other_cat)
 
         raw_src = item.get("source")
-        fallback_name = default_src.name
-        resolved_name = resolve_source_name(raw_src, valid_names, fallback_name)
-        source = src_by_name.get(resolved_name.lower(), default_src)
+        if user.sources_enabled:
+            if default_src is None:
+                raise RuntimeError("User has no sources defined")
+            fallback_name = default_src.name
+            resolved_name = resolve_source_name(raw_src, valid_names, fallback_name)
+            source = src_by_name.get(resolved_name.lower(), default_src)
+            currency = resolve_entry_currency(
+                sources_enabled=True,
+                explicit_currency=item.get("currency"),
+                source_currency=source.currency,
+                default_currency=user.default_currency,
+            )
+            source_name = source.name
+        else:
+            currency = resolve_entry_currency(
+                sources_enabled=False,
+                explicit_currency=item.get("currency"),
+                source_currency=None,
+                default_currency=user.default_currency,
+            )
+            source = default_source_for_currency(db, user, currency)
+            if source is None:
+                raise RuntimeError(f"User has no default source for {currency}")
+            source_name = "N/A"
 
         occurred = resolve_occurred_at(item.get("date"), item.get("time"), now)
         date_str = ensure_date(item.get("date"), now).strftime("%m/%d/%Y")
@@ -362,6 +383,7 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
             category_id=category.id,
             amount=amount,
             source_id=source.id,
+            currency=currency,
             description=description,
             is_internal=is_internal,
         )
@@ -372,8 +394,8 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
                 t_type=t_type,
                 amount=amount,
                 category=category.name,
-                source=source.name,
-                currency=source.currency or "IDR",
+                source=source_name,
+                currency=currency,
                 date=date_str,
                 description=description,
             )

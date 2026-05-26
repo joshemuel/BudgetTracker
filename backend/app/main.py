@@ -4,12 +4,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy import text
 
-log = logging.getLogger(__name__)
-
 from app.api import (
     auth,
     budgets,
     categories,
+    currencies,
     sources,
     stats,
     subscriptions,
@@ -18,6 +17,8 @@ from app.api import (
 )
 from app.db.session import get_engine
 from app.services import scheduler, telegram_poller
+
+log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -42,6 +43,7 @@ app = FastAPI(title="BudgetTracker API", version="0.1.0", lifespan=lifespan)
 
 app.include_router(auth.router)
 app.include_router(sources.router)
+app.include_router(currencies.router)
 app.include_router(categories.router)
 app.include_router(budgets.router)
 app.include_router(transactions.router)

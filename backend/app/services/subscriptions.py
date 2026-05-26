@@ -11,7 +11,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.db.models import Category, Source, Subscription, SubscriptionCharge, Transaction, User
+from app.db.models import Source, Subscription, SubscriptionCharge, Transaction, User
 from app.db.session import SessionLocal
 from app.services import fx
 from app.services import telegram
@@ -136,6 +136,7 @@ def confirm_charge(db: Session, user: User, charge_id: int) -> Transaction | Non
         category_id=sub.category_id,
         amount=charge_amount,
         source_id=sub.source_id,
+        currency=source_currency,
         description=f"{sub.name} (subscription)",
         subscription_charge_id=charge.id,
     )

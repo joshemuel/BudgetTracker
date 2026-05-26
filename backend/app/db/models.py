@@ -53,6 +53,7 @@ class User(Base):
     telegram_chat_id: Mapped[str | None] = mapped_column(String(64))
     default_currency: Mapped[str] = mapped_column(String(3), nullable=False, default="IDR")
     default_expense_source_id: Mapped[int | None] = mapped_column(Integer)
+    sources_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -74,6 +75,18 @@ class Source(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class CurrencySourceDefault(Base):
+    __tablename__ = "currency_source_defaults"
+    __table_args__ = (
+        UniqueConstraint("user_id", "currency", name="uq_currency_source_defaults_user_currency"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    source_id: Mapped[int] = mapped_column(ForeignKey("sources.id", ondelete="CASCADE"), nullable=False)
 
 
 class Category(Base):
@@ -157,6 +170,7 @@ class Transaction(Base):
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"), nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     source_id: Mapped[int] = mapped_column(ForeignKey("sources.id"), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="IDR")
     description: Mapped[str | None] = mapped_column(Text)
     subscription_charge_id: Mapped[int | None] = mapped_column(
         ForeignKey(

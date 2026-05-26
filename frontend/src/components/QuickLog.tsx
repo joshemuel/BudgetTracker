@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Category, Me, Source, TxType } from "@/types";
+import type { Category, CurrencyBalance, Me, Source, TxType } from "@/types";
 import { fmtMoney } from "@/lib/format";
 
 function nowLocalISO(): string {
@@ -104,18 +104,28 @@ export default function QuickLog({ open, onClose }: Props) {
     queryFn: () => api.get<Source[]>("/sources"),
     enabled: open,
   });
+  const { data: currencies } = useQuery<CurrencyBalance[]>({
+    queryKey: ["currencies"],
+    queryFn: () => api.get<CurrencyBalance[]>("/currencies"),
+    enabled: open,
+  });
 
   const [kind, setKind] = useState<EntryKind>("expense");
   const [amountInput, setAmountInput] = useState("");
   const [categoryId, setCategoryId] = useState<number | "">("");
   const [sourceId, setSourceId] = useState<number | "">("");
+  const [currency, setCurrency] = useState<CurrencyBalance["currency"]>("IDR");
   const [toSourceId, setToSourceId] = useState<number | "">("");
   const [description, setDescription] = useState("");
   const [occurredAt, setOccurredAt] = useState(nowLocalISO());
   const [error, setError] = useState<string | null>(null);
 
   const selectedSource = srcs?.find((s) => s.id === Number(sourceId));
-  const amountCurrency = selectedSource?.currency ?? "IDR";
+  const sourcesEnabled = me?.sources_enabled !== false;
+  const preferredSourceId =
+    currencies?.find((row) => row.currency === (me?.default_currency ?? "IDR"))
+      ?.default_source_id ?? me?.default_expense_source_id;
+  const amountCurrency = sourcesEnabled ? selectedSource?.currency ?? "IDR" : currency;
   const amountSymbol = SYMBOL_BY_CURRENCY[amountCurrency] ?? amountCurrency;
 
   useEffect(() => {
@@ -125,11 +135,19 @@ export default function QuickLog({ open, onClose }: Props) {
       setAmountInput("");
       setCategoryId("");
       setSourceId("");
+      setCurrency(me?.default_currency ?? "IDR");
       setToSourceId("");
       setDescription("");
       setOccurredAt(nowLocalISO());
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!open || sourcesEnabled) return;
+    const preferred = currencies?.find((row) => row.currency === me?.default_currency);
+    const first = preferred ?? currencies?.[0];
+    if (first) setCurrency(first.currency);
+  }, [currencies, me?.default_currency, open, sourcesEnabled]);
 
   useEffect(() => {
     if (!open) return;
@@ -138,6 +156,9 @@ export default function QuickLog({ open, onClose }: Props) {
 
   useEffect(() => {
     if (!open) return;
+    if (!sourcesEnabled && kind === "transfer") {
+      setKind("expense");
+    }
     if (kind === "transfer" && categoryId) {
       setCategoryId("");
     }
@@ -145,15 +166,24 @@ export default function QuickLog({ open, onClose }: Props) {
       setToSourceId("");
     }
     if (kind === "transfer" && !sourceId) {
-      const first = defaultSourceId(srcs, me?.default_expense_source_id);
+      const first = defaultSourceId(srcs, preferredSourceId);
       if (first) setSourceId(first);
     }
-  }, [kind, open, srcs, categoryId, toSourceId, sourceId, me?.default_expense_source_id]);
+  }, [
+    kind,
+    open,
+    srcs,
+    categoryId,
+    toSourceId,
+    sourceId,
+    preferredSourceId,
+    sourcesEnabled,
+  ]);
 
   useEffect(() => {
     if (!open) return;
-    if (!sourceId) {
-      const preferred = defaultSourceId(srcs, me?.default_expense_source_id);
+    if (sourcesEnabled && !sourceId) {
+      const preferred = defaultSourceId(srcs, preferredSourceId);
       if (preferred) {
         setSourceId(preferred);
       }
@@ -171,7 +201,8 @@ export default function QuickLog({ open, onClose }: Props) {
     categoryId,
     srcs,
     cats,
-    me?.default_expense_source_id,
+    preferredSourceId,
+    sourcesEnabled,
   ]);
 
   useEffect(() => {
@@ -190,13 +221,14 @@ export default function QuickLog({ open, onClose }: Props) {
         type: kind === "income" ? "income" : "expense",
         category_id: Number(categoryId),
         amount: parseRawAmount(amountInput),
-        source_id: Number(sourceId),
+        ...(sourcesEnabled ? { source_id: Number(sourceId) } : { currency }),
         description: description || null,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["overview"] });
       qc.invalidateQueries({ queryKey: ["sources"] });
+      qc.invalidateQueries({ queryKey: ["currencies"] });
       qc.invalidateQueries({ queryKey: ["monthly"] });
       qc.invalidateQueries({ queryKey: ["daily"] });
       qc.invalidateQueries({ queryKey: ["category-stats"] });
@@ -218,6 +250,7 @@ export default function QuickLog({ open, onClose }: Props) {
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["overview"] });
       qc.invalidateQueries({ queryKey: ["sources"] });
+      qc.invalidateQueries({ queryKey: ["currencies"] });
       qc.invalidateQueries({ queryKey: ["monthly"] });
       qc.invalidateQueries({ queryKey: ["daily"] });
       qc.invalidateQueries({ queryKey: ["category-stats"] });
@@ -230,7 +263,12 @@ export default function QuickLog({ open, onClose }: Props) {
   const hasAmount = Number.isFinite(parsedAmount) && parsedAmount > 0;
   const isTransfer = kind === "transfer";
 
-  const canSubmitSingle = hasAmount && !isTransfer && categoryId && sourceId && !create.isPending;
+  const canSubmitSingle =
+    hasAmount &&
+    !isTransfer &&
+    categoryId &&
+    (sourcesEnabled ? sourceId : currency) &&
+    !create.isPending;
   const canSubmitTransfer =
     hasAmount && isTransfer && sourceId && toSourceId && sourceId !== toSourceId && !transfer.isPending;
 
@@ -296,7 +334,8 @@ export default function QuickLog({ open, onClose }: Props) {
                 <button
                   type="button"
                   onClick={() => setKind("transfer")}
-                  className={`py-2 smallcaps ${
+                  disabled={!sourcesEnabled}
+                  className={`py-2 smallcaps disabled:opacity-40 ${
                     kind === "transfer" ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
                   }`}
                 >
@@ -345,30 +384,49 @@ export default function QuickLog({ open, onClose }: Props) {
                     ))}
                   </select>
                 </label>
-                <label className="block">
-                  <span className="smallcaps text-ink-mute">Source</span>
-                  <select
-                    value={sourceId}
-                    onChange={(e) => {
-                      const nextId = e.target.value ? Number(e.target.value) : "";
-                      setSourceId(nextId);
-                      const nextCurrency = sourceCurrency(srcs, nextId);
-                      setAmountInput(
-                        displayAmount(normalizeByCurrency(amountInput, nextCurrency), nextCurrency)
-                      );
-                    }}
-                    className="mt-1 w-full bg-transparent border-b border-ink py-1 focus:outline-none focus:border-accent"
-                  >
-                    <option value="">—</option>
-                    {srcs
-                      ?.filter((s) => s.active)
-                      .map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
+                {sourcesEnabled ? (
+                  <label className="block">
+                    <span className="smallcaps text-ink-mute">Source</span>
+                    <select
+                      value={sourceId}
+                      onChange={(e) => {
+                        const nextId = e.target.value ? Number(e.target.value) : "";
+                        setSourceId(nextId);
+                        const nextCurrency = sourceCurrency(srcs, nextId);
+                        setAmountInput(
+                          displayAmount(normalizeByCurrency(amountInput, nextCurrency), nextCurrency)
+                        );
+                      }}
+                      className="mt-1 w-full bg-transparent border-b border-ink py-1 focus:outline-none focus:border-accent"
+                    >
+                      <option value="">—</option>
+                      {srcs
+                        ?.filter((s) => s.active)
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                ) : (
+                  <label className="block">
+                    <span className="smallcaps text-ink-mute">Currency</span>
+                    <select
+                      value={currency}
+                      onChange={(e) =>
+                        setCurrency(e.target.value as CurrencyBalance["currency"])
+                      }
+                      className="mt-1 w-full bg-transparent border-b border-ink py-1 focus:outline-none focus:border-accent"
+                    >
+                      {(currencies ?? []).map((row) => (
+                        <option key={row.currency} value={row.currency}>
+                          {row.currency}
                         </option>
                       ))}
-                  </select>
-                </label>
+                    </select>
+                  </label>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

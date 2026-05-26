@@ -122,6 +122,7 @@ Each object:
 - "description": short description. Fix typos. Proper capitalization. No emojis.
 - "date": "MM/DD/yyyy" (US-style, month first). NEVER null — always resolve to an exact date.
 - "time": "HH:mm:ss" or null (only null if date is today and no time context).
+- "currency": one of "IDR", "SGD", "JPY", "AUD", or "TWD" when the user states or clearly implies it, else null. The system will use the user's default currency when this is null.
 - "source": source name explicitly mentioned by the user, or null if absent. It may be outside [{srcs}] when user mentions a new source.
     * When the user says just "credit" (or "kredit"), that's the credit card — return "credit card" as the source.
 
@@ -163,7 +164,7 @@ STEP 2 - Return JSON:
 IF QUESTION: {{"intent": "query", "question": "transcribed question here"}}
 
 IF LOGGING: a JSON ARRAY of transaction objects (even for single transaction).
-Each: {{"intent": "log", "type": "Income"|"Expense", "category": one of [{cats}], "amount": number (int or decimal), "description": str, "date": "MM/DD/yyyy", "time": "HH:mm:ss"|null, "source": one of [{srcs}]|null, "is_internal": bool}}
+Each: {{"intent": "log", "type": "Income"|"Expense", "category": one of [{cats}], "amount": number (int or decimal), "description": str, "date": "MM/DD/yyyy", "time": "HH:mm:ss"|null, "currency": "IDR"|"SGD"|"JPY"|"AUD"|"TWD"|null, "source": one of [{srcs}]|null, "is_internal": bool}}
 
 TYPE: STRONG DEFAULT is "Expense". Only choose "Income" if there is an EXPLICIT income word (received, earned, salary, gaji, masuk, dapat, terima, freelance, refund, cashback, bonus, dividend, payout). A bare amount + item ("35k on coffee") is ALWAYS Expense.
 DATE RULES: US-style MM/DD/yyyy — month FIRST. Example March 11, 2026 = "03/11/2026". "yesterday" = subtract 1 day. "last Monday" = most recent Monday. Always return exact MM/DD/yyyy date. NEVER null.
@@ -177,6 +178,7 @@ TRANSFER: "transferred X from A to B" / "top up B for X" → two objects (Expens
 
 AMOUNT: plain decimals are LITERAL ("3.8" = 3.8, never 3800). Thousand shorthands only with explicit suffix: "40k"=40000, "3.8k"=3800, "500rb"=500000, "1.5jt"=1500000. Indonesian thousand separator with explicit "Rp" ("Rp 21.900" = 21900) is fine; without Rp/k/jt, a dot is a decimal point.
 SOURCE: if user says just "credit"/"kredit", treat it as the credit card.
+CURRENCY: return the explicit or clearly implied currency. Return null when absent so the system can use the user's default currency.
 No emojis.
 If nothing financial, return [].
 """

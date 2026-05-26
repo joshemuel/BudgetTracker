@@ -17,6 +17,7 @@ from app.schemas.common import (
     TransactionUpdate,
 )
 from app.services import fx_historical
+from app.services.currency_mode import default_source_for_currency, resolve_entry_currency
 
 SAVINGS_HINTS = {
     "saving",
@@ -43,6 +44,7 @@ def _to_out(t: Transaction, cats: dict[int, str], srcs: dict[int, str]) -> Trans
         amount=t.amount,
         source_id=t.source_id,
         source_name=srcs.get(t.source_id, ""),
+        currency=t.currency,
         description=t.description,
         transfer_group_id=t.transfer_group_id,
         subscription_charge_id=t.subscription_charge_id,
@@ -103,8 +105,36 @@ def create_transaction(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _validate_refs(db, user.id, payload.category_id, payload.source_id)
-    t = Transaction(user_id=user.id, **payload.model_dump())
+    data = payload.model_dump()
+    source_id = data.pop("source_id", None)
+    if user.sources_enabled:
+        if source_id is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Source is required")
+        _validate_refs(db, user.id, payload.category_id, source_id)
+        source = db.query(Source).filter_by(id=source_id, user_id=user.id).one()
+        data["source_id"] = source.id
+        data["currency"] = resolve_entry_currency(
+            sources_enabled=True,
+            explicit_currency=data.get("currency"),
+            source_currency=source.currency,
+            default_currency=user.default_currency,
+        )
+    else:
+        if source_id is not None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Source routing is disabled")
+        _validate_category(db, user.id, payload.category_id)
+        currency = resolve_entry_currency(
+            sources_enabled=False,
+            explicit_currency=data.get("currency"),
+            source_currency=None,
+            default_currency=user.default_currency,
+        )
+        source = default_source_for_currency(db, user, currency)
+        if source is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"No default source for {currency}")
+        data["source_id"] = source.id
+        data["currency"] = currency
+    t = Transaction(user_id=user.id, **data)
     db.add(t)
     db.commit()
     db.refresh(t)
@@ -118,6 +148,8 @@ def create_transfer(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    if not user.sources_enabled:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Enable Sources to transfer funds")
     if payload.amount <= 0:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Amount must be positive")
     if payload.from_source_id == payload.to_source_id:
@@ -155,6 +187,7 @@ def create_transfer(
         category_id=transfer_cat.id,
         amount=amount_from,
         source_id=from_src.id,
+        currency=from_src.currency,
         description=exp_desc,
         transfer_group_id=gid,
         is_internal=True,
@@ -166,6 +199,7 @@ def create_transfer(
         category_id=transfer_cat.id,
         amount=amount_to,
         source_id=to_src.id,
+        currency=to_src.currency,
         description=inc_desc,
         transfer_group_id=gid,
         is_internal=True,
@@ -202,13 +236,30 @@ def update_transaction(
     if t is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Transaction not found")
     data = payload.model_dump(exclude_unset=True)
-    if "category_id" in data or "source_id" in data:
-        _validate_refs(
-            db,
-            user.id,
-            data.get("category_id", t.category_id),
-            data.get("source_id", t.source_id),
+    if not user.sources_enabled and "source_id" in data:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Source routing is disabled")
+    if "category_id" in data:
+        _validate_category(db, user.id, data["category_id"])
+    if user.sources_enabled and "source_id" in data:
+        if data["source_id"] is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Source is required")
+        _validate_refs(db, user.id, data.get("category_id", t.category_id), data["source_id"])
+        source = db.query(Source).filter_by(id=data["source_id"], user_id=user.id).one()
+        data["currency"] = source.currency
+    elif not user.sources_enabled and "currency" in data:
+        currency = resolve_entry_currency(
+            sources_enabled=False,
+            explicit_currency=data["currency"],
+            source_currency=None,
+            default_currency=user.default_currency,
         )
+        source = default_source_for_currency(db, user, currency)
+        if source is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"No default source for {currency}")
+        data["source_id"] = source.id
+        data["currency"] = currency
+    elif user.sources_enabled:
+        data.pop("currency", None)
     for k, v in data.items():
         setattr(t, k, v)
     db.commit()
@@ -231,10 +282,14 @@ def delete_transaction(
 
 
 def _validate_refs(db: Session, user_id: int, category_id: int, source_id: int) -> None:
-    if db.query(Category).filter_by(id=category_id, user_id=user_id).first() is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown category")
+    _validate_category(db, user_id, category_id)
     if db.query(Source).filter_by(id=source_id, user_id=user_id).first() is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown source")
+
+
+def _validate_category(db: Session, user_id: int, category_id: int) -> None:
+    if db.query(Category).filter_by(id=category_id, user_id=user_id).first() is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown category")
 
 
 def _is_savings_like(name: str) -> bool:

@@ -16,6 +16,7 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
   const [confirmPw, setConfirmPw] = useState("");
   const [pwError, setPwError] = useState<string | null>(null);
   const [currency, setCurrency] = useState<Me["default_currency"]>("IDR");
+  const [sourcesEnabled, setSourcesEnabled] = useState(true);
   const [sourceId, setSourceId] = useState<number | "">("");
 
   const { data: sources } = useQuery<Source[]>({
@@ -23,28 +24,32 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
     queryFn: () => api.get<Source[]>("/sources"),
   });
 
-  const activeSources = (sources ?? []).filter((s) => s.active);
+  const currencySources = (sources ?? []).filter((s) => s.active && s.currency === currency);
 
   useEffect(() => {
     if (!me) return;
     setCurrency(me.default_currency || "IDR");
+    setSourcesEnabled(me.sources_enabled);
   }, [me]);
 
   useEffect(() => {
-    if (!me || activeSources.length === 0) return;
-    if (me.default_expense_source_id != null) {
-      setSourceId(me.default_expense_source_id);
+    if (!me || currencySources.length === 0) {
+      setSourceId("");
       return;
     }
-    const bca = activeSources.find((s) => s.name.toLowerCase() === "bca");
-    setSourceId(bca ? bca.id : activeSources[0].id);
-  }, [me, sources]);
+    const current = currencySources.find((s) => s.id === sourceId);
+    if (current) return;
+    const saved = currencySources.find((s) => s.id === me.default_expense_source_id);
+    const bca = currencySources.find((s) => s.name.toLowerCase() === "bca");
+    setSourceId((saved ?? bca ?? currencySources[0]).id);
+  }, [me, currencySources, sourceId]);
 
   const save = useMutation({
     mutationFn: () =>
       api.patch<Me>("/auth/me", {
         default_currency: currency,
         default_expense_source_id: sourceId || null,
+        sources_enabled: sourcesEnabled,
       }),
     onSuccess: async (updated) => {
       qc.setQueryData(["me"], updated);
@@ -56,6 +61,7 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
       await Promise.all([
         qc.refetchQueries({ queryKey: ["me"] }),
         qc.refetchQueries({ queryKey: ["sources"] }),
+        qc.refetchQueries({ queryKey: ["currencies"] }),
         qc.refetchQueries({ queryKey: ["budgets"], type: "active" }),
         qc.refetchQueries({ queryKey: ["overview"], type: "active" }),
         qc.refetchQueries({ queryKey: ["monthly"], type: "active" }),
@@ -165,16 +171,30 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
             </select>
           </label>
           <label className="block mb-3">
-            <span className="smallcaps text-ink-mute block mb-1">Default Expense Source (Telegram)</span>
+            <span className="smallcaps text-ink-mute block mb-1">Default Source</span>
             <select
               value={sourceId}
+              disabled={!sourcesEnabled || currencySources.length === 0}
               onChange={(e) => setSourceId(e.target.value ? Number(e.target.value) : "")}
-              className="w-full bg-transparent border-b border-ink py-1"
+              className="w-full bg-transparent border-b border-ink py-1 disabled:opacity-45"
             >
-              {activeSources.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+              {currencySources.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
               ))}
             </select>
+          </label>
+          <label className="flex items-center justify-between gap-3 mb-3 border-t border-paper-rule pt-3">
+            <span>
+              <span className="smallcaps text-ink-mute block">Sources</span>
+              <span className="text-xs text-ink-soft">Track named wallets and cards.</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={sourcesEnabled}
+              onChange={(e) => setSourcesEnabled(e.target.checked)}
+            />
           </label>
           <div className="flex justify-end gap-2">
             <button className="smallcaps text-ink-mute" onClick={() => setOpen(false)}>Cancel</button>

@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Category, Source, Transaction, TransactionList, TxType } from "@/types";
+import type { Category, Me, Source, Transaction, TransactionList, TxType } from "@/types";
 import { fmtCompactMoney, fmtDateTime, fmtMoney, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useAmountVisibility } from "@/lib/privacy";
 
 type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
+const CURRENCIES: CurrencyCode[] = ["IDR", "SGD", "JPY", "AUD", "TWD"];
 
 function toLocalDateTimeInput(iso: string): string {
   const d = new Date(iso);
@@ -30,6 +31,7 @@ export default function TransactionsPage() {
   const [editType, setEditType] = useState<TxType>("expense");
   const [editCategoryId, setEditCategoryId] = useState<number | "">("");
   const [editSourceId, setEditSourceId] = useState<number | "">("");
+  const [editCurrency, setEditCurrency] = useState<CurrencyCode>("IDR");
   const [editAmount, setEditAmount] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
@@ -43,16 +45,21 @@ export default function TransactionsPage() {
     queryKey: ["sources"],
     queryFn: () => api.get<Source[]>("/sources"),
   });
+  const { data: me } = useQuery<Me>({
+    queryKey: ["me"],
+    queryFn: () => api.get<Me>("/auth/me"),
+  });
+  const sourcesEnabled = me?.sources_enabled !== false;
 
   const qs = useMemo(() => {
     const p = new URLSearchParams();
     p.set("limit", String(limit));
     p.set("offset", String((page - 1) * limit));
     if (categoryId) p.set("category_id", String(categoryId));
-    if (sourceId) p.set("source_id", String(sourceId));
+    if (sourcesEnabled && sourceId) p.set("source_id", String(sourceId));
     if (q) p.set("q", q);
     return p.toString();
-  }, [q, categoryId, sourceId, limit, page]);
+  }, [q, categoryId, sourceId, sourcesEnabled, limit, page]);
 
   const { data } = useQuery<TransactionList>({
     queryKey: ["transactions", qs],
@@ -72,20 +79,13 @@ export default function TransactionsPage() {
     }
   }, [data, page, totalPages]);
 
-  const currencyBySource = useMemo(() => {
-    const m: Record<number, CurrencyCode> = {};
-    for (const s of srcs ?? []) {
-      m[s.id] = s.currency;
-    }
-    return m;
-  }, [srcs]);
-
   const del = useMutation({
     mutationFn: (id: number) => api.del(`/transactions/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["overview"] });
       qc.invalidateQueries({ queryKey: ["sources"] });
+      qc.invalidateQueries({ queryKey: ["currencies"] });
       setPendingDelete(null);
     },
   });
@@ -97,6 +97,7 @@ export default function TransactionsPage() {
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["overview"] });
       qc.invalidateQueries({ queryKey: ["sources"] });
+      qc.invalidateQueries({ queryKey: ["currencies"] });
       qc.invalidateQueries({ queryKey: ["monthly"] });
       qc.invalidateQueries({ queryKey: ["daily"] });
       qc.invalidateQueries({ queryKey: ["category-stats"] });
@@ -109,7 +110,7 @@ export default function TransactionsPage() {
     editOccurredAt &&
     editAmount !== "" &&
     editCategoryId !== "" &&
-    editSourceId !== "" &&
+    (sourcesEnabled ? editSourceId !== "" : true) &&
     !patch.isPending;
 
   return (
@@ -148,10 +149,11 @@ export default function TransactionsPage() {
             ))}
           </select>
         </label>
-        <label className="block">
+        <label className={`block ${sourcesEnabled ? "" : "opacity-45"}`}>
           <span className="smallcaps text-ink-mute">Source</span>
           <select
             value={sourceId}
+            disabled={!sourcesEnabled}
             onChange={(e) => {
               setSourceId(e.target.value ? Number(e.target.value) : "");
               setPage(1);
@@ -193,6 +195,7 @@ export default function TransactionsPage() {
               <th>Description</th>
               <th>Category</th>
               <th>Source</th>
+              <th>Currency</th>
               <th className="text-right">Amount</th>
               <th />
             </tr>
@@ -214,8 +217,13 @@ export default function TransactionsPage() {
                 </td>
                 <td>{t.category_name}</td>
                 <td className="text-ink-soft">
-                  {showAmounts ? t.source_name : <span className="masked-amount">••••••</span>}
+                  {sourcesEnabled ? (
+                    showAmounts ? t.source_name : <span className="masked-amount">••••••</span>
+                  ) : (
+                    "N/A"
+                  )}
                 </td>
+                <td className="text-ink-soft">{t.currency}</td>
                 <td
                   className={`text-right num ${
                     t.type === "expense" ? "text-accent" : "text-gain"
@@ -225,8 +233,8 @@ export default function TransactionsPage() {
                     <>
                       {t.type === "expense" ? "−" : "+"}
                       {isMobile
-                        ? fmtCompactMoney(toNumber(t.amount), currencyBySource[t.source_id] ?? "IDR")
-                        : fmtMoney(toNumber(t.amount), currencyBySource[t.source_id] ?? "IDR")}
+                        ? fmtCompactMoney(toNumber(t.amount), t.currency)
+                        : fmtMoney(toNumber(t.amount), t.currency)}
                     </>
                   ) : (
                     "••••••"
@@ -240,6 +248,7 @@ export default function TransactionsPage() {
                       setEditType(t.type);
                       setEditCategoryId(t.category_id);
                       setEditSourceId(t.source_id);
+                      setEditCurrency(t.currency);
                       setEditAmount(String(toNumber(t.amount)));
                       setEditDescription(t.description ?? "");
                     }}
@@ -258,7 +267,7 @@ export default function TransactionsPage() {
             ))}
             {txs.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center text-ink-mute py-8">
+                <td colSpan={7} className="text-center text-ink-mute py-8">
                   Nothing to report.
                 </td>
               </tr>
@@ -344,21 +353,38 @@ export default function TransactionsPage() {
                   ))}
                 </select>
               </label>
-              <label className="block">
-                <span className="smallcaps text-ink-mute block mb-1">Source</span>
-                <select
-                  value={editSourceId}
-                  onChange={(e) => setEditSourceId(e.target.value ? Number(e.target.value) : "")}
-                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
-                >
-                  <option value="">—</option>
-                  {srcs?.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {sourcesEnabled ? (
+                <label className="block">
+                  <span className="smallcaps text-ink-mute block mb-1">Source</span>
+                  <select
+                    value={editSourceId}
+                    onChange={(e) => setEditSourceId(e.target.value ? Number(e.target.value) : "")}
+                    className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                  >
+                    <option value="">—</option>
+                    {srcs?.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <label className="block">
+                  <span className="smallcaps text-ink-mute block mb-1">Currency</span>
+                  <select
+                    value={editCurrency}
+                    onChange={(e) => setEditCurrency(e.target.value as CurrencyCode)}
+                    className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                  >
+                    {CURRENCIES.map((currency) => (
+                      <option key={currency} value={currency}>
+                        {currency}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <label className="block sm:col-span-2">
                 <span className="smallcaps text-ink-mute block mb-1">Amount</span>
                 <input
@@ -395,7 +421,9 @@ export default function TransactionsPage() {
                       occurred_at: new Date(editOccurredAt).toISOString(),
                       type: editType,
                       category_id: Number(editCategoryId),
-                      source_id: Number(editSourceId),
+                      ...(sourcesEnabled
+                        ? { source_id: Number(editSourceId) }
+                        : { currency: editCurrency }),
                       amount: editAmount,
                       description: editDescription.trim() || null,
                     },

@@ -10,6 +10,7 @@ const backendTarget = process.env.BACKEND_URL ?? "http://backend:8000";
 const proxiedPaths = [
   "/api/auth",
   "/api/sources",
+  "/api/currencies",
   "/api/categories",
   "/api/budgets",
   "/api/transactions",

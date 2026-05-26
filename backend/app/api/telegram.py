@@ -14,6 +14,7 @@ from app.api.deps import get_db
 from app.db.models import AppState, Category, Source, Transaction, User
 from app.services import financial, intent, query, telegram
 from app.services.auth import verify_password
+from app.services.currency_mode import default_source_for_currency
 from app.services.parse import (
     correct_inflated_decimal_amounts,
     format_number,
@@ -251,6 +252,7 @@ def _tx_ids_from_message(message: dict[str, Any], fallback_tx_id: int) -> list[i
 def _summary_from_tx(db: Session, tx: Transaction) -> financial.TxSummary:
     category = db.get(Category, tx.category_id)
     source = db.get(Source, tx.source_id)
+    user = db.get(User, tx.user_id)
     occurred = tx.occurred_at
     if occurred.tzinfo is not None:
         occurred = occurred.astimezone(now_local().tzinfo)
@@ -259,8 +261,8 @@ def _summary_from_tx(db: Session, tx: Transaction) -> financial.TxSummary:
         t_type=tx.type,
         amount=Decimal(tx.amount),
         category=category.name if category else "?",
-        source=source.name if source else "?",
-        currency=(source.currency if source else "IDR") or "IDR",
+        source=("N/A" if user is not None and not user.sources_enabled else source.name if source else "?"),
+        currency=(tx.currency or (source.currency if source else "IDR")) or "IDR",
         date=occurred.strftime("%m/%d/%Y"),
         description=tx.description,
     )
@@ -692,6 +694,9 @@ def _handle_pending_tx_edit_reply(
         return True
 
     if m_source:
+        if not user.sources_enabled:
+            _emit_message(chat_id, "Enable Sources to edit an entry source.", send_fn)
+            return True
         raw = m_source.group(1).strip()
         srcs = [s.name for s in db.query(Source).filter_by(user_id=user.id, active=True).all()]
         resolved = resolve_source_name(raw, srcs, "")
@@ -706,6 +711,7 @@ def _handle_pending_tx_edit_reply(
         old_src = db.get(Source, tx.source_id)
         before = old_src.name if old_src else "?"
         tx.source_id = src.id
+        tx.currency = src.currency
         db.commit()
         if send_fn is None:
             _restore_pending_tx_message(db, user, value)
@@ -826,15 +832,8 @@ def _handle_text(
     itn = intent.classify(t, cats, srcs)
     kind = itn.get("type", "log")
 
-    default_src_name: str | None = None
-    if user.default_expense_source_id is not None:
-        default_src = (
-            db.query(Source)
-            .filter_by(id=user.default_expense_source_id, user_id=user.id, active=True)
-            .one_or_none()
-        )
-        if default_src is not None:
-            default_src_name = default_src.name
+    default_src = default_source_for_currency(db, user, user.default_currency or "IDR")
+    default_src_name = default_src.name if default_src is not None else None
 
     if kind == "query":
         answer = query.answer(db, user, t)
@@ -881,6 +880,10 @@ def _handle_text(
             "Leo couldn't find any financial data. Try 'spent 50k on food'.",
             send_fn,
         )
+        return
+
+    if not user.sources_enabled and any(_is_transfer_like_item(item) for item in items):
+        _emit_message(chat_id, "Enable Sources to record transfers or credit card payments.", send_fn)
         return
 
     if default_src_name:
@@ -963,15 +966,11 @@ def _handle_media_b64(
     if result["kind"] == "query":
         _emit_message(chat_id, query.answer(db, user, result["question"]), send_fn)
     elif result["kind"] == "log":
-        default_src_name: str | None = None
-        if user.default_expense_source_id is not None:
-            default_src = (
-                db.query(Source)
-                .filter_by(id=user.default_expense_source_id, user_id=user.id, active=True)
-                .one_or_none()
-            )
-            if default_src is not None:
-                default_src_name = default_src.name
+        if not user.sources_enabled and any(_is_transfer_like_item(item) for item in result["items"]):
+            _emit_message(chat_id, "Enable Sources to record transfers or credit card payments.", send_fn)
+            return
+        default_src = default_source_for_currency(db, user, user.default_currency or "IDR")
+        default_src_name = default_src.name if default_src is not None else None
 
         if default_src_name:
             for item in result["items"]:

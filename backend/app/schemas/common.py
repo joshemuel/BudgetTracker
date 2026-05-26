@@ -36,6 +36,19 @@ class SourceOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CurrencyOut(BaseModel):
+    currency: str
+    current_balance: Decimal
+    default_source_id: int | None
+    default_source_name: str | None
+    source_count: int
+
+
+class CurrencyUpdate(BaseModel):
+    current_balance: Decimal | None = None
+    default_source_id: int | None = None
+
+
 class CategoryIn(BaseModel):
     name: str = Field(min_length=1, max_length=64)
 
@@ -79,7 +92,8 @@ class TransactionIn(BaseModel):
     type: TransactionType
     category_id: int
     amount: Decimal
-    source_id: int
+    source_id: int | None = None
+    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD)$")
     description: str | None = None
     transfer_group_id: UUID | None = None
 
@@ -98,6 +112,7 @@ class TransactionUpdate(BaseModel):
     category_id: int | None = None
     amount: Decimal | None = None
     source_id: int | None = None
+    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD)$")
     description: str | None = None
 
 
@@ -110,6 +125,7 @@ class TransactionOut(BaseModel):
     amount: Decimal
     source_id: int
     source_name: str
+    currency: str
     description: str | None
     transfer_group_id: UUID | None
     subscription_charge_id: int | None
