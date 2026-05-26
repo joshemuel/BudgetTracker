@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Category, Source } from "@/types";
+import type { Category, CurrencyBalance, Me, Source } from "@/types";
 import { fmtMoney } from "@/lib/format";
 import { useAmountVisibility } from "@/lib/privacy";
 import { SectionTitle } from "@/components/Figure";
@@ -47,7 +47,149 @@ function isSameNumeric(a: string | number, b: string | number): boolean {
   return Math.abs(na - nb) < 0.000001;
 }
 
-function SourcesBlock() {
+function CurrencyBlock({ sourcesEnabled }: { sourcesEnabled: boolean }) {
+  const qc = useQueryClient();
+  const { showAmounts } = useAmountVisibility();
+  const { data: currencies } = useQuery<CurrencyBalance[]>({
+    queryKey: ["currencies"],
+    queryFn: () => api.get<CurrencyBalance[]>("/currencies"),
+  });
+  const { data: sources } = useQuery<Source[]>({
+    queryKey: ["sources"],
+    queryFn: () => api.get<Source[]>("/sources"),
+  });
+  const [editing, setEditing] = useState<CurrencyBalance | null>(null);
+  const [currentFundsInput, setCurrentFundsInput] = useState("0");
+
+  const patch = useMutation({
+    mutationFn: ({ currency, body }: { currency: CurrencyCode; body: Record<string, unknown> }) =>
+      api.patch(`/currencies/${currency}`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["currencies"] });
+      qc.invalidateQueries({ queryKey: ["sources"] });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      setEditing(null);
+    },
+  });
+
+  return (
+    <section className="mb-12">
+      <SectionTitle kicker="The totals">Currencies</SectionTitle>
+      <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
+        <table className="ledger-table w-full text-[11px] sm:text-[13px]">
+          <thead>
+            <tr>
+              <th>Currency</th>
+              <th className="text-right">Current Funds</th>
+              <th>Default Source</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {(currencies ?? []).map((c) => (
+              <tr key={c.currency}>
+                <td className="font-[450]">{c.currency}</td>
+                <td className="text-right num">
+                  {showAmounts ? fmtMoney(c.current_balance, c.currency) : "••••••"}
+                </td>
+                <td>
+                  <select
+                    value={c.default_source_id ?? ""}
+                    disabled={!sourcesEnabled || patch.isPending}
+                    onChange={(e) => {
+                      if (!e.target.value) return;
+                      patch.mutate({
+                        currency: c.currency,
+                        body: { default_source_id: Number(e.target.value) },
+                      });
+                    }}
+                    className="w-full bg-transparent border-b border-ink py-1 disabled:opacity-45"
+                  >
+                    {(sources ?? [])
+                      .filter((s) => s.active && s.currency === c.currency)
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                  </select>
+                </td>
+                <td className="text-right">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditing(c);
+                      setCurrentFundsInput(normalizeInput(c.current_balance, c.currency));
+                    }}
+                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
+                  >
+                    reset
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {currencies && currencies.length === 0 && (
+              <tr>
+                <td colSpan={4} className="text-center text-ink-mute py-8">
+                  Add a source to establish a currency.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {editing && (
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="modal-card w-full max-w-md p-6">
+            <h3 className="font-semibold mb-4">Reset: {editing.currency}</h3>
+            <label className="block">
+              <span className="smallcaps text-ink-mute block mb-1">Current funds</span>
+              <div className="flex items-center gap-2">
+                <span className="smallcaps text-ink-mute min-w-10">
+                  {currencySymbol(editing.currency)}
+                </span>
+                <input
+                  value={currentFundsInput}
+                  onChange={(e) => setCurrentFundsInput(e.target.value)}
+                  onBlur={() =>
+                    setCurrentFundsInput(normalizeInput(currentFundsInput, editing.currency))
+                  }
+                  onFocus={() => setCurrentFundsInput(parseDisplayAmount(currentFundsInput))}
+                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full num"
+                />
+              </div>
+            </label>
+            <div className="flex gap-2 mt-5 justify-end">
+              <button
+                type="button"
+                onClick={() => setEditing(null)}
+                className="smallcaps px-3 py-1 border border-ink/30 rounded"
+                disabled={patch.isPending}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  patch.mutate({
+                    currency: editing.currency,
+                    body: { current_balance: parseDisplayAmount(currentFundsInput) || "0" },
+                  })
+                }
+                className="smallcaps px-3 py-1 bg-ink text-paper rounded disabled:opacity-60"
+                disabled={patch.isPending}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function SourcesBlock({ enabled }: { enabled: boolean }) {
   const qc = useQueryClient();
   const { showAmounts } = useAmountVisibility();
   const { data } = useQuery<Source[]>({
@@ -78,12 +220,14 @@ function SourcesBlock() {
       setCurrency("IDR");
       setIsCc(false);
       qc.invalidateQueries({ queryKey: ["sources"] });
+      qc.invalidateQueries({ queryKey: ["currencies"] });
     },
   });
   const del = useMutation({
     mutationFn: (id: number) => api.del(`/sources/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sources"] });
+      qc.invalidateQueries({ queryKey: ["currencies"] });
       setPendingDelete(null);
     },
   });
@@ -92,12 +236,14 @@ function SourcesBlock() {
       api.patch(`/sources/${id}`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sources"] });
+      qc.invalidateQueries({ queryKey: ["currencies"] });
       setEditing(null);
     },
   });
 
   return (
-    <section>
+    <section className={enabled ? "" : "opacity-45 grayscale"}>
+      <fieldset disabled={!enabled}>
       <SectionTitle kicker="The wallets">Sources</SectionTitle>
       <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
         <table className="ledger-table mb-4 w-full text-[11px] sm:text-[13px]">
@@ -294,6 +440,7 @@ function SourcesBlock() {
           Add source
         </button>
       </form>
+      </fieldset>
     </section>
   );
 }
@@ -471,9 +618,16 @@ function CategoriesBlock() {
 }
 
 export default function SettingsPage() {
+  const { data: me } = useQuery<Me>({
+    queryKey: ["me"],
+    queryFn: () => api.get<Me>("/auth/me"),
+  });
+  const sourcesEnabled = me?.sources_enabled !== false;
+
   return (
     <div className="max-w-3xl">
-      <SourcesBlock />
+      <CurrencyBlock sourcesEnabled={sourcesEnabled} />
+      <SourcesBlock enabled={sourcesEnabled} />
       <CategoriesBlock />
     </div>
   );

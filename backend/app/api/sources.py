@@ -124,6 +124,7 @@ def update_source(
         )
         for t in txs:
             t.amount = _convert(Decimal(t.amount), src_currency, dst_currency)
+            t.currency = dst_currency
         src.starting_balance = _round_currency(Decimal(src.starting_balance), dst_currency)
         for t in txs:
             t.amount = _round_currency(Decimal(t.amount), dst_currency)
@@ -166,6 +167,7 @@ def update_source(
                         category_id=untracked.id,
                         amount=abs(delta),
                         source_id=src.id,
+                        currency=src.currency,
                         description=None,
                         is_internal=False,
                     )

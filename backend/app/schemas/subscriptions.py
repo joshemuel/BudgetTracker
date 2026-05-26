@@ -12,7 +12,7 @@ class SubscriptionIn(BaseModel):
     name: str = Field(min_length=1, max_length=128)
     amount: Decimal
     currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD)$")
-    source_id: int
+    source_id: int | None = None
     category_id: int
     billing_day: int = Field(ge=1, le=31)
     frequency: Frequency = "monthly"

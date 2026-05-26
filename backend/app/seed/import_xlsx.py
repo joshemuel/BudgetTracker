@@ -242,6 +242,7 @@ def run_import(
                 category_id=cat.id,
                 amount=t["amount"],
                 source_id=src.id,
+                currency=src.currency,
                 description=t["description"],
                 transfer_group_id=t.get("transfer_group_id"),
             )

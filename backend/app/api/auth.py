@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import SESSION_COOKIE, get_current_user, get_db
 from app.config import get_settings
-from app.db.models import Budget, SessionToken, Source, User
+from app.db.models import Budget, CurrencySourceDefault, SessionToken, Source, User
 from app.schemas.auth import (
     ChangePasswordRequest,
     LoginRequest,
@@ -22,6 +22,25 @@ def _round_currency(amount: Decimal, currency: str) -> Decimal:
     if currency in {"IDR", "JPY"}:
         return amount.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
     return amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _set_currency_default_source(db: Session, user: User, source: Source) -> None:
+    currency = (source.currency or user.default_currency or "IDR").upper()
+    row = (
+        db.query(CurrencySourceDefault)
+        .filter_by(user_id=user.id, currency=currency)
+        .one_or_none()
+    )
+    if row is None:
+        db.add(
+            CurrencySourceDefault(
+                user_id=user.id,
+                currency=currency,
+                source_id=source.id,
+            )
+        )
+    else:
+        row.source_id = source.id
 
 
 @router.post("/login", response_model=UserOut)
@@ -90,6 +109,10 @@ def update_me(
             if src is None:
                 raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown source")
             user.default_expense_source_id = src.id
+            _set_currency_default_source(db, user, src)
+
+    if "sources_enabled" in payload.model_fields_set and payload.sources_enabled is not None:
+        user.sources_enabled = payload.sources_enabled
 
     db.commit()
     db.refresh(user)

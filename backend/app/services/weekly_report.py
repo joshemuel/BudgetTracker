@@ -8,7 +8,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Category, Source, Transaction, User
+from app.db.models import Category, Transaction, User
 from app.db.session import SessionLocal
 from app.services import fx, telegram
 from app.services.parse import format_number, tz
@@ -87,8 +87,7 @@ def build_weekly_report(db: Session, user: User, now: datetime | None = None) ->
         conditions.append(~Transaction.category_id.in_(excluded))
 
     rows = db.execute(
-        select(Transaction.occurred_at, Transaction.amount, Source.currency, Category.name)
-        .join(Source, Source.id == Transaction.source_id)
+        select(Transaction.occurred_at, Transaction.amount, Transaction.currency, Category.name)
         .join(Category, Category.id == Transaction.category_id)
         .where(*conditions)
     ).all()

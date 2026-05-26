@@ -5,6 +5,7 @@ export type Me = {
   username: string;
   default_currency: CurrencyCode;
   default_expense_source_id: number | null;
+  sources_enabled: boolean;
 };
 
 export type Source = {
@@ -21,6 +22,14 @@ export type Category = {
   id: number;
   name: string;
   is_default: boolean;
+};
+
+export type CurrencyBalance = {
+  currency: CurrencyCode;
+  current_balance: string;
+  default_source_id: number | null;
+  default_source_name: string | null;
+  source_count: number;
 };
 
 export type Budget = {
@@ -42,6 +51,7 @@ export type Transaction = {
   amount: string;
   source_id: number;
   source_name: string;
+  currency: CurrencyCode;
   description: string | null;
   transfer_group_id: string | null;
   subscription_charge_id: number | null;

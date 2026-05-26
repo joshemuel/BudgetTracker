@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "@/api";
-import type { Me, Overview, Source } from "@/types";
+import type { CurrencyBalance, Me, Overview, Source } from "@/types";
 import { fmtCompactMoney, fmtMoney, fmtPct, monthName, toNumber } from "@/lib/format";
 import { Figure, SectionTitle } from "@/components/Figure";
 import { useAmountVisibility } from "@/lib/privacy";
@@ -110,6 +110,10 @@ export default function OverviewPage() {
   const { data: sources } = useQuery<Source[]>({
     queryKey: ["sources"],
     queryFn: () => api.get<Source[]>("/sources"),
+  });
+  const { data: currencies } = useQuery<CurrencyBalance[]>({
+    queryKey: ["currencies"],
+    queryFn: () => api.get<CurrencyBalance[]>("/currencies"),
   });
 
   if (!ov) return <p className="smallcaps text-ink-mute">Assembling the ledger…</p>;
@@ -251,9 +255,23 @@ export default function OverviewPage() {
         </div>
 
         <div>
-          <p className="smallcaps text-ink-mute">Accounts</p>
+          <p className="smallcaps text-ink-mute">{me?.sources_enabled === false ? "Currencies" : "Accounts"}</p>
           <ul className="mt-2 divide-y divide-paper-rule">
-            {(sources ?? [])
+            {me?.sources_enabled === false
+              ? (currencies ?? []).map((c) => (
+                  <li key={c.currency} className="py-2 flex justify-between items-baseline">
+                    <span className="font-[450]">{c.currency}</span>
+                    <span className={`num ${toNumber(c.current_balance) < 0 ? "text-accent" : ""}`}>
+                      {showAmounts
+                        ? `${new Intl.NumberFormat("de-DE", {
+                            minimumFractionDigits: c.currency === "JPY" ? 0 : 2,
+                            maximumFractionDigits: c.currency === "JPY" ? 0 : 2,
+                          }).format(toNumber(c.current_balance))} ${c.currency}`
+                        : "••••••"}
+                    </span>
+                  </li>
+                ))
+              : (sources ?? [])
               .filter((s) => s.active)
               .map((s) => (
                 <li key={s.id} className="py-2 flex justify-between items-baseline">

@@ -18,6 +18,7 @@ function invalidateLiveQueries(qc: QueryClient): void {
   qc.invalidateQueries({ queryKey: ["daily"] });
   qc.invalidateQueries({ queryKey: ["category-stats"] });
   qc.invalidateQueries({ queryKey: ["sources"] });
+  qc.invalidateQueries({ queryKey: ["currencies"] });
   qc.invalidateQueries({ queryKey: ["transactions"] });
   qc.invalidateQueries({ queryKey: ["budgets"] });
 }

@@ -62,6 +62,7 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
   });
   const sourceCurrencyMap = useMemo(() => sourceCurrencyById(srcs), [srcs]);
   const userDefault = (me?.default_currency ?? "IDR") as CurrencyCode;
+  const sourcesEnabled = me?.sources_enabled !== false;
 
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
@@ -94,7 +95,7 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
         name,
         amount,
         currency,
-        source_id: Number(sourceId),
+        ...(sourcesEnabled ? { source_id: Number(sourceId) } : {}),
         category_id: Number(categoryId),
         billing_day: billingDay,
         frequency,
@@ -111,7 +112,7 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
       className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-4 sm:p-5 border border-paper-rule bg-paper-deep/30"
       onSubmit={(e) => {
         e.preventDefault();
-        if (name && amount && categoryId && sourceId) create.mutate();
+        if (name && amount && categoryId && (sourcesEnabled ? sourceId : currency)) create.mutate();
       }}
     >
       <label className="sm:col-span-2">
@@ -149,7 +150,7 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
           ))}
         </select>
         <p className="text-xs text-ink-mute mt-1">
-          Defaults to source currency, editable anytime.
+          {sourcesEnabled ? "Defaults to source currency, editable anytime." : "Routes by the currency default source."}
         </p>
       </label>
       <label>
@@ -174,21 +175,23 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
           <option value="yearly">Yearly</option>
         </select>
       </label>
-      <label>
-        <span className="smallcaps text-ink-mute block">Source</span>
-        <select
-          value={sourceId}
-          onChange={(e) => setSourceId(e.target.value ? Number(e.target.value) : "")}
-          className="bg-transparent border-b border-ink py-1 w-full"
-        >
-          <option value="">—</option>
-          {srcs?.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      {sourcesEnabled && (
+        <label>
+          <span className="smallcaps text-ink-mute block">Source</span>
+          <select
+            value={sourceId}
+            onChange={(e) => setSourceId(e.target.value ? Number(e.target.value) : "")}
+            className="bg-transparent border-b border-ink py-1 w-full"
+          >
+            <option value="">—</option>
+            {srcs?.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label>
         <span className="smallcaps text-ink-mute block">Category</span>
         <select
@@ -242,6 +245,7 @@ export default function SubscriptionsPage() {
     queryFn: () => api.get<Me>("/auth/me"),
   });
   const userCurrency = preferredCurrency(me);
+  const sourcesEnabled = me?.sources_enabled !== false;
 
   const { data: subs } = useQuery<Subscription[]>({
     queryKey: ["subscriptions"],
@@ -273,6 +277,7 @@ export default function SubscriptionsPage() {
       qc.invalidateQueries({ queryKey: ["subscriptions"] });
       qc.invalidateQueries({ queryKey: ["overview"] });
       qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["currencies"] });
     },
   });
   const skip = useMutation({
@@ -371,7 +376,11 @@ export default function SubscriptionsPage() {
                 <tr key={s.id} className={s.active ? "" : "opacity-50"}>
                   <td className="font-[500]">{s.name}</td>
                   <td className="text-ink-soft">
-                    {showAmounts ? s.source_name : <span className="masked-amount">••••••</span>}
+                    {sourcesEnabled ? (
+                      showAmounts ? s.source_name : <span className="masked-amount">••••••</span>
+                    ) : (
+                      "N/A"
+                    )}
                   </td>
                   <td>{s.category_name}</td>
                   <td className="text-right num text-accent">
@@ -449,6 +458,11 @@ function EditSubscriptionModal({
     queryKey: ["sources"],
     queryFn: () => api.get<Source[]>("/sources"),
   });
+  const { data: me } = useQuery<Me>({
+    queryKey: ["me"],
+    queryFn: () => api.get<Me>("/auth/me"),
+  });
+  const sourcesEnabled = me?.sources_enabled !== false;
 
   const [name, setName] = useState(subscription.name);
   const [amount, setAmount] = useState(String(subscription.amount));
@@ -546,27 +560,36 @@ function EditSubscriptionModal({
               <option value="yearly">Yearly</option>
             </select>
           </label>
-          <label>
-            <span className="smallcaps text-ink-mute block mb-1">Source</span>
-            <select
-              value={sourceId}
-              onChange={(e) => {
-                const nextSourceId = Number(e.target.value);
-                setSourceId(nextSourceId);
-                const sourceCurrency = sourceCurrencyMap[nextSourceId];
-                if (!customCurrency && sourceCurrency) {
-                  setCurrency(sourceCurrency);
-                }
-              }}
-              className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
-            >
-              {srcs?.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          {sourcesEnabled ? (
+            <label>
+              <span className="smallcaps text-ink-mute block mb-1">Source</span>
+              <select
+                value={sourceId}
+                onChange={(e) => {
+                  const nextSourceId = Number(e.target.value);
+                  setSourceId(nextSourceId);
+                  const sourceCurrency = sourceCurrencyMap[nextSourceId];
+                  if (!customCurrency && sourceCurrency) {
+                    setCurrency(sourceCurrency);
+                  }
+                }}
+                className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+              >
+                {srcs?.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <div>
+              <p className="smallcaps text-ink-mute block mb-1">Source</p>
+              <p className="bg-paper-deep border border-ink/15 rounded px-2 py-1 text-ink-soft">
+                N/A
+              </p>
+            </div>
+          )}
           <label>
             <span className="smallcaps text-ink-mute block mb-1">Category</span>
             <select
@@ -599,7 +622,7 @@ function EditSubscriptionModal({
               if (currency !== subscription.currency) body.currency = currency;
               if (billingDay !== subscription.billing_day) body.billing_day = billingDay;
               if (frequency !== subscription.frequency) body.frequency = frequency;
-              if (sourceId !== subscription.source_id) body.source_id = sourceId;
+              if (sourcesEnabled && sourceId !== subscription.source_id) body.source_id = sourceId;
               if (categoryId !== subscription.category_id) body.category_id = categoryId;
               if (active !== subscription.active) body.active = active;
               if (Object.keys(body).length === 0) {

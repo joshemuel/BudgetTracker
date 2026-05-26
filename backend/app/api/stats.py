@@ -67,8 +67,7 @@ def _category_spent(
         conditions.append(~Transaction.category_id.in_(excluded_category_ids))
 
     rows = db.execute(
-        select(Transaction.category_id, Transaction.amount, Source.currency)
-        .join(Source, Source.id == Transaction.source_id)
+        select(Transaction.category_id, Transaction.amount, Transaction.currency)
         .where(*conditions)
     ).all()
     out: dict[int, Decimal] = {}
@@ -228,8 +227,7 @@ def overview(
         totals_conditions.append(~Transaction.category_id.in_(excluded_category_ids))
 
     totals_rows = db.execute(
-        select(Transaction.type, Transaction.amount, Source.currency)
-        .join(Source, Source.id == Transaction.source_id)
+        select(Transaction.type, Transaction.amount, Transaction.currency)
         .where(*totals_conditions)
     ).all()
 
@@ -286,8 +284,7 @@ def monthly(
         conditions.append(~Transaction.category_id.in_(excluded_category_ids))
 
     rows = db.execute(
-        select(Transaction.occurred_at, Transaction.type, Transaction.amount, Source.currency)
-        .join(Source, Source.id == Transaction.source_id)
+        select(Transaction.occurred_at, Transaction.type, Transaction.amount, Transaction.currency)
         .where(*conditions)
     ).all()
 
@@ -342,8 +339,7 @@ def daily(
         conditions.append(~Transaction.category_id.in_(excluded_category_ids))
 
     rows = db.execute(
-        select(Transaction.occurred_at, Transaction.type, Transaction.amount, Source.currency)
-        .join(Source, Source.id == Transaction.source_id)
+        select(Transaction.occurred_at, Transaction.type, Transaction.amount, Transaction.currency)
         .where(*conditions)
     ).all()
 
@@ -407,9 +403,8 @@ def categories_stats(
             Transaction.category_id,
             Transaction.type,
             Transaction.amount,
-            Source.currency,
+            Transaction.currency,
         )
-        .join(Source, Source.id == Transaction.source_id)
         .where(*conditions)
     ).all()
     cat_names = {c.id: c.name for c in db.query(Category).filter_by(user_id=user.id).all()}

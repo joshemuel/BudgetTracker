@@ -17,6 +17,7 @@ from app.schemas.subscriptions import (
 )
 from app.services import fx
 from app.services import subscriptions as sub_svc
+from app.services.currency_mode import default_source_for_currency, normalize_currency
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
@@ -105,11 +106,20 @@ def create_subscription(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _validate_refs(db, user.id, payload.category_id, payload.source_id)
-    source = db.query(Source).filter_by(id=payload.source_id, user_id=user.id).one_or_none()
-    if source is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown source")
-    sub_currency = payload.currency or source.currency or "IDR"
+    _validate_category(db, user.id, payload.category_id)
+    if user.sources_enabled:
+        if payload.source_id is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Source is required")
+        _validate_source(db, user.id, payload.source_id)
+        source = db.query(Source).filter_by(id=payload.source_id, user_id=user.id).one()
+        sub_currency = payload.currency or source.currency or "IDR"
+    else:
+        if payload.source_id is not None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Source routing is disabled")
+        sub_currency = normalize_currency(payload.currency, user.default_currency or "IDR")
+        source = default_source_for_currency(db, user, sub_currency)
+        if source is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"No default source for {sub_currency}")
     next_billing = payload.next_billing_date or _first_billing_date(
         payload.start_date, payload.billing_day
     )
@@ -118,7 +128,7 @@ def create_subscription(
         name=payload.name,
         amount=payload.amount,
         currency=sub_currency,
-        source_id=payload.source_id,
+        source_id=source.id,
         category_id=payload.category_id,
         billing_day=payload.billing_day,
         frequency=payload.frequency,
@@ -145,13 +155,22 @@ def update_subscription(
     if sub is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Subscription not found")
     data = payload.model_dump(exclude_unset=True)
-    if "category_id" in data or "source_id" in data:
-        _validate_refs(
-            db,
-            user.id,
-            data.get("category_id", sub.category_id),
-            data.get("source_id", sub.source_id),
-        )
+    if "category_id" in data:
+        _validate_category(db, user.id, data["category_id"])
+    if user.sources_enabled and "source_id" in data:
+        if data["source_id"] is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Source is required")
+        _validate_source(db, user.id, data["source_id"])
+    if not user.sources_enabled:
+        if "source_id" in data:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Source routing is disabled")
+        if "currency" in data:
+            code = normalize_currency(data["currency"], user.default_currency or "IDR")
+            source = default_source_for_currency(db, user, code)
+            if source is None:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, f"No default source for {code}")
+            data["source_id"] = source.id
+            data["currency"] = code
     for k, v in data.items():
         setattr(sub, k, v)
     db.commit()
@@ -277,7 +296,15 @@ def _first_billing_date(start: date, billing_day: int) -> date:
 
 
 def _validate_refs(db: Session, user_id: int, category_id: int, source_id: int) -> None:
+    _validate_category(db, user_id, category_id)
+    _validate_source(db, user_id, source_id)
+
+
+def _validate_category(db: Session, user_id: int, category_id: int) -> None:
     if db.query(Category).filter_by(id=category_id, user_id=user_id).first() is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown category")
+
+
+def _validate_source(db: Session, user_id: int, source_id: int) -> None:
     if db.query(Source).filter_by(id=source_id, user_id=user_id).first() is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown source")
