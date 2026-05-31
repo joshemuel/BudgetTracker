@@ -16,7 +16,7 @@ def _captured_prompt(text: str = "Spent 3.8 for gift") -> str:
         captured["prompt"] = prompt
         return "[]"
 
-    with patch.object(intent.llm, "call", side_effect=fake_call):
+    with patch.object(intent.llm, "call_logging", side_effect=fake_call):
         intent.extract_financial(text, ["Gifts"], ["BCA", "BCA Credit Card"], "24/04/2026")
     return captured["prompt"]
 

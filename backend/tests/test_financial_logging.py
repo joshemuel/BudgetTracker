@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 from uuid import uuid4
 
 from app.db.models import AppState, Budget, Category, Source, Transaction, User
@@ -190,6 +191,131 @@ def test_log_items_maps_grocery_to_groceries_category(auth_client):
             if tx_id is not None:
                 db.query(Transaction).filter(Transaction.id == tx_id).delete(synchronize_session=False)
             db.query(Source).filter(Source.id == source.json()["id"]).delete(synchronize_session=False)
+            db.commit()
+
+
+def test_log_items_routes_explicit_currency_to_matching_source(auth_client):
+    """'$300 SGD' with no named source must land on an SGD account, not record
+    Rp 300 on the default IDR source."""
+    me = auth_client.get("/auth/me").json()
+    user_id = int(me["id"])
+    suffix = uuid4().hex[:8]
+
+    idr = auth_client.post(
+        "/sources",
+        json={"name": f"pytest_route_idr_{suffix}", "starting_balance": "0", "currency": "IDR"},
+    )
+    assert idr.status_code == 201, idr.text
+    sgd = auth_client.post(
+        "/sources",
+        json={"name": f"pytest_route_sgd_{suffix}", "starting_balance": "0", "currency": "SGD"},
+    )
+    assert sgd.status_code == 201, sgd.text
+    tx_id: int | None = None
+
+    try:
+        with SessionLocal() as db:
+            user = db.query(User).filter_by(id=user_id).one()
+            outcome = financial.log_items(
+                db,
+                user,
+                [
+                    {
+                        "type": "Expense",
+                        "category": "Coffee",
+                        "amount": 300,
+                        "source": None,
+                        "currency": "SGD",
+                        "description": "coffee",
+                        "date": None,
+                        "time": None,
+                    }
+                ],
+            )
+            tx_id = outcome.transaction_ids[0]
+            tx = db.query(Transaction).filter(Transaction.id == tx_id).one()
+            src = db.query(Source).filter(Source.id == tx.source_id).one()
+
+        assert tx.currency == "SGD"
+        assert src.currency == "SGD"
+        assert tx.amount == Decimal("300")
+    finally:
+        with SessionLocal() as db:
+            if tx_id is not None:
+                db.query(Transaction).filter(Transaction.id == tx_id).delete(
+                    synchronize_session=False
+                )
+            db.query(Source).filter(
+                Source.id.in_([idr.json()["id"], sgd.json()["id"]])
+            ).delete(synchronize_session=False)
+            db.commit()
+
+
+def test_log_items_collapses_duplicate_budget_lines_per_category(auth_client):
+    """Two expenses in the same category yield a single, final budget line."""
+    me = auth_client.get("/auth/me").json()
+    user_id = int(me["id"])
+    suffix = uuid4().hex[:8]
+
+    category = auth_client.post("/categories", json={"name": f"pytest_dedupe_{suffix}"}).json()
+    created_budget = auth_client.post(
+        "/budgets",
+        json={"category_id": category["id"], "monthly_limit": "1000"},
+    )
+    assert created_budget.status_code == 201, created_budget.text
+    budget_id = created_budget.json()["id"]
+    source = auth_client.post(
+        "/sources",
+        json={"name": f"pytest_dedupe_src_{suffix}", "starting_balance": "0", "currency": "IDR"},
+    )
+    assert source.status_code == 201, source.text
+    tx_ids: list[int] = []
+
+    try:
+        with SessionLocal() as db:
+            user = db.query(User).filter_by(id=user_id).one()
+            outcome = financial.log_items(
+                db,
+                user,
+                [
+                    {
+                        "type": "Expense",
+                        "category": category["name"],
+                        "amount": 200,
+                        "source": source.json()["name"],
+                        "description": "first",
+                        "date": None,
+                        "time": None,
+                    },
+                    {
+                        "type": "Expense",
+                        "category": category["name"],
+                        "amount": 300,
+                        "source": source.json()["name"],
+                        "description": "second",
+                        "date": None,
+                        "time": None,
+                    },
+                ],
+            )
+            tx_ids = list(outcome.transaction_ids)
+
+        assert len(outcome.budget_notes) == 1
+        note = outcome.budget_notes[0]
+        assert "500 / 1.000" in note
+    finally:
+        with SessionLocal() as db:
+            if tx_ids:
+                db.query(Transaction).filter(Transaction.id.in_(tx_ids)).delete(
+                    synchronize_session=False
+                )
+            db.query(Budget).filter(Budget.id == budget_id).delete(synchronize_session=False)
+            db.query(Source).filter(Source.id == source.json()["id"]).delete(
+                synchronize_session=False
+            )
+            db.query(Category).filter(Category.id == category["id"]).delete(
+                synchronize_session=False
+            )
             db.commit()
 
 

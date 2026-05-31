@@ -24,7 +24,11 @@ from app.services.parse import (
     resolve_source_name,
     tz,
 )
-from app.services.currency_mode import default_source_for_currency, resolve_entry_currency
+from app.services.currency_mode import (
+    default_source_for_currency,
+    normalize_currency,
+    resolve_entry_currency,
+)
 
 log = logging.getLogger(__name__)
 
@@ -315,7 +319,10 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
         raise RuntimeError("User has no sources defined")
 
     now = now_local()
-    budget_notes: list[str] = []
+    # Keyed by category id, last-write-wins: logging several items in the same
+    # category recomputes the running monthly total each time, so the final write
+    # holds the correct figure. Distinct categories each keep their own line.
+    budget_notes_by_cat: dict[int, str] = {}
     created: list[Transaction] = []
     _summary_data: list[dict] = []
 
@@ -338,15 +345,29 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
         category = cat_by_name.get(resolved_cat_name.lower(), other_cat)
 
         raw_src = item.get("source")
+        explicit_currency = item.get("currency")
         if user.sources_enabled:
             if default_src is None:
                 raise RuntimeError("User has no sources defined")
             fallback_name = default_src.name
             resolved_name = resolve_source_name(raw_src, valid_names, fallback_name)
             source = src_by_name.get(resolved_name.lower(), default_src)
+            # When the user states a currency but does not name a source, route the
+            # entry to that currency's default source (e.g. "$300 SGD" -> the SGD
+            # account) rather than coercing the amount into the default source's
+            # currency. Only reroute when a matching-currency source exists, so
+            # source-balance math (which assumes tx currency == source currency)
+            # stays consistent.
+            named_source = bool(str(raw_src).strip()) if raw_src is not None else False
+            if not named_source and explicit_currency:
+                wanted = normalize_currency(explicit_currency)
+                if wanted != normalize_currency(source.currency):
+                    currency_source = default_source_for_currency(db, user, wanted)
+                    if currency_source is not None:
+                        source = currency_source
             currency = resolve_entry_currency(
                 sources_enabled=True,
-                explicit_currency=item.get("currency"),
+                explicit_currency=explicit_currency,
                 source_currency=source.currency,
                 default_currency=user.default_currency,
             )
@@ -408,7 +429,7 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
                 spent, limit, status = ms
                 if limit > 0:
                     pct = int(round(float(spent / limit) * 100))
-                    budget_notes.append(
+                    budget_notes_by_cat[category.id] = (
                         f"Budget — {category.name}: {format_number(spent)} / "
                         f"{format_number(limit)} ({pct}%) — {status}"
                     )
@@ -426,7 +447,7 @@ def log_items(db: Session, user: User, items: list[dict[str, Any]]) -> LogOutcom
         for tx, data in zip(created, _summary_data)
     ]
 
-    return LogOutcome(summaries=summaries, budget_notes=budget_notes)
+    return LogOutcome(summaries=summaries, budget_notes=list(budget_notes_by_cat.values()))
 
 
 _TRANSFER_TO_RE = re.compile(r"^transfer\s+to\s+(.+)$", re.IGNORECASE)

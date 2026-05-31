@@ -22,6 +22,9 @@ class SourceUpdate(BaseModel):
     currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD)$")
     is_credit_card: bool | None = None
     active: bool | None = None
+    # When a manual balance change creates a reconciliation delta, record it under
+    # the "Other" category (counts in summaries) instead of "Untrackable" (hidden).
+    track_as_other: bool = False
 
 
 class SourceOut(BaseModel):
@@ -47,6 +50,8 @@ class CurrencyOut(BaseModel):
 class CurrencyUpdate(BaseModel):
     current_balance: Decimal | None = None
     default_source_id: int | None = None
+    # See SourceUpdate.track_as_other.
+    track_as_other: bool = False
 
 
 class CategoryIn(BaseModel):

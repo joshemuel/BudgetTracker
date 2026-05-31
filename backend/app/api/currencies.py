@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
-from app.api.sources import _current_balance_map, _round_currency
-from app.db.models import Category, CurrencySourceDefault, Source, Transaction, User
+from app.api.sources import _current_balance_map, _reconcile_category, _round_currency
+from app.db.models import CurrencySourceDefault, Source, Transaction, User
 from app.schemas.common import CurrencyOut, CurrencyUpdate
 from app.services.currency_mode import default_source_for_currency, normalize_currency
 
@@ -95,21 +95,15 @@ def update_currency(
             current.current_balance
         )
         if delta != 0:
-            untrackable = (
-                db.query(Category).filter_by(user_id=user.id, name="Untrackable").one_or_none()
-            )
-            if untrackable is None:
-                untrackable = (
-                    db.query(Category).filter_by(user_id=user.id, name="Untracked").one_or_none()
-                )
-            if untrackable is None:
-                raise HTTPException(400, "Untrackable category is missing")
+            category = _reconcile_category(db, user.id, payload.track_as_other)
+            if category is None:
+                raise HTTPException(400, "Reconciliation category is missing")
             db.add(
                 Transaction(
                     user_id=user.id,
                     occurred_at=datetime.now(timezone.utc),
                     type="income" if delta > 0 else "expense",
-                    category_id=untrackable.id,
+                    category_id=category.id,
                     amount=abs(delta),
                     source_id=default.id,
                     currency=code,

@@ -20,6 +20,20 @@ def _round_currency(amount: Decimal, currency: str) -> Decimal:
     return amount.quantize(Decimal("0.01"))
 
 
+def _reconcile_category(db: Session, user_id: int, track_as_other: bool) -> Category | None:
+    """Category for a manual balance-reset delta. 'Other' counts in summaries;
+    'Untrackable' (the default) is hidden from them."""
+    if track_as_other:
+        other = db.query(Category).filter_by(user_id=user_id, name="Other").one_or_none()
+        if other is not None:
+            return other
+        # Fall back to Untrackable if "Other" is somehow missing.
+    untracked = db.query(Category).filter_by(user_id=user_id, name="Untrackable").one_or_none()
+    if untracked is None:
+        untracked = db.query(Category).filter_by(user_id=user_id, name="Untracked").one_or_none()
+    return untracked
+
+
 def _current_balance_map(db: Session, user_id: int) -> dict[int, Decimal]:
     stmt = (
         select(
@@ -104,6 +118,7 @@ def update_source(
 
     updates = payload.model_dump(exclude_unset=True)
     current_balance = updates.pop("current_balance", None)
+    track_as_other = bool(updates.pop("track_as_other", False))
 
     new_currency = updates.get("currency")
     if new_currency and new_currency != src.currency:
@@ -151,20 +166,14 @@ def update_source(
         target = _round_currency(Decimal(current_balance), src.currency)
         delta = target - current_now
         if delta != 0:
-            untracked = (
-                db.query(Category).filter_by(user_id=user.id, name="Untrackable").one_or_none()
-            )
-            if untracked is None:
-                untracked = (
-                    db.query(Category).filter_by(user_id=user.id, name="Untracked").one_or_none()
-                )
-            if untracked is not None:
+            category = _reconcile_category(db, user.id, track_as_other)
+            if category is not None:
                 db.add(
                     Transaction(
                         user_id=user.id,
                         occurred_at=datetime.now(timezone.utc),
                         type="income" if delta > 0 else "expense",
-                        category_id=untracked.id,
+                        category_id=category.id,
                         amount=abs(delta),
                         source_id=src.id,
                         currency=src.currency,

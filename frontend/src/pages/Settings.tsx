@@ -6,6 +6,7 @@ import { fmtMoney } from "@/lib/format";
 import { useAmountVisibility } from "@/lib/privacy";
 import { SectionTitle } from "@/components/Figure";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import TrackAsOtherDialog from "@/components/TrackAsOtherDialog";
 
 const CURRENCIES = ["IDR", "SGD", "JPY", "AUD", "TWD"] as const;
 type CurrencyCode = (typeof CURRENCIES)[number];
@@ -60,6 +61,10 @@ function CurrencyBlock({ sourcesEnabled }: { sourcesEnabled: boolean }) {
   });
   const [editing, setEditing] = useState<CurrencyBalance | null>(null);
   const [currentFundsInput, setCurrentFundsInput] = useState("0");
+  const [confirmTrack, setConfirmTrack] = useState<{
+    currency: CurrencyCode;
+    body: Record<string, unknown>;
+  } | null>(null);
 
   const patch = useMutation({
     mutationFn: ({ currency, body }: { currency: CurrencyCode; body: Record<string, unknown> }) =>
@@ -68,7 +73,9 @@ function CurrencyBlock({ sourcesEnabled }: { sourcesEnabled: boolean }) {
       qc.invalidateQueries({ queryKey: ["currencies"] });
       qc.invalidateQueries({ queryKey: ["sources"] });
       qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["overview"] });
       setEditing(null);
+      setConfirmTrack(null);
     },
   });
 
@@ -171,7 +178,7 @@ function CurrencyBlock({ sourcesEnabled }: { sourcesEnabled: boolean }) {
               <button
                 type="button"
                 onClick={() =>
-                  patch.mutate({
+                  setConfirmTrack({
                     currency: editing.currency,
                     body: { current_balance: parseDisplayAmount(currentFundsInput) || "0" },
                   })
@@ -185,6 +192,24 @@ function CurrencyBlock({ sourcesEnabled }: { sourcesEnabled: boolean }) {
           </div>
         </div>
       )}
+      <TrackAsOtherDialog
+        open={confirmTrack !== null}
+        busy={patch.isPending}
+        onTrack={() => {
+          if (confirmTrack)
+            patch.mutate({
+              currency: confirmTrack.currency,
+              body: { ...confirmTrack.body, track_as_other: true },
+            });
+        }}
+        onKeepUntracked={() => {
+          if (confirmTrack)
+            patch.mutate({ currency: confirmTrack.currency, body: confirmTrack.body });
+        }}
+        onCancel={() => {
+          if (!patch.isPending) setConfirmTrack(null);
+        }}
+      />
     </section>
   );
 }
@@ -205,6 +230,10 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
   const [editName, setEditName] = useState("");
   const [editCurrentFundsInput, setEditCurrentFundsInput] = useState("0");
   const [editCurrency, setEditCurrency] = useState<CurrencyCode>("IDR");
+  const [confirmTrack, setConfirmTrack] = useState<{
+    id: number;
+    body: Record<string, unknown>;
+  } | null>(null);
 
   const create = useMutation({
     mutationFn: () =>
@@ -237,7 +266,10 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sources"] });
       qc.invalidateQueries({ queryKey: ["currencies"] });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["overview"] });
       setEditing(null);
+      setConfirmTrack(null);
     },
   });
 
@@ -346,7 +378,11 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
                       body.name = trimmedName;
                     }
                     const parsedEditCurrent = parseDisplayAmount(editCurrentFundsInput);
-                    if (!isSameNumeric(parsedEditCurrent, editing.current_balance)) {
+                    const balanceChanged = !isSameNumeric(
+                      parsedEditCurrent,
+                      editing.current_balance,
+                    );
+                    if (balanceChanged) {
                       body.current_balance = parsedEditCurrent || "0";
                     }
                     if (editCurrency !== editing.currency) {
@@ -356,7 +392,13 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
                       setEditing(null);
                       return;
                     }
-                    patch.mutate({ id: editing.id, body });
+                    // A direct balance change creates a reconciliation delta — ask
+                    // whether to record it as "Others" or keep it untracked.
+                    if (balanceChanged) {
+                      setConfirmTrack({ id: editing.id, body });
+                    } else {
+                      patch.mutate({ id: editing.id, body });
+                    }
                   }}
                   className="smallcaps px-3 py-1 bg-ink text-paper rounded"
                 >
@@ -386,6 +428,23 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
           if (pendingDelete) del.mutate(pendingDelete.id);
         }}
       />
+      <TrackAsOtherDialog
+        open={confirmTrack !== null}
+        busy={patch.isPending}
+        onTrack={() => {
+          if (confirmTrack)
+            patch.mutate({
+              id: confirmTrack.id,
+              body: { ...confirmTrack.body, track_as_other: true },
+            });
+        }}
+        onKeepUntracked={() => {
+          if (confirmTrack) patch.mutate({ id: confirmTrack.id, body: confirmTrack.body });
+        }}
+        onCancel={() => {
+          if (!patch.isPending) setConfirmTrack(null);
+        }}
+      />
       <form
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end"
         onSubmit={(e) => {
@@ -410,7 +469,7 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
               onChange={(e) => setCurrentFundsInput(e.target.value)}
               onBlur={() => setCurrentFundsInput(normalizeInput(currentFundsInput, currency))}
               onFocus={() => setCurrentFundsInput(parseDisplayAmount(currentFundsInput))}
-              className="bg-transparent border-b border-ink py-1 w-40 num"
+              className="bg-transparent border-b border-ink py-1 w-full sm:w-40 num"
             />
           </div>
         </label>

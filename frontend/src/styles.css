@@ -52,6 +52,12 @@ html, body, #root {
   text-rendering: optimizeLegibility;
 }
 
+/* Never let a stray wide element open a horizontal scrollbar on phones. */
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 /* === Paper texture: subtle noise + ruled edges === */
 body::before {
   content: "";
@@ -258,8 +264,10 @@ hr {
     font-size: 8px;
   }
 
+  /* Fluid base size so rem/em-based text scales with the phone's width
+     instead of snapping at a single breakpoint. */
   html, body {
-    font-size: 11.5px;
+    font-size: clamp(11px, 3.2vw, 13px);
   }
 
   .display {

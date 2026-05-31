@@ -20,7 +20,9 @@ from app.services.parse import (
     format_number,
     now_local,
     parse_amount,
+    parse_date_mdy,
     resolve_source_name,
+    tz,
 )
 
 log = logging.getLogger(__name__)
@@ -603,7 +605,8 @@ _TX_EDIT_PROMPT = (
     "amount [value]   (e.g. amount 50k)\n"
     "category [name]  (e.g. category Food)\n"
     "source [name]    (e.g. source BCA Debit)\n"
-    "description [text]\n\n"
+    "description [text]\n"
+    "date [value]     (e.g. date 12/25/2025)\n\n"
     "Reply 'cancel' to abort."
 )
 
@@ -649,6 +652,7 @@ def _handle_pending_tx_edit_reply(
     m_category = re.match(r"^category\s+(.+)$", t, re.IGNORECASE)
     m_source = re.match(r"^source\s+(.+)$", t, re.IGNORECASE)
     m_desc = re.match(r"^(?:description|note)\s+(.*)$", t, re.IGNORECASE)
+    m_date = re.match(r"^date\s+(.+)$", t, re.IGNORECASE)
 
     if m_amount:
         before = format_number(Decimal(tx.amount))
@@ -730,6 +734,34 @@ def _handle_pending_tx_edit_reply(
         _emit_message(
             chat_id,
             _format_edit_update("description", before, new_desc or "-"),
+            send_fn,
+        )
+        return True
+
+    if m_date:
+        raw = m_date.group(1).strip()
+        new_date = parse_date_mdy(raw)
+        if new_date is None:
+            _emit_message(
+                chat_id, "Couldn't parse that date. Try e.g. date 12/25/2025.", send_fn
+            )
+            return True
+        current = tx.occurred_at
+        if current.tzinfo is None:
+            current = current.replace(tzinfo=tz())
+        local = current.astimezone(tz())
+        before = local.strftime("%m/%d/%Y")
+        # Keep the original time-of-day; only move the calendar date.
+        tx.occurred_at = local.replace(
+            year=new_date.year, month=new_date.month, day=new_date.day
+        )
+        db.commit()
+        if send_fn is None:
+            _restore_pending_tx_message(db, user, value)
+        _clear_pending_tx_edit_state(db, user.id)
+        _emit_message(
+            chat_id,
+            _format_edit_update("date", before, new_date.strftime("%m/%d/%Y")),
             send_fn,
         )
         return True

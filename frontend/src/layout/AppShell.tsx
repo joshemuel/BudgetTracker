@@ -57,7 +57,7 @@ function Masthead({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-baseline sm:justify-between smallcaps text-ink-mute border-t border-paper-rule pt-4 sm:pt-5">
         <span className="order-1">Beta Version</span>
         <span className="order-3 sm:order-2 hidden sm:inline">{dateStr}</span>
-        <span className="order-2 sm:order-3 flex items-center gap-4 sm:gap-6 self-start sm:self-auto">
+        <span className="order-2 sm:order-3 flex flex-wrap items-center gap-x-4 gap-y-2 sm:gap-6 self-start sm:self-auto">
           <UserPrefsMenu me={me} />
           <button
             onClick={toggleTheme}
@@ -182,8 +182,8 @@ function IosInstallHelp({ open, onClose }: { open: boolean; onClose: () => void 
 
 function SectionNav() {
   return (
-    <nav className="py-3 border-b border-paper-rule overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-      <ul className="flex gap-4 sm:gap-6 smallcaps min-w-max">
+    <nav className="py-3 border-b border-paper-rule">
+      <ul className="flex flex-wrap gap-x-4 gap-y-2 sm:gap-x-6 smallcaps">
         {nav.map((n) => (
           <li key={n.to}>
             <NavLink

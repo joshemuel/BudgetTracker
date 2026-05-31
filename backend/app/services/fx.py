@@ -6,8 +6,10 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
 import httpx
+from sqlalchemy.orm import Session
 
 from app.db.models import AppState
+from app.db.session import SessionLocal
 
 log = logging.getLogger(__name__)
 
@@ -109,6 +111,42 @@ def get_rates_cached(db) -> FxRates:
         }
     db.commit()
     return fresh
+
+
+def refresh_rates(db: Session | None = None) -> bool:
+    """Force-fetch the latest USD-based FX rates and cache them in AppState.
+
+    Used by the daily scheduler job so conversions in budgets/overviews reflect
+    once-daily prices instead of relying on lazy 12h on-demand fetches. Returns
+    True when fresh rates were stored, False when the fetch failed (the existing
+    cache is left untouched). Opens its own session when called without one
+    (scheduler context)."""
+    own_session = db is None
+    if own_session:
+        db = SessionLocal()
+    try:
+        try:
+            fresh = _fetch_latest_rates()
+        except Exception as e:
+            log.warning("Daily FX refresh failed: %s", e)
+            return False
+        state = db.get(AppState, STATE_KEY)
+        payload = {
+            "fetched_at": fresh.fetched_at.isoformat(),
+            "rates": {k: str(v) for k, v in fresh.rates_per_usd.items()},
+        }
+        if state is None:
+            db.add(AppState(key=STATE_KEY, value=payload))
+        else:
+            merged = dict(state.value.get("rates", {})) if isinstance(state.value, dict) else {}
+            merged.update(payload["rates"])
+            state.value = {"fetched_at": payload["fetched_at"], "rates": merged}
+        db.commit()
+        log.info("FX rates refreshed (%s)", fresh.fetched_at.isoformat())
+        return True
+    finally:
+        if own_session:
+            db.close()
 
 
 def convert_to_idr(amount: Decimal, source_currency: str, rates: FxRates) -> Decimal:
