@@ -46,6 +46,58 @@ def _excluded_untracked_category_ids(db: Session, user_id: int) -> set[int]:
     return {int(category_id) for category_id, in rows}
 
 
+def _prev_n_month_keys(year: int, month: int, n: int) -> list[tuple[int, int]]:
+    """The n complete calendar months strictly before (year, month), newest first."""
+    keys: list[tuple[int, int]] = []
+    y, m = year, month
+    for _ in range(n):
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+        keys.append((y, m))
+    return keys
+
+
+def _quantile(ordered: list[float], q: float) -> float:
+    """Linear-interpolation quantile on a pre-sorted list."""
+    if not ordered:
+        return 0.0
+    if len(ordered) == 1:
+        return ordered[0]
+    pos = (len(ordered) - 1) * q
+    lo = int(pos)
+    hi = min(lo + 1, len(ordered) - 1)
+    frac = pos - lo
+    return ordered[lo] * (1 - frac) + ordered[hi] * frac
+
+
+def _trimmed_daily_mean(values: list[float]) -> tuple[float, int]:
+    """Mean daily spend with abnormally large days removed.
+
+    `values` is one entry per calendar day (zero-spend days included). The upper
+    IQR fence (Q3 + 1.5*IQR) is computed over the *spend* days only, then days
+    above it are dropped so a single huge one-off purchase can't inflate the
+    projection. Zero/quiet days are always kept — they are legitimate signal that
+    pulls the per-day burn rate down. Returns (mean, n_excluded).
+    """
+    n = len(values)
+    if n == 0:
+        return 0.0, 0
+    positives = sorted(v for v in values if v > 0)
+    if len(positives) >= 4:
+        q1 = _quantile(positives, 0.25)
+        q3 = _quantile(positives, 0.75)
+        upper = q3 + 1.5 * (q3 - q1)
+    else:
+        upper = float("inf")  # too few spend days to judge outliers
+    kept = [v for v in values if v <= upper]
+    excluded = n - len(kept)
+    if not kept:
+        return sum(values) / n, 0
+    return sum(kept) / len(kept), excluded
+
+
 def _category_spent(
     db: Session,
     user_id: int,
@@ -363,6 +415,79 @@ def daily(
             }
         )
     return {"year": y, "month": m, "currency": report_currency, "days": out}
+
+
+@router.get("/projection")
+def projection(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    year: int = Query(default=None),
+    month: int = Query(default=None),
+    currency: str | None = Query(default=None),
+    months: int = Query(default=3, ge=1, le=12),
+):
+    """Outlier-trimmed average daily expense from the months *before* (year, month).
+
+    Used to project the rest of the current month: multiply ``avg_daily_expense``
+    by the number of remaining days. Built from the last ``months`` complete
+    calendar months, excluding abnormally large spend days (see
+    ``_trimmed_daily_mean``). Months with no transactions at all are skipped so a
+    brand-new user isn't dragged toward zero by empty history.
+    """
+    now = datetime.now(timezone.utc)
+    y = year or now.year
+    m = month or now.month
+    report_currency = _report_currency(user, currency)
+    rates = fx.get_rates_cached(db)
+    excluded_category_ids = _excluded_untracked_category_ids(db, user.id)
+
+    keys = _prev_n_month_keys(y, m, months)
+    earliest_start, _ = _month_bounds(keys[-1][0], keys[-1][1])
+    _, latest_end = _month_bounds(keys[0][0], keys[0][1])
+
+    conditions = [
+        Transaction.user_id == user.id,
+        Transaction.deleted_at.is_(None),
+        Transaction.type == "expense",
+        Transaction.is_internal.is_(False),
+        Transaction.occurred_at >= earliest_start,
+        Transaction.occurred_at < latest_end,
+    ]
+    if excluded_category_ids:
+        conditions.append(~Transaction.category_id.in_(excluded_category_ids))
+
+    rows = db.execute(
+        select(Transaction.occurred_at, Transaction.amount, Transaction.currency)
+        .where(*conditions)
+    ).all()
+
+    spend_by_day: dict[tuple[int, int, int], Decimal] = {}
+    for occurred_at, amount, cur in rows:
+        key = (occurred_at.year, occurred_at.month, occurred_at.day)
+        spend_by_day[key] = spend_by_day.get(key, Decimal("0")) + fx.convert(
+            Decimal(amount), cur or "IDR", report_currency, rates
+        )
+
+    daily_values: list[float] = []
+    months_used = 0
+    for (ky, km) in keys:
+        mstart, mend = _month_bounds(ky, km)
+        dim = (mend - mstart).days
+        month_days = [float(spend_by_day.get((ky, km, d), Decimal("0"))) for d in range(1, dim + 1)]
+        if any(v > 0 for v in month_days):
+            daily_values.extend(month_days)
+            months_used += 1
+
+    days_total = len(daily_values)
+    avg_daily, days_excluded = _trimmed_daily_mean(daily_values)
+
+    return {
+        "currency": report_currency,
+        "avg_daily_expense": str(_round_currency(Decimal(str(avg_daily)), report_currency)),
+        "months_used": months_used,
+        "days_total": days_total,
+        "days_excluded": days_excluded,
+    }
 
 
 @router.get("/categories")

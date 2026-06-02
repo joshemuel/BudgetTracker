@@ -128,7 +128,7 @@ export default function TransactionsPage() {
 
   return (
     <div>
-      <SectionTitle kicker="The running register">Transactions</SectionTitle>
+      <SectionTitle>Transactions</SectionTitle>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 border-b border-paper-rule pb-4">
         <label className="block">

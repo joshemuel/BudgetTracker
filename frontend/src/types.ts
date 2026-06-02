@@ -94,6 +94,14 @@ export type Monthly = { year: number; currency: CurrencyCode; months: MonthlyRow
 export type DailyRow = { day: number; income: string; expense: string };
 export type Daily = { year: number; month: number; currency: CurrencyCode; days: DailyRow[] };
 
+export type Projection = {
+  currency: CurrencyCode;
+  avg_daily_expense: string;
+  months_used: number;
+  days_total: number;
+  days_excluded: number;
+};
+
 export type CategoryStat = {
   category_id: number;
   category_name: string;

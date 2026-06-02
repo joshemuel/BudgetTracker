@@ -127,7 +127,7 @@ export default function BudgetsPage() {
   return (
     <div>
       <div className="flex items-end justify-between gap-3 flex-wrap">
-        <SectionTitle kicker="The fences">Budgets</SectionTitle>
+        <SectionTitle>Budgets</SectionTitle>
         <button
           type="button"
           onClick={toggleAmounts}

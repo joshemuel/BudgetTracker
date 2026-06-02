@@ -7,6 +7,7 @@ import { SectionTitle } from "@/components/Figure";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
 import { useAmountVisibility } from "@/lib/privacy";
+import { useIsMobile } from "@/lib/mediaQuery";
 
 type Frequency = "monthly" | "yearly";
 type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
@@ -238,7 +239,8 @@ export default function SubscriptionsPage() {
   const [adding, setAdding] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Subscription | null>(null);
   const [editing, setEditing] = useState<Subscription | null>(null);
-  const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const isMobile = useIsMobile();
 
   const { data: me } = useQuery<Me>({
     queryKey: ["me"],
@@ -297,7 +299,7 @@ export default function SubscriptionsPage() {
   return (
     <div className="space-y-10">
       <div className="flex items-end justify-between flex-wrap gap-4">
-        <SectionTitle kicker="Recurring charges">Subscriptions</SectionTitle>
+        <SectionTitle>Subscriptions</SectionTitle>
         <div className="text-right">
           <p className="smallcaps text-ink-mute">Monthly total</p>
           <p className="num text-[2rem] leading-[0.95] sm:text-2xl sm:leading-none break-words">{totalDisplay}</p>
@@ -358,6 +360,96 @@ export default function SubscriptionsPage() {
           </div>
         )}
 
+        {isMobile ? (
+          <ul className="border-t border-paper-rule divide-y divide-paper-rule">
+            {(subs ?? []).map((s) => {
+              const expanded = expandedId === s.id;
+              return (
+                <li key={s.id} className={s.active ? "" : "opacity-50"}>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId(expanded ? null : s.id)}
+                    aria-expanded={expanded}
+                    className="w-full text-left flex items-start gap-3 py-3 min-h-[44px]"
+                  >
+                    <span className="flex-1 min-w-0">
+                      <span className="font-[500] block truncate">{s.name}</span>
+                      <span className="num text-ink-soft text-[11px] block mt-0.5">
+                        next {s.next_billing_date}
+                      </span>
+                    </span>
+                    <span className="shrink-0 flex flex-col items-end">
+                      <span className="num text-accent">
+                        {showAmounts
+                          ? fmtCompactMoney(s.amount, (s.currency as CurrencyCode) || "IDR")
+                          : "••••••"}
+                      </span>
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                        className={`text-ink-mute mt-1 transition-transform ${
+                          expanded ? "rotate-180" : ""
+                        }`}
+                      >
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </span>
+                  </button>
+                  {expanded && (
+                    <div className="pb-3">
+                      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px] border-t border-paper-rule pt-2">
+                        <dt className="smallcaps text-ink-mute self-center">Source</dt>
+                        <dd className="text-right">
+                          {sourcesEnabled ? (showAmounts ? s.source_name : "••••••") : "N/A"}
+                        </dd>
+                        <dt className="smallcaps text-ink-mute self-center">Category</dt>
+                        <dd className="text-right">{s.category_name}</dd>
+                        <dt className="smallcaps text-ink-mute self-center">Amount</dt>
+                        <dd className="text-right num">
+                          {showAmounts
+                            ? fmtMoney(s.amount, (s.currency as CurrencyCode) || "IDR")
+                            : "••••••"}
+                        </dd>
+                        <dt className="smallcaps text-ink-mute self-center">Cadence</dt>
+                        <dd className="text-right smallcaps text-ink-mute">{s.frequency}</dd>
+                        <dt className="smallcaps text-ink-mute self-center">Next billing</dt>
+                        <dd className="text-right num">{s.next_billing_date}</dd>
+                        <dt className="smallcaps text-ink-mute self-center">Status</dt>
+                        <dd className="text-right">{s.active ? "Active" : "Inactive"}</dd>
+                      </dl>
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          type="button"
+                          onClick={() => setEditing(s)}
+                          className="smallcaps flex-1 min-h-[44px] border border-ink/30 rounded-sm"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingDelete(s)}
+                          className="smallcaps flex-1 min-h-[44px] border border-accent/40 text-accent rounded-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+            {subs && subs.length === 0 && (
+              <li className="py-8 text-center text-ink-mute">No subscriptions yet.</li>
+            )}
+          </ul>
+        ) : (
         <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
           <table className="ledger-table w-full text-[11px] sm:text-[13px]">
             <thead>
@@ -385,9 +477,7 @@ export default function SubscriptionsPage() {
                   <td>{s.category_name}</td>
                   <td className="text-right num text-accent">
                     {showAmounts
-                      ? isMobile
-                        ? fmtCompactMoney(s.amount, (s.currency as CurrencyCode) || "IDR")
-                        : fmtMoney(s.amount, (s.currency as CurrencyCode) || "IDR")
+                      ? fmtMoney(s.amount, (s.currency as CurrencyCode) || "IDR")
                       : "••••••"}
                   </td>
                   <td className="smallcaps text-ink-mute">{s.frequency}</td>
@@ -418,6 +508,7 @@ export default function SubscriptionsPage() {
             </tbody>
           </table>
         </div>
+        )}
       </section>
       <ConfirmDialog
         open={pendingDelete !== null}

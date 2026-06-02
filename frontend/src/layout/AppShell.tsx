@@ -142,8 +142,8 @@ function Masthead({
           <path d="M7 24 L13 17 L18.5 21.5 L25 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           <circle cx="25" cy="8" r="1.6" fill="currentColor" />
         </svg>
-        <h1 className="display text-[20px] sm:text-[28px] md:text-[36px] lg:text-[44px] leading-[0.95] text-ink">
-          Budget <span className="display-italic text-accent">Tracker</span>
+        <h1 className="text-[20px] sm:text-[28px] md:text-[36px] lg:text-[44px] font-semibold tracking-tight leading-[0.95] text-ink">
+          Budget Tracker
         </h1>
       </div>
 

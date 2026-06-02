@@ -11,7 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { api } from "@/api";
-import type { Daily, Me } from "@/types";
+import type { Daily, Me, Projection } from "@/types";
 import { fmtMoney, fmtShort, monthName, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 import { useAmountVisibility } from "@/lib/privacy";
@@ -51,14 +51,6 @@ export default function DailyPage() {
     };
   });
 
-  const previousMonth = month === 1 ? 12 : month - 1;
-  const previousYear = month === 1 ? year - 1 : year;
-  const { data: prevData } = useQuery<Daily>({
-    queryKey: ["daily", previousYear, previousMonth, currency, "prev"],
-    queryFn: () =>
-      api.get<Daily>(withCurrency(`/stats/daily?year=${previousYear}&month=${previousMonth}`, currency)),
-  });
-
   const today = new Date();
   const isCurrentMonth = today.getFullYear() === year && today.getMonth() + 1 === month;
   const isFutureMonth =
@@ -66,49 +58,28 @@ export default function DailyPage() {
     (year === today.getFullYear() && month > today.getMonth() + 1);
   const todayDay = isCurrentMonth ? today.getDate() : 0;
 
-  const previousDays = prevData?.days ?? [];
-  const previousByDay = new Map<number, number>();
-  let prevCum = 0;
-  for (const row of previousDays) {
-    prevCum += toNumber(row.expense);
-    previousByDay.set(row.day, prevCum);
-  }
-
-  const previousMonthLastDay = previousDays.length
-    ? previousDays[previousDays.length - 1].day
-    : 0;
-  const trailingCount = Math.min(7, previousDays.length);
-  const trailingExpenseAvg =
-    trailingCount > 0
-      ? previousDays
-          .slice(previousDays.length - trailingCount)
-          .reduce((sum, d) => sum + toNumber(d.expense), 0) / trailingCount
-      : 0;
-
-  const previousCumulativeAt = (day: number): number | null => {
-    if (previousMonthLastDay === 0) return null;
-    if (day <= previousMonthLastDay) {
-      return previousByDay.get(day) ?? null;
-    }
-    const last = previousByDay.get(previousMonthLastDay) ?? 0;
-    return last + trailingExpenseAvg * (day - previousMonthLastDay);
-  };
+  // Projected pace: outlier-trimmed average daily spend from the prior complete
+  // months (computed on the backend). Only meaningful for the live month.
+  const { data: projectionData } = useQuery<Projection>({
+    queryKey: ["projection", year, month, currency],
+    queryFn: () =>
+      api.get<Projection>(withCurrency(`/stats/projection?year=${year}&month=${month}`, currency)),
+    enabled: isCurrentMonth,
+  });
+  const avgDailyExpense = toNumber(projectionData?.avg_daily_expense ?? 0);
 
   const todayCumulative =
     isCurrentMonth && todayDay > 0
       ? (chartData.find((row) => row.day === todayDay)?.Cumulative ?? cum)
       : 0;
-  const prevAnchorCumulative =
-    isCurrentMonth && todayDay > 0 ? (previousCumulativeAt(todayDay) ?? 0) : 0;
 
   const chartDataWithGhost = chartData.map((row) => {
     const isPastToday = isCurrentMonth && todayDay > 0 && row.day > todayDay;
     let ghostProjection: number | null = null;
     if (isCurrentMonth && todayDay > 0 && row.day >= todayDay) {
-      const prevAtDay = previousCumulativeAt(row.day);
-      if (prevAtDay != null) {
-        ghostProjection = todayCumulative + Math.max(0, prevAtDay - prevAnchorCumulative);
-      }
+      // Straight-line extrapolation from today's actual total using the
+      // outlier-trimmed daily average of the previous months.
+      ghostProjection = todayCumulative + avgDailyExpense * (row.day - todayDay);
     }
     return {
       ...row,
@@ -136,7 +107,7 @@ export default function DailyPage() {
   return (
     <div>
       <div className="flex items-end justify-between flex-wrap gap-4">
-        <SectionTitle kicker="Day by day, as written">
+        <SectionTitle>
           {monthName(month)} {year}
         </SectionTitle>
         <div className="flex gap-3 items-center w-full sm:w-auto justify-between sm:justify-start">
@@ -258,7 +229,7 @@ export default function DailyPage() {
         </ResponsiveContainer>
       </div>
 
-      <SectionTitle kicker="Daily density">Heat of the month</SectionTitle>
+      <SectionTitle>Heatmap</SectionTitle>
       <div className="grid grid-cols-7 gap-[2px] sm:gap-[3px]">
         {days.map((d) => {
           const ratio = toNumber(d.expense) / maxExp;
@@ -295,7 +266,7 @@ export default function DailyPage() {
       </div>
 
       <div className="mt-10">
-        <SectionTitle kicker="Where the rupiah went">By Category</SectionTitle>
+        <SectionTitle>By Category</SectionTitle>
         <CategoriesBreakdown from={from} to={to} currency={reportCurrency} compact />
       </div>
     </div>

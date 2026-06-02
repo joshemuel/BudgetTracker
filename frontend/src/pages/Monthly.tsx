@@ -69,7 +69,7 @@ export default function MonthlyPage() {
   return (
     <div>
       <div className="flex items-end justify-between">
-        <SectionTitle kicker="The long arc">
+        <SectionTitle>
           {year} — Month by Month
         </SectionTitle>
         <div className="flex gap-2 smallcaps">

@@ -81,7 +81,7 @@ function CurrencyBlock({ sourcesEnabled }: { sourcesEnabled: boolean }) {
 
   return (
     <section className="mb-12">
-      <SectionTitle kicker="The totals">Currencies</SectionTitle>
+      <SectionTitle>Currencies</SectionTitle>
       <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
         <table className="ledger-table w-full text-[11px] sm:text-[13px]">
           <thead>
@@ -276,7 +276,7 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
   return (
     <section className={enabled ? "" : "opacity-45 grayscale"}>
       <fieldset disabled={!enabled}>
-      <SectionTitle kicker="The wallets">Sources</SectionTitle>
+      <SectionTitle>Sources</SectionTitle>
       <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
         <table className="ledger-table mb-4 w-full text-[11px] sm:text-[13px]">
           <thead>
@@ -558,7 +558,7 @@ function CategoriesBlock() {
 
   return (
     <section className="mt-12">
-      <SectionTitle kicker="The taxonomy">Categories</SectionTitle>
+      <SectionTitle>Categories</SectionTitle>
       <div className="-mx-2 px-2 sm:mx-0 sm:px-0 mb-6">
         <table className="ledger-table w-full text-[11px] sm:text-[13px]">
           <thead>

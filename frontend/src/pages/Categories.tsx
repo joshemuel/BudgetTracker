@@ -175,7 +175,7 @@ export default function CategoriesPage() {
 
   return (
     <div>
-      <SectionTitle kicker="Where the rupiah went">By Category</SectionTitle>
+      <SectionTitle>By Category</SectionTitle>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
         <label className="block">

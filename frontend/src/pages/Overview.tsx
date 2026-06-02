@@ -5,6 +5,7 @@ import { api } from "@/api";
 import type { CurrencyBalance, Me, Overview, Source } from "@/types";
 import { fmtCompactMoney, fmtMoney, fmtPct, monthName, toNumber } from "@/lib/format";
 import { Figure, SectionTitle } from "@/components/Figure";
+import SpendDonut from "@/components/SpendDonut";
 import { useAmountVisibility } from "@/lib/privacy";
 import { useIsMobile } from "@/lib/mediaQuery";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
@@ -118,10 +119,11 @@ export default function OverviewPage() {
     queryFn: () => api.get<CurrencyBalance[]>("/currencies"),
   });
 
-  if (!ov) return <p className="smallcaps text-ink-mute">Assembling the ledger…</p>;
+  if (!ov) return <p className="smallcaps text-ink-mute">Loading…</p>;
 
   const net = toNumber(ov.totals.net);
   const netTone = net >= 0 ? "gain" : "accent";
+  const netColor = net >= 0 ? "text-gain" : "text-accent";
   const paceRatio = ov.today_day / ov.days_in_month;
   const fmtAmount = (v: string | number) =>
     showAmounts
@@ -138,7 +140,7 @@ export default function OverviewPage() {
       <section className="col-span-12">
         <div className="flex items-center justify-between gap-3">
           <p className="smallcaps text-ink-mute">
-            {monthName(ov.month)} MMXXVI · Day {ov.today_day} of {ov.days_in_month}
+            {monthName(ov.month)} {ov.year} · Day {ov.today_day} of {ov.days_in_month}
           </p>
           <button
             type="button"
@@ -150,38 +152,58 @@ export default function OverviewPage() {
             {showAmounts ? "Hide" : "Show"}
           </button>
         </div>
-        <h2 className="display text-xl sm:text-2xl md:text-3xl lg:text-4xl mt-2">
-          <span className="display-italic">A month</span>, in figures.
-        </h2>
       </section>
 
-      <section className="col-span-12 md:col-span-4 border-t border-ink pt-2">
-        <Figure
-          label="Income"
-          value={fmtAmount(ov.totals.income)}
-          tone="gain"
-          sub="Credits posted this month"
-          emphasize
-        />
-      </section>
-      <section className="col-span-12 md:col-span-4 border-t border-ink pt-2">
-        <Figure
-          label="Expenditure"
-          value={fmtAmount(ov.totals.expense)}
-          tone="accent"
-          sub="Debits posted this month"
-          emphasize
-        />
-      </section>
-      <section className="col-span-12 md:col-span-4 border-t border-ink pt-2">
-        <Figure
-          label="Net"
-          value={fmtAmount(ov.totals.net)}
-          tone={netTone}
-          sub={`Pace · ${fmtPct(paceRatio)} of month elapsed`}
-          emphasize={isMobile}
-        />
-      </section>
+      {isMobile ? (
+        <section className="col-span-12 space-y-6">
+          <div className="border-t-2 border-ink pt-3">
+            <p className="smallcaps text-ink-mute">Net this month</p>
+            <p className={`num ${netColor} text-5xl leading-[0.95] mt-1 break-words`}>
+              {fmtAmount(ov.totals.net)}
+            </p>
+            <p className="smallcaps text-ink-mute mt-1.5">Pace · {fmtPct(paceRatio)}</p>
+          </div>
+
+          <SpendDonut currency={ov.currency} year={ov.year} month={ov.month} />
+
+          <div className="grid grid-cols-2 gap-4 border-t border-ink pt-3">
+            <div>
+              <p className="smallcaps text-ink-mute">Income</p>
+              <p className="num text-gain text-3xl leading-[0.95] mt-1 break-words">
+                {fmtAmount(ov.totals.income)}
+              </p>
+            </div>
+            <div>
+              <p className="smallcaps text-ink-mute">Expenditure</p>
+              <p className="num text-accent text-3xl leading-[0.95] mt-1 break-words">
+                {fmtAmount(ov.totals.expense)}
+              </p>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <>
+          <section className="col-span-12 md:col-span-4 border-t border-ink pt-2">
+            <Figure label="Income" value={fmtAmount(ov.totals.income)} tone="gain" emphasize />
+          </section>
+          <section className="col-span-12 md:col-span-4 border-t border-ink pt-2">
+            <Figure
+              label="Expenditure"
+              value={fmtAmount(ov.totals.expense)}
+              tone="accent"
+              emphasize
+            />
+          </section>
+          <section className="col-span-12 md:col-span-4 border-t border-ink pt-2">
+            <Figure
+              label="Net"
+              value={fmtAmount(ov.totals.net)}
+              tone={netTone}
+              sub={`Pace · ${fmtPct(paceRatio)}`}
+            />
+          </section>
+        </>
+      )}
 
       <section className="col-span-12 lg:col-span-8 mt-4 sm:mt-6">
         <SectionTitle kicker="The running totals">By Category</SectionTitle>
