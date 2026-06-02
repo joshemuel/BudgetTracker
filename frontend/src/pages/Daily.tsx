@@ -67,19 +67,32 @@ export default function DailyPage() {
     enabled: isCurrentMonth,
   });
   const avgDailyExpense = toNumber(projectionData?.avg_daily_expense ?? 0);
+  // Typical spend for day-of-month d is dailyProfile[d - 1]. We cumulate it from
+  // today forward so the projected pace follows the usual monthly rhythm rather
+  // than a flat straight line. Falls back to the constant daily average if no
+  // profile is available (e.g. brand-new user / no history).
+  const dailyProfile = projectionData?.daily_profile ?? [];
+  const profileFor = (day: number): number =>
+    dailyProfile.length > 0 ? toNumber(dailyProfile[day - 1] ?? 0) : avgDailyExpense;
 
   const todayCumulative =
     isCurrentMonth && todayDay > 0
       ? (chartData.find((row) => row.day === todayDay)?.Cumulative ?? cum)
       : 0;
 
+  let projectedCum = todayCumulative;
+  let lastProjectedDay = todayDay;
   const chartDataWithGhost = chartData.map((row) => {
     const isPastToday = isCurrentMonth && todayDay > 0 && row.day > todayDay;
     let ghostProjection: number | null = null;
     if (isCurrentMonth && todayDay > 0 && row.day >= todayDay) {
-      // Straight-line extrapolation from today's actual total using the
-      // outlier-trimmed daily average of the previous months.
-      ghostProjection = todayCumulative + avgDailyExpense * (row.day - todayDay);
+      // Walk the projected cumulative forward one day at a time, adding each
+      // day's typical (outlier-tamed) spend — a curve anchored at today's total.
+      for (let d = lastProjectedDay + 1; d <= row.day; d++) {
+        projectedCum += profileFor(d);
+      }
+      lastProjectedDay = row.day;
+      ghostProjection = projectedCum;
     }
     return {
       ...row,

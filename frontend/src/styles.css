@@ -275,7 +275,7 @@ hr {
      cells around them. Native selects open a picker, so the iOS-zoom guard
      above isn't needed here. */
   .ledger-table select {
-    font-size: 13px;
+    font-size: 10px;
   }
 
   .display {
@@ -297,6 +297,16 @@ hr {
   .modal-card {
     border-radius: 6px;
     max-height: calc(100dvh - 1rem);
+  }
+
+  /* Keep the chat launcher and docked panel clear of the fixed bottom tab bar
+     (≈56px tall + the iOS home-indicator safe area). */
+  .chat-fab {
+    bottom: calc(72px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .safe-chat-right {
+    bottom: calc(60px + env(safe-area-inset-bottom));
   }
 }
 

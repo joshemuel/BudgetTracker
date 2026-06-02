@@ -1,11 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Budget Tracker">
   <rect width="512" height="512" rx="112" fill="#f5efe3" />
-  <rect x="72" y="72" width="368" height="368" rx="88" fill="#19170f" />
-  <g fill="#f5efe3">
-    <rect x="136" y="142" width="240" height="20" rx="10" />
-    <rect x="136" y="194" width="180" height="16" rx="8" />
-    <rect x="136" y="238" width="132" height="16" rx="8" />
-    <path d="M136 318h96v58h-96z" />
-    <path d="M254 286h34l26 67 26-67h34l-47 112h-26z" />
+  <g transform="translate(106 106) scale(9.375)" fill="none" stroke="#19170f" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2.5" y="2.5" width="27" height="27" stroke-width="1.4" />
+    <line x1="6" y1="12" x2="26" y2="12" stroke-width="0.9" opacity="0.55" />
+    <line x1="6" y1="20" x2="26" y2="20" stroke-width="0.9" opacity="0.55" />
+    <path d="M7 24 L13 17 L18.5 21.5 L25 8" stroke-width="1.8" />
+    <circle cx="25" cy="8" r="1.6" fill="#19170f" stroke="none" />
   </g>
 </svg>

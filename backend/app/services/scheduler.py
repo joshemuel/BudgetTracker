@@ -6,6 +6,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from app.config import get_settings
+from app.services import daily_summary
 from app.services import fx
 from app.services import subscriptions as sub_svc
 from app.services import weekly_report
@@ -41,6 +42,14 @@ def start() -> None:
         fx.refresh_rates,
         trigger=CronTrigger(hour=6, minute=30),
         id="fx_refresh",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    _scheduler.add_job(
+        daily_summary.refresh_all,
+        trigger=CronTrigger(hour=6, minute=45),
+        id="daily_summary",
         replace_existing=True,
         max_instances=1,
         coalesce=True,

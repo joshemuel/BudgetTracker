@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.db.models import Budget, Category, Source, Transaction, User
-from app.services import fx
+from app.services import daily_summary, fx
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
@@ -72,6 +72,16 @@ def _quantile(ordered: list[float], q: float) -> float:
     return ordered[lo] * (1 - frac) + ordered[hi] * frac
 
 
+def _upper_fence(positive_values: list[float]) -> float:
+    """IQR upper fence (Q3 + 1.5*IQR) over spend days; inf if too few to judge."""
+    positives = sorted(positive_values)
+    if len(positives) < 4:
+        return float("inf")  # too few spend days to judge outliers
+    q1 = _quantile(positives, 0.25)
+    q3 = _quantile(positives, 0.75)
+    return q3 + 1.5 * (q3 - q1)
+
+
 def _trimmed_daily_mean(values: list[float]) -> tuple[float, int]:
     """Mean daily spend with abnormally large days removed.
 
@@ -84,13 +94,7 @@ def _trimmed_daily_mean(values: list[float]) -> tuple[float, int]:
     n = len(values)
     if n == 0:
         return 0.0, 0
-    positives = sorted(v for v in values if v > 0)
-    if len(positives) >= 4:
-        q1 = _quantile(positives, 0.25)
-        q3 = _quantile(positives, 0.75)
-        upper = q3 + 1.5 * (q3 - q1)
-    else:
-        upper = float("inf")  # too few spend days to judge outliers
+    upper = _upper_fence([v for v in values if v > 0])
     kept = [v for v in values if v <= upper]
     excluded = n - len(kept)
     if not kept:
@@ -426,13 +430,17 @@ def projection(
     currency: str | None = Query(default=None),
     months: int = Query(default=3, ge=1, le=12),
 ):
-    """Outlier-trimmed average daily expense from the months *before* (year, month).
+    """Outlier-tamed spending shape from the months *before* (year, month).
 
-    Used to project the rest of the current month: multiply ``avg_daily_expense``
-    by the number of remaining days. Built from the last ``months`` complete
-    calendar months, excluding abnormally large spend days (see
-    ``_trimmed_daily_mean``). Months with no transactions at all are skipped so a
-    brand-new user isn't dragged toward zero by empty history.
+    Returns both a single ``avg_daily_expense`` (kept for diagnostics) and a
+    per-day-of-month ``daily_profile`` the frontend cumulates from "today" to
+    draw the projected pace as a *curve* that echoes the typical monthly rhythm
+    (bills clustering on certain days, quiet stretches) rather than a featureless
+    straight line. Both are built from the last ``months`` complete calendar
+    months. Abnormally large days are *capped* at the IQR upper fence (so one
+    huge one-off purchase can't spike the profile) instead of being dropped, and
+    months with no transactions at all are skipped so a brand-new user isn't
+    dragged toward zero by empty history.
     """
     now = datetime.now(timezone.utc)
     y = year or now.year
@@ -469,25 +477,56 @@ def projection(
         )
 
     daily_values: list[float] = []
-    months_used = 0
+    used: list[tuple[int, int, int]] = []  # (year, month, days_in_month) of months with spend
     for (ky, km) in keys:
         mstart, mend = _month_bounds(ky, km)
         dim = (mend - mstart).days
         month_days = [float(spend_by_day.get((ky, km, d), Decimal("0"))) for d in range(1, dim + 1)]
         if any(v > 0 for v in month_days):
             daily_values.extend(month_days)
-            months_used += 1
+            used.append((ky, km, dim))
 
+    months_used = len(used)
     days_total = len(daily_values)
     avg_daily, days_excluded = _trimmed_daily_mean(daily_values)
+
+    # Per-day-of-month spending shape. Each historical day is capped at the IQR
+    # upper fence so a single huge one-off is tamed (not dropped), then averaged
+    # across the months that *have* that day. Days no prior month reached (e.g.
+    # the 31st) and the no-history case fall back to the overall capped mean.
+    cap = _upper_fence([v for v in daily_values if v > 0])
+    capped_all = [min(v, cap) for v in daily_values]
+    fallback = sum(capped_all) / len(capped_all) if capped_all else 0.0
+
+    tstart, tend = _month_bounds(y, m)
+    days_in_target = (tend - tstart).days
+    daily_profile: list[str] = []
+    for d in range(1, days_in_target + 1):
+        samples = [
+            min(float(spend_by_day.get((ky, km, d), Decimal("0"))), cap)
+            for (ky, km, dim) in used
+            if d <= dim
+        ]
+        value = sum(samples) / len(samples) if samples else fallback
+        daily_profile.append(str(_round_currency(Decimal(str(value)), report_currency)))
 
     return {
         "currency": report_currency,
         "avg_daily_expense": str(_round_currency(Decimal(str(avg_daily)), report_currency)),
+        "daily_profile": daily_profile,
         "months_used": months_used,
         "days_total": days_total,
         "days_excluded": days_excluded,
     }
+
+
+@router.get("/summary")
+def summary(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """One-line, daily-refreshed natural-language summary of the last 7 days."""
+    return daily_summary.get_or_build(db, user)
 
 
 @router.get("/categories")

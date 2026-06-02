@@ -97,9 +97,16 @@ export type Daily = { year: number; month: number; currency: CurrencyCode; days:
 export type Projection = {
   currency: CurrencyCode;
   avg_daily_expense: string;
+  /** Per-day-of-month typical spend (index 0 = day 1), capped + averaged over recent months. */
+  daily_profile: string[];
   months_used: number;
   days_total: number;
   days_excluded: number;
+};
+
+export type Summary = {
+  text: string;
+  generated_on: string;
 };
 
 export type CategoryStat = {

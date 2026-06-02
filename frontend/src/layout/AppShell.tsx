@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Me } from "@/types";
@@ -22,6 +22,155 @@ const nav = [
   { to: "/budgets", label: "Budgets" },
   { to: "/settings", label: "Settings" },
 ];
+
+// Mobile collapses the seven sections into four bottom-bar tabs. Multi-page
+// tabs expose their members through a segmented sub-nav (see GroupSubNav).
+type SubLink = { to: string; label: string; end?: boolean };
+type MobileGroup = {
+  key: "overview" | "activity" | "ledger" | "manage";
+  label: string;
+  to: string; // landing route when the tab is tapped
+  routes: string[]; // every route that lights this tab up
+  sub?: SubLink[];
+};
+
+const mobileGroups: MobileGroup[] = [
+  { key: "overview", label: "Overview", to: "/", routes: ["/"] },
+  {
+    key: "activity",
+    label: "Activity",
+    to: "/monthly",
+    routes: ["/monthly", "/daily"],
+    sub: [
+      { to: "/monthly", label: "Monthly" },
+      { to: "/daily", label: "Daily" },
+    ],
+  },
+  { key: "ledger", label: "Transactions", to: "/transactions", routes: ["/transactions"] },
+  {
+    key: "manage",
+    label: "Manage",
+    to: "/subscriptions",
+    routes: ["/subscriptions", "/budgets", "/settings"],
+    sub: [
+      { to: "/subscriptions", label: "Subscriptions" },
+      { to: "/budgets", label: "Budgets" },
+      { to: "/settings", label: "Settings" },
+    ],
+  },
+];
+
+function NavIcon({ name }: { name: MobileGroup["key"] }) {
+  const stroke = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.7,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  if (name === "overview") {
+    // Dashboard bars — echoes the masthead chart mark.
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" {...stroke}>
+        <path d="M4 20V11" />
+        <path d="M10 20V4" />
+        <path d="M16 20v-6" />
+        <path d="M21 20H3" />
+      </svg>
+    );
+  }
+  if (name === "activity") {
+    // Calendar — Monthly + Daily.
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" {...stroke}>
+        <rect x="3" y="4.5" width="18" height="16.5" rx="2" />
+        <path d="M3 9.5h18" />
+        <path d="M8 2.5v4" />
+        <path d="M16 2.5v4" />
+      </svg>
+    );
+  }
+  if (name === "ledger") {
+    // Receipt — Transactions.
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" {...stroke}>
+        <path d="M5 3h14v18l-2.6-1.6L14 21l-2-1.4L10 21l-2.4-1.6L5 21V3Z" />
+        <path d="M9 8h6" />
+        <path d="M9 12h6" />
+      </svg>
+    );
+  }
+  // Sliders — Subscriptions + Budgets + Settings.
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" {...stroke}>
+      <path d="M4 7h8" />
+      <path d="M17 7h3" />
+      <circle cx="14.5" cy="7" r="2" />
+      <path d="M4 17h3" />
+      <path d="M12 17h8" />
+      <circle cx="9.5" cy="17" r="2" />
+    </svg>
+  );
+}
+
+function BottomNav() {
+  const { pathname } = useLocation();
+  return (
+    <nav
+      className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-paper border-t border-ink"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
+      <ul className="grid grid-cols-4">
+        {mobileGroups.map((g) => {
+          const active = g.routes.includes(pathname);
+          return (
+            <li key={g.key}>
+              <Link
+                to={g.to}
+                aria-current={active ? "page" : undefined}
+                className={
+                  "flex flex-col items-center justify-center gap-1 min-h-[56px] py-2 transition-colors " +
+                  (active ? "text-accent" : "text-ink-soft active:text-ink")
+                }
+              >
+                <NavIcon name={g.key} />
+                <span className="smallcaps leading-none" style={{ fontSize: "9px" }}>
+                  {g.label}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
+function GroupSubNav() {
+  const { pathname } = useLocation();
+  const group = mobileGroups.find((g) => g.routes.includes(pathname));
+  if (!group?.sub) return null;
+  return (
+    <nav className="sm:hidden pt-3 pb-1">
+      <div className="inline-flex border border-ink smallcaps nav-tabs">
+        {group.sub.map((s, i) => (
+          <NavLink
+            key={s.to}
+            to={s.to}
+            end={s.end}
+            className={({ isActive }) =>
+              "px-3 py-1.5 transition-colors " +
+              (i > 0 ? "border-l border-ink " : "") +
+              (isActive ? "bg-ink text-paper" : "text-ink-soft active:text-ink")
+            }
+          >
+            {s.label}
+          </NavLink>
+        ))}
+      </div>
+    </nav>
+  );
+}
 
 function Masthead({
   me,
@@ -180,21 +329,21 @@ function IosInstallHelp({ open, onClose }: { open: boolean; onClose: () => void 
   );
 }
 
+// Desktop section nav. Mobile uses the BottomNav + GroupSubNav instead.
 function SectionNav() {
   return (
-    <nav className="py-2 sm:py-3 border-b border-paper-rule">
-      <ul className="grid grid-cols-4 gap-y-1 gap-x-1 sm:flex sm:flex-wrap sm:gap-x-6 sm:gap-y-2 smallcaps nav-tabs">
+    <nav className="hidden sm:block py-3 border-b border-paper-rule">
+      <ul className="flex flex-wrap gap-x-6 gap-y-2 smallcaps nav-tabs">
         {nav.map((n) => (
           <li key={n.to}>
             <NavLink
               to={n.to}
               end={n.end}
               className={({ isActive }) =>
-                "flex items-center justify-center text-center min-h-[44px] px-1 py-2 rounded-sm leading-tight transition-colors " +
-                "sm:block sm:min-h-0 sm:px-0 sm:py-0 sm:pb-1 sm:rounded-none sm:border-b-2 sm:whitespace-nowrap " +
+                "block pb-1 border-b-2 whitespace-nowrap transition-colors " +
                 (isActive
-                  ? "text-accent bg-accent/[0.08] sm:bg-transparent sm:border-accent"
-                  : "text-ink-soft hover:text-ink active:bg-ink/[0.04] sm:active:bg-transparent sm:border-transparent")
+                  ? "text-accent border-accent"
+                  : "text-ink-soft hover:text-ink border-transparent")
               }
             >
               {n.label}
@@ -256,9 +405,10 @@ export default function AppShell() {
       : null;
 
   return (
-    <div className="max-w-[1160px] lg:max-w-[1220px] mx-auto px-3 sm:px-4 md:px-5 lg:px-6 xl:px-8">
+    <div className="max-w-[1160px] lg:max-w-[1220px] mx-auto px-3 sm:px-4 md:px-5 lg:px-6 xl:px-8 pb-24 sm:pb-0">
       <Masthead me={me} onLog={() => setLogOpen(true)} install={installCta} />
       <SectionNav />
+      <GroupSubNav />
       <main className="py-7 sm:py-10 md:py-12 lg:py-14">
         <Outlet />
       </main>
@@ -270,6 +420,7 @@ export default function AppShell() {
       </footer>
       <QuickLog open={logOpen} onClose={() => setLogOpen(false)} />
       <WebChat />
+      <BottomNav />
       <IosInstallHelp
         open={isMobile && pwaInstall.showIosInstructions}
         onClose={pwaInstall.closeIosInstructions}

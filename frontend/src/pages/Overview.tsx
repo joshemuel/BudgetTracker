@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "@/api";
-import type { CurrencyBalance, Me, Overview, Source } from "@/types";
+import type { CurrencyBalance, Me, Overview, Source, Summary } from "@/types";
 import { fmtCompactMoney, fmtMoney, fmtPct, monthName, toNumber } from "@/lib/format";
 import { Figure, SectionTitle } from "@/components/Figure";
-import SpendDonut from "@/components/SpendDonut";
+import SpendRadar from "@/components/SpendRadar";
 import { useAmountVisibility } from "@/lib/privacy";
 import { useIsMobile } from "@/lib/mediaQuery";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
@@ -118,6 +118,10 @@ export default function OverviewPage() {
     queryKey: ["currencies"],
     queryFn: () => api.get<CurrencyBalance[]>("/currencies"),
   });
+  const { data: summary } = useQuery<Summary>({
+    queryKey: ["summary"],
+    queryFn: () => api.get<Summary>("/stats/summary"),
+  });
 
   if (!ov) return <p className="smallcaps text-ink-mute">Loading…</p>;
 
@@ -164,8 +168,6 @@ export default function OverviewPage() {
             <p className="smallcaps text-ink-mute mt-1.5">Pace · {fmtPct(paceRatio)}</p>
           </div>
 
-          <SpendDonut currency={ov.currency} year={ov.year} month={ov.month} />
-
           <div className="grid grid-cols-2 gap-4 border-t border-ink pt-3">
             <div>
               <p className="smallcaps text-ink-mute">Income</p>
@@ -203,6 +205,23 @@ export default function OverviewPage() {
             />
           </section>
         </>
+      )}
+
+      {summary?.text && (
+        <section className="col-span-12">
+          <div className="border-t border-ink pt-3">
+            <p className="smallcaps text-ink-mute">This week</p>
+            <p className="mt-1 text-ink-soft text-[13px] sm:text-sm leading-snug">
+              {showAmounts ? summary.text : <span className="masked-amount">••••••</span>}
+            </p>
+          </div>
+        </section>
+      )}
+
+      {isMobile && (
+        <section className="col-span-12">
+          <SpendRadar currency={ov.currency} year={ov.year} month={ov.month} />
+        </section>
       )}
 
       <section className="col-span-12 lg:col-span-8 mt-4 sm:mt-6">
