@@ -97,12 +97,12 @@ def download_file_b64(file_id: str) -> str | None:
         return None
 
 
-def set_webhook(url: str) -> dict:
+def set_webhook(url: str, secret_token: str | None = None) -> dict:
+    params = {"url": url, "drop_pending_updates": "true"}
+    if secret_token:
+        params["secret_token"] = secret_token
     with httpx.Client(timeout=15.0) as c:
-        r = c.get(
-            f"{_base()}/setWebhook",
-            params={"url": url, "drop_pending_updates": "true"},
-        )
+        r = c.get(f"{_base()}/setWebhook", params=params)
         r.raise_for_status()
         return r.json()
 

@@ -9,6 +9,9 @@ class LoginRequest(BaseModel):
 class UserOut(BaseModel):
     id: int
     username: str
+    email: str | None = None
+    is_admin: bool = False
+    status: str = "approved"
     telegram_chat_id: str | None = None
     default_currency: str = "IDR"
     default_expense_source_id: int | None = None

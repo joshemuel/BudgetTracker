@@ -17,7 +17,6 @@ const nav = [
   { to: "/", label: "Overview", end: true },
   { to: "/monthly", label: "Monthly" },
   { to: "/daily", label: "Daily" },
-  { to: "/subscriptions", label: "Subscriptions" },
   { to: "/transactions", label: "Transactions" },
   { to: "/budgets", label: "Budgets" },
   { to: "/settings", label: "Settings" },
@@ -50,10 +49,9 @@ const mobileGroups: MobileGroup[] = [
   {
     key: "manage",
     label: "Manage",
-    to: "/subscriptions",
-    routes: ["/subscriptions", "/budgets", "/settings"],
+    to: "/budgets",
+    routes: ["/budgets", "/settings"],
     sub: [
-      { to: "/subscriptions", label: "Subscriptions" },
       { to: "/budgets", label: "Budgets" },
       { to: "/settings", label: "Settings" },
     ],
@@ -412,10 +410,9 @@ export default function AppShell() {
       <main className="py-7 sm:py-10 md:py-12 lg:py-14">
         <Outlet />
       </main>
-      <footer className="py-10 sm:py-14 border-t border-paper-rule flex flex-col gap-2 sm:flex-row sm:justify-between smallcaps text-ink-mute">
-        <span>Printed locally · Jakarta</span>
+      <footer className="py-10 sm:py-14 border-t border-paper-rule flex sm:justify-end smallcaps text-ink-mute">
         <span>
-          Press <kbd className="px-1 border border-paper-rule num">N</kbd> to log · <span className="italic">— fin —</span>
+          Press <kbd className="px-1 border border-paper-rule num">N</kbd> to log
         </span>
       </footer>
       <QuickLog open={logOpen} onClose={() => setLogOpen(false)} />

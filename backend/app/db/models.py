@@ -49,7 +49,13 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Nullable: Google-only users authenticate via OAuth and have no password.
+    password_hash: Mapped[str | None] = mapped_column(String(255))
+    email: Mapped[str | None] = mapped_column(String(255), unique=True)
+    google_sub: Mapped[str | None] = mapped_column(String(64), unique=True)
+    is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # "pending" | "approved" | "rejected". New Google registrations start pending.
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="approved")
     telegram_chat_id: Mapped[str | None] = mapped_column(String(64))
     default_currency: Mapped[str] = mapped_column(String(3), nullable=False, default="IDR")
     default_expense_source_id: Mapped[int | None] = mapped_column(Integer)

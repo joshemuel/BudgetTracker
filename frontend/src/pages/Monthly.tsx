@@ -15,6 +15,7 @@ import type { Me, Monthly } from "@/types";
 import { fmtCompactMoney, fmtMoney, fmtShort, monthName, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 import { useAmountVisibility } from "@/lib/privacy";
+import { useIsMobile } from "@/lib/mediaQuery";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
 
 export default function MonthlyPage() {
@@ -32,7 +33,7 @@ export default function MonthlyPage() {
   });
   const reportCurrency = data?.currency ?? currency;
 
-  const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
+  const isMobile = useIsMobile();
   const fmtAmount = (v: string | number) =>
     showAmounts
       ? isMobile
@@ -115,13 +116,18 @@ export default function MonthlyPage() {
         </div>
       </div>
 
-      <div className="mt-8 h-[240px] sm:h-[360px]">
+      <div className="mt-8 overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
+        <div
+          className="h-[240px] sm:h-[360px]"
+          style={isMobile ? { minWidth: 680 } : undefined}
+        >
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
             <CartesianGrid stroke="#d9cdb4" vertical={false} />
             <XAxis
               dataKey="name"
               stroke="#4a4437"
+              interval={0}
               tick={{ fontFamily: "Instrument Sans", fontSize: 11 }}
               tickLine={false}
             />
@@ -167,6 +173,7 @@ export default function MonthlyPage() {
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+        </div>
       </div>
 
       <div className="-mx-2 px-2 sm:mx-0 sm:px-0">

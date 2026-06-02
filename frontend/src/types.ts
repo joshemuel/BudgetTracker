@@ -3,6 +3,9 @@ export type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
 export type Me = {
   id: number;
   username: string;
+  email: string | null;
+  is_admin: boolean;
+  status: "pending" | "approved" | "rejected";
   default_currency: CurrencyCode;
   default_expense_source_id: number | null;
   sources_enabled: boolean;

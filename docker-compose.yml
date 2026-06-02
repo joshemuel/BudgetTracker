@@ -27,6 +27,7 @@ services:
       APP_SECRET: ${APP_SECRET:-dev-secret-change-me}
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       LLM_BASE_URL: https://generativelanguage.googleapis.com/v1beta/openai
       LLM_LOG_MODEL: gemini-2.5-flash-lite
@@ -34,6 +35,7 @@ services:
       LLM_QUERY_MODEL: gemini-2.5-flash
       TZ: ${TZ:-Asia/Jakarta}
       TELEGRAM_POLLING: ${TELEGRAM_POLLING:-false}
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:

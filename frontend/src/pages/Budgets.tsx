@@ -5,6 +5,7 @@ import type { Budget, Category, Me } from "@/types";
 import { fmtMoney } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 import { useAmountVisibility } from "@/lib/privacy";
+import Subscriptions from "@/pages/Subscriptions";
 
 type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
 
@@ -125,7 +126,8 @@ export default function BudgetsPage() {
   });
 
   return (
-    <div>
+    <div className="space-y-14">
+      <div>
       <div className="flex items-end justify-between gap-3 flex-wrap">
         <SectionTitle>Budgets</SectionTitle>
         <button
@@ -273,6 +275,8 @@ export default function BudgetsPage() {
           Save
         </button>
       </form>
+      </div>
+      <Subscriptions />
     </div>
   );
 }

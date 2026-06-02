@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Me } from "@/types";
 import { useIsMobile } from "@/lib/mediaQuery";
 
 type Role = "user" | "leo";
@@ -109,10 +108,6 @@ function MicIcon() {
 }
 
 export default function WebChat() {
-  const { data: me } = useQuery<Me>({
-    queryKey: ["me"],
-    queryFn: () => api.get<Me>("/auth/me"),
-  });
   const isMobile = useIsMobile();
 
   const [open, setOpen] = useState(false);
@@ -159,9 +154,8 @@ export default function WebChat() {
 
   const postText = useMutation({
     mutationFn: async (message: string) => {
-      if (!me?.username) throw new Error("Missing user");
+      // The acting user is derived from the session cookie server-side.
       return api.post<WebChatResponse>("/telegram/web_chat", {
-        username: me.username,
         text: message,
       });
     },
@@ -190,9 +184,7 @@ export default function WebChat() {
 
   const postAudio = useMutation({
     mutationFn: async ({ b64, mime }: { b64: string; mime: string }) => {
-      if (!me?.username) throw new Error("Missing user");
       return api.post<WebChatResponse>("/telegram/web_chat", {
-        username: me.username,
         audio_b64: b64,
         audio_mime: mime,
       });

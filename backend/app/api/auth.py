@@ -46,8 +46,12 @@ def _set_currency_default_source(db: Session, user: User, source: Source) -> Non
 @router.post("/login", response_model=UserOut)
 def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)):
     user = db.query(User).filter_by(username=payload.username).one_or_none()
-    if user is None or not verify_password(payload.password, user.password_hash):
+    if user is None or not user.password_hash or not verify_password(
+        payload.password, user.password_hash
+    ):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
+    if user.status != "approved":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Account is pending approval")
     token = create_session(db, user)
     db.commit()
     response.set_cookie(
@@ -126,7 +130,9 @@ def change_password(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not verify_password(payload.current_password, user.password_hash):
+    if not user.password_hash or not verify_password(
+        payload.current_password, user.password_hash
+    ):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Current password is incorrect")
     if len(payload.new_password) < 8:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "New password must be at least 8 characters")

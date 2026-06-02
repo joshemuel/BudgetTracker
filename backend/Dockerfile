@@ -15,6 +15,13 @@ RUN pip install --upgrade pip && pip install -e .
 
 COPY . /app
 
+# Run as a non-root user. Deps are installed system-wide (world-readable) and
+# the app writes nothing to disk, so no chown is needed.
+RUN useradd --create-home --uid 10001 appuser
+USER appuser
+
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Production-safe default (no --reload). Dev opts into reload via the compose
+# `command:` override, which also bind-mounts the source for hot reload.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

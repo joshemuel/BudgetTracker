@@ -6,11 +6,12 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Callable
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_current_admin, get_current_user, get_db
+from app.config import get_settings
 from app.db.models import AppState, Category, Source, Transaction, User
 from app.services import financial, intent, query, telegram
 from app.services.auth import verify_password
@@ -70,8 +71,11 @@ def _handle_login(
         return
     _, username, password = parts
     user = db.query(User).filter_by(username=username).one_or_none()
-    if user is None or not verify_password(password, user.password_hash):
+    if user is None or not user.password_hash or not verify_password(password, user.password_hash):
         _emit_message(chat_id, "Invalid credentials.", send_fn)
+        return
+    if user.status != "approved":
+        _emit_message(chat_id, "Account is pending approval.", send_fn)
         return
     cid = str(chat_id)
     # Evict any prior binding for this chat (different user) and for this user (different chat).
@@ -1076,7 +1080,16 @@ def dispatch_update(db: Session, update: dict[str, Any]) -> None:
 
 
 @router.post("/webhook")
-async def webhook(update: dict[str, Any], db: Session = Depends(get_db)):
+async def webhook(
+    update: dict[str, Any],
+    db: Session = Depends(get_db),
+    x_telegram_bot_api_secret_token: str | None = Header(default=None),
+):
+    # When a webhook secret is configured, reject updates that don't echo it —
+    # this is how we know the POST genuinely came from Telegram, not an attacker.
+    expected = get_settings().telegram_webhook_secret
+    if expected and x_telegram_bot_api_secret_token != expected:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid webhook secret")
     update_id = update.get("update_id")
     if update_id is None or not _ensure_update_new(db, int(update_id)):
         return {"ok": True}
@@ -1085,27 +1098,25 @@ async def webhook(update: dict[str, Any], db: Session = Depends(get_db)):
 
 
 @router.post("/set_webhook")
-def set_webhook(payload: dict[str, str]):
+def set_webhook(payload: dict[str, str], _admin: User = Depends(get_current_admin)):
     """Admin helper: POST { url } to register the webhook URL with Telegram."""
     url = payload.get("url", "")
     if not url:
         return {"ok": False, "error": "missing url"}
-    return telegram.set_webhook(url)
+    secret = get_settings().telegram_webhook_secret or None
+    return telegram.set_webhook(url, secret_token=secret)
 
 
 @router.post("/web_chat")
-async def web_chat(payload: dict[str, Any], db: Session = Depends(get_db)):
-    username = str(payload.get("username") or "").strip()
-    if not username:
-        return {"ok": False, "error": "missing username"}
-
-    user = db.query(User).filter_by(username=username).one_or_none()
-    if user is None:
-        return {"ok": False, "error": "unknown user"}
-
+async def web_chat(
+    payload: dict[str, Any],
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # The acting user comes from the authenticated session — never from the body.
     messages: list[str] = []
 
-    def _capture(__: int | str, text: str) -> None:
+    def _capture(_chat: int | str, text: str) -> None:
         messages.append(text)
 
     text = str(payload.get("text") or "").strip()

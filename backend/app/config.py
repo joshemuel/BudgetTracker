@@ -19,6 +19,7 @@ class Settings(BaseSettings):
 
     telegram_token: str = Field(default="", alias="TELEGRAM_TOKEN")
     telegram_chat_id: str = Field(default="", alias="TELEGRAM_CHAT_ID")
+    telegram_webhook_secret: str = Field(default="", alias="TELEGRAM_WEBHOOK_SECRET")
 
     llm_api_key: str = Field(
         default="",
