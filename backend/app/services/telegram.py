@@ -37,6 +37,7 @@ def send_message(
     chat_id: int | str,
     text: str,
     reply_markup: dict | None = None,
+    parse_mode: str | None = None,
 ) -> bool:
     if not get_settings().telegram_token:
         log.info("telegram token unset — would send to %s: %s", chat_id, text[:80])
@@ -44,6 +45,8 @@ def send_message(
     payload: dict = {"chat_id": chat_id, "text": text}
     if reply_markup is not None:
         payload["reply_markup"] = reply_markup
+    if parse_mode is not None:
+        payload["parse_mode"] = parse_mode
     return _post_json("sendMessage", payload, timeout=20.0)
 
 

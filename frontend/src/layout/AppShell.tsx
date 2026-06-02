@@ -182,18 +182,19 @@ function IosInstallHelp({ open, onClose }: { open: boolean; onClose: () => void 
 
 function SectionNav() {
   return (
-    <nav className="py-3 border-b border-paper-rule">
-      <ul className="flex flex-wrap gap-x-4 gap-y-2 sm:gap-x-6 smallcaps">
+    <nav className="py-2 sm:py-3 border-b border-paper-rule">
+      <ul className="grid grid-cols-4 gap-y-1 gap-x-1 sm:flex sm:flex-wrap sm:gap-x-6 sm:gap-y-2 smallcaps nav-tabs">
         {nav.map((n) => (
           <li key={n.to}>
             <NavLink
               to={n.to}
               end={n.end}
               className={({ isActive }) =>
-                "whitespace-nowrap pb-1 border-b-2 transition-colors " +
+                "flex items-center justify-center text-center min-h-[44px] px-1 py-2 rounded-sm leading-tight transition-colors " +
+                "sm:block sm:min-h-0 sm:px-0 sm:py-0 sm:pb-1 sm:rounded-none sm:border-b-2 sm:whitespace-nowrap " +
                 (isActive
-                  ? "border-accent text-accent"
-                  : "border-transparent text-ink-soft hover:text-ink")
+                  ? "text-accent bg-accent/[0.08] sm:bg-transparent sm:border-accent"
+                  : "text-ink-soft hover:text-ink active:bg-ink/[0.04] sm:active:bg-transparent sm:border-transparent")
               }
             >
               {n.label}

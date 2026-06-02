@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -41,16 +42,24 @@ def _excluded_category_ids(db: Session, user_id: int) -> set[int]:
     return {int(category_id) for category_id, in rows}
 
 
+BAR_WIDTH = 9
+LABEL_CAP = 14
+
+
 def _format_money(currency: str, amount: Decimal) -> str:
     prefix = "Rp " if currency.upper() == "IDR" else f"{currency.upper()} "
     return f"{prefix}{format_number(amount)}"
 
 
-def _bar(value: Decimal, max_value: Decimal, width: int = 16) -> str:
+def _bar(value: Decimal, max_value: Decimal, width: int = BAR_WIDTH) -> str:
     if value <= 0 or max_value <= 0:
-        return "-"
+        return "░" * width
     filled = max(1, min(width, int((value / max_value) * width)))
-    return "#" * filled
+    return "█" * filled + "░" * (width - filled)
+
+
+def _truncate(label: str, cap: int = LABEL_CAP) -> str:
+    return label if len(label) <= cap else label[: cap - 1] + "…"
 
 
 def _chart_lines(
@@ -61,12 +70,21 @@ def _chart_lines(
 ) -> list[str]:
     visible = rows if max_rows is None else rows[:max_rows]
     if not visible:
-        return [title, "  -"]
+        return [title, "  —"]
     max_value = max((value for _, value in visible), default=Decimal("0"))
+    labels = [_truncate(label) for label, _ in visible]
+    amounts = [_format_money(currency, value) for _, value in visible]
+    label_w = max(len(label) for label in labels)
+    amount_w = max(len(amount) for amount in amounts)
     lines = [title]
-    for label, value in visible:
-        lines.append(f"  {label:<12} {_bar(value, max_value):<16} {_format_money(currency, value)}")
+    for label, (_, value), amount in zip(labels, visible, amounts):
+        bar = _bar(value, max_value)
+        lines.append(f"{label:<{label_w}}  {bar}  {amount:>{amount_w}}")
     return lines
+
+
+def _wrap(lines: list[str]) -> str:
+    return f"<pre>{html.escape(chr(10).join(lines))}</pre>"
 
 
 def build_weekly_report(db: Session, user: User, now: datetime | None = None) -> str:
@@ -103,9 +121,9 @@ def build_weekly_report(db: Session, user: User, now: datetime | None = None) ->
         by_category[str(category_name)] += value
         total += value
 
-    title = f"Weekly report ({start.strftime('%d %b')} - {(end - timedelta(days=1)).strftime('%d %b')})"
+    title = f"Weekly report · {start.strftime('%d %b')}–{(end - timedelta(days=1)).strftime('%d %b')}"
     if total <= 0:
-        return f"{title}\n\nNo tracked spending this week."
+        return _wrap([title, "", "No tracked spending this week."])
 
     day_rows: list[tuple[str, Decimal]] = []
     for i in range(7):
@@ -116,13 +134,13 @@ def build_weekly_report(db: Session, user: User, now: datetime | None = None) ->
 
     lines = [
         title,
-        f"Total spent: {_format_money(currency, total)}",
+        f"Total  {_format_money(currency, total)}",
         "",
-        *_chart_lines("Daily spending", day_rows, currency),
+        *_chart_lines("Daily", day_rows, currency),
         "",
-        *_chart_lines("Category spending", category_rows, currency, max_rows=8),
+        *_chart_lines("Top categories", category_rows, currency, max_rows=8),
     ]
-    return "\n".join(lines)
+    return _wrap(lines)
 
 
 def send_weekly_reports(now: datetime | None = None) -> int:
@@ -138,7 +156,7 @@ def send_weekly_reports(now: datetime | None = None) -> int:
                 continue
             try:
                 message = build_weekly_report(db, user, now=now)
-                if telegram.send_message(user.telegram_chat_id, message):
+                if telegram.send_message(user.telegram_chat_id, message, parse_mode="HTML"):
                     sent += 1
             except Exception as e:
                 log.exception("weekly report failed for user %s: %s", user.id, e)

@@ -312,11 +312,11 @@ export default function QuickLog({ open, onClose }: Props) {
           >
             <div>
               <span className="smallcaps text-ink-mute block mb-2">Kind</span>
-              <div className="grid grid-cols-1 sm:grid-cols-3 border border-ink">
+              <div className="grid grid-cols-3 border border-ink">
                 <button
                   type="button"
                   onClick={() => setKind("expense")}
-                  className={`py-2 smallcaps border-b sm:border-b-0 sm:border-r border-ink ${
+                  className={`min-h-[44px] py-2 smallcaps border-r border-ink ${
                     kind === "expense" ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
                   }`}
                 >
@@ -325,7 +325,7 @@ export default function QuickLog({ open, onClose }: Props) {
                 <button
                   type="button"
                   onClick={() => setKind("income")}
-                  className={`py-2 smallcaps border-b sm:border-b-0 sm:border-r border-ink ${
+                  className={`min-h-[44px] py-2 smallcaps border-r border-ink ${
                     kind === "income" ? "bg-gain text-paper" : "text-ink-soft hover:text-ink"
                   }`}
                 >
@@ -335,7 +335,7 @@ export default function QuickLog({ open, onClose }: Props) {
                   type="button"
                   onClick={() => setKind("transfer")}
                   disabled={!sourcesEnabled}
-                  className={`py-2 smallcaps disabled:opacity-40 ${
+                  className={`min-h-[44px] py-2 smallcaps disabled:opacity-40 ${
                     kind === "transfer" ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
                   }`}
                 >

@@ -6,6 +6,7 @@ import type { CurrencyBalance, Me, Overview, Source } from "@/types";
 import { fmtCompactMoney, fmtMoney, fmtPct, monthName, toNumber } from "@/lib/format";
 import { Figure, SectionTitle } from "@/components/Figure";
 import { useAmountVisibility } from "@/lib/privacy";
+import { useIsMobile } from "@/lib/mediaQuery";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
 import { SYNC_EVENT } from "@/lib/sync";
 
@@ -81,6 +82,7 @@ function eyeButtonIcon(show: boolean) {
 
 export default function OverviewPage() {
   const { showAmounts, toggleAmounts } = useAmountVisibility();
+  const isMobile = useIsMobile();
   const [freshPulse, setFreshPulse] = useState(false);
 
   useEffect(() => {
@@ -121,7 +123,6 @@ export default function OverviewPage() {
   const net = toNumber(ov.totals.net);
   const netTone = net >= 0 ? "gain" : "accent";
   const paceRatio = ov.today_day / ov.days_in_month;
-  const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
   const fmtAmount = (v: string | number) =>
     showAmounts
       ? isMobile
@@ -193,15 +194,41 @@ export default function OverviewPage() {
             to draw your first limit.
           </p>
         ) : (
-          <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
-            <table className="ledger-table w-full text-[10px] sm:text-xs">
+          isMobile ? (
+          <ul className="border-t border-ink divide-y divide-paper-rule">
+            {ov.budgets.map((b) => (
+              <li key={b.category_id} className="py-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="font-[450]">{b.category_name}</span>
+                  <span className={`smallcaps shrink-0 ${STATUS_STYLE[b.status]}`}>
+                    {STATUS_LABEL[b.status]}
+                  </span>
+                </div>
+                <div className="mt-2">
+                  <Bar pct={b.pct_used} status={b.status} />
+                </div>
+                <div className="mt-2 flex items-baseline justify-between text-[12px] num">
+                  <span className="text-ink-soft">
+                    {fmtAmount(b.spent)}{" "}
+                    <span className="text-ink-mute">/ {fmtAmount(b.limit)}</span>
+                  </span>
+                  <span className={toNumber(b.remaining) < 0 ? "text-accent" : "text-ink-soft"}>
+                    {fmtAmount(b.remaining)} left
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+          ) : (
+          <div>
+            <table className="ledger-table w-full text-xs">
               <thead>
                 <tr>
                   <th>Category</th>
                   <th className="text-right">Spent</th>
                   <th className="text-right">Limit</th>
                   <th className="text-right">Remaining</th>
-                  <th className="w-[96px] sm:w-40">Pace</th>
+                  <th className="w-40">Pace</th>
                   <th className="text-right">Status</th>
                 </tr>
               </thead>
@@ -229,6 +256,7 @@ export default function OverviewPage() {
               </tbody>
             </table>
           </div>
+          )
         )}
       </section>
 

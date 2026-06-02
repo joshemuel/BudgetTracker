@@ -6,6 +6,7 @@ import { fmtCompactMoney, fmtDateTime, fmtMoney, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useAmountVisibility } from "@/lib/privacy";
+import { useIsMobile } from "@/lib/mediaQuery";
 
 type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
 const CURRENCIES: CurrencyCode[] = ["IDR", "SGD", "JPY", "AUD", "TWD"];
@@ -35,7 +36,8 @@ export default function TransactionsPage() {
   const [editAmount, setEditAmount] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
-  const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const isMobile = useIsMobile();
 
   const { data: cats } = useQuery<Category[]>({
     queryKey: ["categories"],
@@ -104,6 +106,17 @@ export default function TransactionsPage() {
       setEditing(null);
     },
   });
+
+  const startEdit = (t: Transaction) => {
+    setEditing(t);
+    setEditOccurredAt(toLocalDateTimeInput(t.occurred_at));
+    setEditType(t.type);
+    setEditCategoryId(t.category_id);
+    setEditSourceId(t.source_id);
+    setEditCurrency(t.currency);
+    setEditAmount(String(toNumber(t.amount)));
+    setEditDescription(t.description ?? "");
+  };
 
   const canEdit =
     !!editing &&
@@ -187,94 +200,188 @@ export default function TransactionsPage() {
         </label>
       </div>
 
-      <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
-        <table className="ledger-table w-full text-[11px] sm:text-[13px]">
-          <thead>
-            <tr>
-              <th>When</th>
-              <th>Description</th>
-              <th>Category</th>
-              <th>Source</th>
-              <th>Currency</th>
-              <th className="text-right">Amount</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {txs.map((t) => (
-              <tr key={t.id}>
-                <td className="num text-ink-soft text-sm">{fmtDateTime(t.occurred_at)}</td>
-                <td className="font-[450]">
-                  {t.description || <span className="text-ink-mute italic">—</span>}
-                  {t.transfer_group_id && (
-                    <span className="ml-2 smallcaps text-ink-mute">transfer</span>
-                  )}
-                  {t.fx_rate && (
-                    <span className="ml-2 smallcaps text-ink-mute whitespace-nowrap">
-                      fx {Number(t.fx_rate).toPrecision(4)}
-                    </span>
-                  )}
-                </td>
-                <td>{t.category_name}</td>
-                <td className="text-ink-soft">
-                  {sourcesEnabled ? (
-                    showAmounts ? t.source_name : <span className="masked-amount">••••••</span>
-                  ) : (
-                    "N/A"
-                  )}
-                </td>
-                <td className="text-ink-soft">{t.currency}</td>
-                <td
-                  className={`text-right num ${
-                    t.type === "expense" ? "text-accent" : "text-gain"
-                  }`}
+      {isMobile ? (
+        <ul className="border-t border-paper-rule divide-y divide-paper-rule">
+          {txs.map((t) => {
+            const expanded = expandedId === t.id;
+            return (
+              <li key={t.id}>
+                <button
+                  type="button"
+                  onClick={() => setExpandedId(expanded ? null : t.id)}
+                  aria-expanded={expanded}
+                  className="w-full text-left flex items-start gap-3 py-3 min-h-[44px]"
                 >
-                  {showAmounts ? (
-                    <>
-                      {t.type === "expense" ? "−" : "+"}
-                      {isMobile
-                        ? fmtCompactMoney(toNumber(t.amount), t.currency)
-                        : fmtMoney(toNumber(t.amount), t.currency)}
-                    </>
-                  ) : (
-                    "••••••"
-                  )}
-                </td>
-                <td className="text-right whitespace-nowrap">
-                  <button
-                    onClick={() => {
-                      setEditing(t);
-                      setEditOccurredAt(toLocalDateTimeInput(t.occurred_at));
-                      setEditType(t.type);
-                      setEditCategoryId(t.category_id);
-                      setEditSourceId(t.source_id);
-                      setEditCurrency(t.currency);
-                      setEditAmount(String(toNumber(t.amount)));
-                      setEditDescription(t.description ?? "");
-                    }}
-                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2 mr-1"
-                  >
-                    edit
-                  </button>
-                  <button
-                    onClick={() => setPendingDelete(t)}
-                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
-                  >
-                    delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {txs.length === 0 && (
+                  <span className="flex-1 min-w-0">
+                    <span className="num text-ink-soft text-[11px] block">
+                      {fmtDateTime(t.occurred_at)}
+                    </span>
+                    <span className="font-[450] block truncate">
+                      {t.description || <span className="text-ink-mute italic">—</span>}
+                    </span>
+                    <span className="smallcaps text-ink-mute block mt-0.5">{t.category_name}</span>
+                  </span>
+                  <span className="shrink-0 flex flex-col items-end">
+                    <span
+                      className={`num ${t.type === "expense" ? "text-accent" : "text-gain"}`}
+                    >
+                      {showAmounts ? (
+                        <>
+                          {t.type === "expense" ? "−" : "+"}
+                          {fmtCompactMoney(toNumber(t.amount), t.currency)}
+                        </>
+                      ) : (
+                        "••••••"
+                      )}
+                    </span>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                      className={`text-ink-mute mt-1 transition-transform ${
+                        expanded ? "rotate-180" : ""
+                      }`}
+                    >
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </span>
+                </button>
+                {expanded && (
+                  <div className="pb-3">
+                    <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px] border-t border-paper-rule pt-2">
+                      <dt className="smallcaps text-ink-mute self-center">Source</dt>
+                      <dd className="text-right">
+                        {sourcesEnabled ? (showAmounts ? t.source_name : "••••••") : "N/A"}
+                      </dd>
+                      <dt className="smallcaps text-ink-mute self-center">Currency</dt>
+                      <dd className="text-right num">{t.currency}</dd>
+                      <dt className="smallcaps text-ink-mute self-center">Amount</dt>
+                      <dd className="text-right num">
+                        {showAmounts ? fmtMoney(toNumber(t.amount), t.currency) : "••••••"}
+                      </dd>
+                      {t.fx_rate && (
+                        <>
+                          <dt className="smallcaps text-ink-mute self-center">FX rate</dt>
+                          <dd className="text-right num">{Number(t.fx_rate).toPrecision(4)}</dd>
+                        </>
+                      )}
+                      {t.transfer_group_id && (
+                        <>
+                          <dt className="smallcaps text-ink-mute self-center">Kind</dt>
+                          <dd className="text-right">transfer</dd>
+                        </>
+                      )}
+                    </dl>
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(t)}
+                        className="smallcaps flex-1 min-h-[44px] border border-ink/30 rounded-sm"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingDelete(t)}
+                        className="smallcaps flex-1 min-h-[44px] border border-accent/40 text-accent rounded-sm"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+          {txs.length === 0 && (
+            <li className="py-8 text-center text-ink-mute">Nothing to report.</li>
+          )}
+        </ul>
+      ) : (
+        <div>
+          <table className="ledger-table w-full text-[13px]">
+            <thead>
               <tr>
-                <td colSpan={7} className="text-center text-ink-mute py-8">
-                  Nothing to report.
-                </td>
+                <th>When</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th>Source</th>
+                <th>Currency</th>
+                <th className="text-right">Amount</th>
+                <th />
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {txs.map((t) => (
+                <tr key={t.id}>
+                  <td className="num text-ink-soft text-sm">{fmtDateTime(t.occurred_at)}</td>
+                  <td className="font-[450]">
+                    {t.description || <span className="text-ink-mute italic">—</span>}
+                    {t.transfer_group_id && (
+                      <span className="ml-2 smallcaps text-ink-mute">transfer</span>
+                    )}
+                    {t.fx_rate && (
+                      <span className="ml-2 smallcaps text-ink-mute whitespace-nowrap">
+                        fx {Number(t.fx_rate).toPrecision(4)}
+                      </span>
+                    )}
+                  </td>
+                  <td>{t.category_name}</td>
+                  <td className="text-ink-soft">
+                    {sourcesEnabled ? (
+                      showAmounts ? t.source_name : <span className="masked-amount">••••••</span>
+                    ) : (
+                      "N/A"
+                    )}
+                  </td>
+                  <td className="text-ink-soft">{t.currency}</td>
+                  <td
+                    className={`text-right num ${
+                      t.type === "expense" ? "text-accent" : "text-gain"
+                    }`}
+                  >
+                    {showAmounts ? (
+                      <>
+                        {t.type === "expense" ? "−" : "+"}
+                        {fmtMoney(toNumber(t.amount), t.currency)}
+                      </>
+                    ) : (
+                      "••••••"
+                    )}
+                  </td>
+                  <td className="text-right whitespace-nowrap">
+                    <button
+                      onClick={() => startEdit(t)}
+                      className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2 mr-1"
+                    >
+                      edit
+                    </button>
+                    <button
+                      onClick={() => setPendingDelete(t)}
+                      className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
+                    >
+                      delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {txs.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="text-center text-ink-mute py-8">
+                    Nothing to report.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {total > 0 && (
         <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">

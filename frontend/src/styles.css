@@ -222,17 +222,6 @@ hr {
   background: rgba(0, 0, 0, 0.64);
 }
 
-.modal-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
-  background-image:
-    linear-gradient(transparent 31px, color-mix(in srgb, var(--color-ink-mute) 14%, transparent) 32px);
-  background-size: 100% 32px;
-}
-
 .safe-chat-right {
   right: max(0.75rem, env(safe-area-inset-right));
   bottom: env(safe-area-inset-bottom);
@@ -264,10 +253,22 @@ hr {
     font-size: 8px;
   }
 
+  /* Primary nav is a touch target — keep it legible, not 8px. */
+  .nav-tabs.smallcaps {
+    letter-spacing: 0.05em;
+    font-size: 10px;
+  }
+
   /* Fluid base size so rem/em-based text scales with the phone's width
      instead of snapping at a single breakpoint. */
   html, body {
     font-size: clamp(11px, 3.2vw, 13px);
+  }
+
+  /* Form controls at >=16px stop iOS Safari from zooming the page on focus,
+     and read as native fields rather than shrunken desktop inputs. */
+  input, select, textarea {
+    font-size: 16px;
   }
 
   .display {

@@ -71,10 +71,14 @@ def test_build_weekly_report_includes_daily_and_category_charts(auth_client):
             )
 
         assert "Weekly report" in report
-        assert "Daily spending" in report
-        assert "Category spending" in report
-        assert category_name in report
+        assert "Daily" in report
+        assert "Top categories" in report
+        # Category labels are truncated to LABEL_CAP chars in the chart.
+        assert category_name[:13] in report
         assert "125.000" in report
+        # Rendered inside a monospace block with block-glyph bars.
+        assert report.startswith("<pre>")
+        assert "█" in report
     finally:
         with SessionLocal() as db:
             if tx_id is not None:

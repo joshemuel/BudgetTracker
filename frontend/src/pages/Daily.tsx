@@ -259,7 +259,7 @@ export default function DailyPage() {
       </div>
 
       <SectionTitle kicker="Daily density">Heat of the month</SectionTitle>
-      <div className="grid grid-cols-4 sm:grid-cols-7 gap-[3px]">
+      <div className="grid grid-cols-7 gap-[2px] sm:gap-[3px]">
         {days.map((d) => {
           const ratio = toNumber(d.expense) / maxExp;
           const bg =
