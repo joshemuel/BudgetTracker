@@ -44,8 +44,12 @@ npm install --no-audit --no-fund
 npm run build
 sudo rsync -av --delete dist/ /var/www/budgettracker/
 
-# rebuild backend — force fresh image (no stale layers) then recreate the container
+# free disk space before building: remove stopped containers, dangling images,
+# and the build cache that accumulates from repeated --no-cache builds
 cd /opt/budgettracker
+sudo docker system prune -f
+
+# rebuild backend — force fresh image (no stale layers) then recreate the container
 sudo docker compose -f docker-compose.prod.yml build --no-cache backend
 sudo docker compose -f docker-compose.prod.yml up -d --force-recreate db backend
 sudo docker compose -f docker-compose.prod.yml exec -T backend alembic upgrade head
