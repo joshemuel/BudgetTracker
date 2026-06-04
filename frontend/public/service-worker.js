@@ -1,10 +1,13 @@
-const CACHE_NAME = "budget-tracker-shell-v1"
+const CACHE_NAME = "budget-tracker-shell-v2"
 const SHELL_ASSETS = [
   "/",
   "/index.html",
   "/manifest.webmanifest",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/icons/icon-512-maskable.png",
+  "/icons/apple-touch-icon-180.png",
   "/icons/app-icon.svg",
-  "/icons/app-icon-maskable.svg",
 ]
 
 self.addEventListener("install", (event) => {

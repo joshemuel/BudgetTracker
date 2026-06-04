@@ -77,6 +77,86 @@ export function fmtPct(v: number): string {
   return (v * 100).toFixed(0) + "%";
 }
 
+type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
+
+function groupDigits(digits: string): string {
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+/**
+ * Strip grouping/symbols back to a plain numeric string for submission:
+ * "1,234.50" -> "1234.50", "" -> "". Keeps a leading minus and a single
+ * decimal point; drops a lone trailing dot.
+ */
+export function parseAmountInput(raw: string | number | null | undefined): string {
+  if (raw == null) return "";
+  const cleaned = String(raw).replace(/,/g, "").replace(/[^0-9.\-]/g, "");
+  const neg = cleaned.startsWith("-");
+  const unsigned = cleaned.replace(/-/g, "");
+  const parts = unsigned.split(".");
+  const intPart = parts[0] || "";
+  const fracPart = parts.slice(1).join("");
+  const body = fracPart ? `${intPart}.${fracPart}` : intPart;
+  return `${neg ? "-" : ""}${body}`;
+}
+
+/**
+ * Reformat an in-progress amount with thousands separators *while typing*.
+ * Preserves a trailing "." and partial decimals so editing isn't disrupted;
+ * JPY has no fractional part. Pairs with `handleAmountChange` for caret safety.
+ */
+export function formatAmountLive(raw: string, currency: CurrencyCode = "IDR"): string {
+  let s = String(raw).replace(/[^0-9.\-]/g, "");
+  const neg = s.startsWith("-");
+  s = s.replace(/-/g, "");
+  if (currency === "JPY") s = s.replace(/\./g, "");
+  const firstDot = s.indexOf(".");
+  let intPart: string;
+  let frac: string | null;
+  if (firstDot === -1) {
+    intPart = s;
+    frac = null;
+  } else {
+    intPart = s.slice(0, firstDot);
+    frac = s.slice(firstDot + 1).replace(/\./g, ""); // collapse any extra dots
+  }
+  intPart = intPart.replace(/^0+(?=\d)/, ""); // trim leading zeros, keep a single 0
+  const grouped = intPart === "" ? "" : groupDigits(intPart);
+  const out = frac !== null ? `${grouped}.${frac}` : grouped;
+  return `${neg ? "-" : ""}${out}`;
+}
+
+/**
+ * `onChange` for grouped amount inputs: reformats live and restores the caret
+ * to the same digit offset, so inserting a comma doesn't kick the cursor to
+ * the end. Call with the input element, the active currency, and the setter.
+ */
+export function handleAmountChange(
+  el: HTMLInputElement,
+  currency: CurrencyCode,
+  setValue: (v: string) => void
+): void {
+  const prev = el.value;
+  const caret = el.selectionStart ?? prev.length;
+  const digitsBefore = prev.slice(0, caret).replace(/[^0-9]/g, "").length;
+  const next = formatAmountLive(prev, currency);
+  setValue(next);
+  requestAnimationFrame(() => {
+    let pos = 0;
+    let seen = 0;
+    while (pos < next.length && seen < digitsBefore) {
+      const code = next.charCodeAt(pos);
+      if (code >= 48 && code <= 57) seen++;
+      pos++;
+    }
+    try {
+      el.setSelectionRange(pos, pos);
+    } catch {
+      /* element may be detached after a re-render */
+    }
+  });
+}
+
 const MONTHS_LONG = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",

@@ -2,7 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Category, Me, Source, Transaction, TransactionList, TxType } from "@/types";
-import { fmtCompactMoney, fmtDateTime, fmtMoney, toNumber } from "@/lib/format";
+import {
+  fmtCompactMoney,
+  fmtDateTime,
+  fmtMoney,
+  formatAmountLive,
+  handleAmountChange,
+  parseAmountInput,
+  toNumber,
+} from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useAmountVisibility } from "@/lib/privacy";
@@ -114,7 +122,7 @@ export default function TransactionsPage() {
     setEditCategoryId(t.category_id);
     setEditSourceId(t.source_id);
     setEditCurrency(t.currency);
-    setEditAmount(String(toNumber(t.amount)));
+    setEditAmount(formatAmountLive(String(toNumber(t.amount)), t.currency));
     setEditDescription(t.description ?? "");
   };
 
@@ -495,9 +503,10 @@ export default function TransactionsPage() {
               <label className="block sm:col-span-2">
                 <span className="smallcaps text-ink-mute block mb-1">Amount</span>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   value={editAmount}
-                  onChange={(e) => setEditAmount(e.target.value)}
+                  onChange={(e) => handleAmountChange(e.currentTarget, editCurrency, setEditAmount)}
                   className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full num"
                 />
               </label>
@@ -531,7 +540,7 @@ export default function TransactionsPage() {
                       ...(sourcesEnabled
                         ? { source_id: Number(editSourceId) }
                         : { currency: editCurrency }),
-                      amount: editAmount,
+                      amount: parseAmountInput(editAmount),
                       description: editDescription.trim() || null,
                     },
                   });

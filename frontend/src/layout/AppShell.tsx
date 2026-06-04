@@ -50,10 +50,12 @@ const mobileGroups: MobileGroup[] = [
     key: "manage",
     label: "Manage",
     to: "/budgets",
-    routes: ["/budgets", "/settings"],
+    routes: ["/budgets", "/settings", "/settings/categories", "/settings/account"],
     sub: [
       { to: "/budgets", label: "Budgets" },
-      { to: "/settings", label: "Settings" },
+      { to: "/settings", label: "Sources", end: true },
+      { to: "/settings/categories", label: "Categories" },
+      { to: "/settings/account", label: "Account" },
     ],
   },
 ];

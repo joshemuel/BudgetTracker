@@ -21,18 +21,20 @@
   --radius-card: 2px;
 }
 
-/* === Night mode: warm ink background, paper text. Same editorial feel, inverted. === */
+/* === Night mode: warm espresso background, paper text. Same editorial feel,
+   inverted — lifted off pure black with stronger hairlines and legible muted
+   text so it reads cleanly at a glance. === */
 :root[data-theme="dark"] {
-  --color-paper: #14110a;
-  --color-paper-deep: #1c1810;
-  --color-paper-rule: #39321f;
-  --color-ink: #efe7d3;
-  --color-ink-soft: #c4bba5;
-  --color-ink-mute: #8e8673;
-  --color-accent: #e27355;
-  --color-gain: #9cbb76;
-  --color-warn: #d9a057;
-  --color-highlight: #2a2415;
+  --color-paper: #1b1813;
+  --color-paper-deep: #242019;
+  --color-paper-rule: #4a4130;
+  --color-ink: #f4ecdb;
+  --color-ink-soft: #d2c9b2;
+  --color-ink-mute: #a59a80;
+  --color-accent: #f08a66;
+  --color-gain: #abcb80;
+  --color-warn: #e6ad5f;
+  --color-highlight: #2c2618;
 }
 
 :root {
@@ -133,6 +135,22 @@ hr {
 *:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+
+/* Native selects render their option popup with OS colors and ignore the
+   transparent backgrounds we use, so dark mode left options invisible. Pin the
+   control + popup to the theme tokens. The inset focus offset keeps the accent
+   ring on the control instead of bleeding across neighbours / the open list. */
+select {
+  color: var(--color-ink);
+}
+select option,
+select optgroup {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+}
+select:focus-visible {
+  outline-offset: -2px;
 }
 
 /* Scrollbar treatment */

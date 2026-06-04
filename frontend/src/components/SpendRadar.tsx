@@ -14,9 +14,32 @@ import type { CategoryStats, CurrencyCode } from "@/types";
 import { fmtCompactMoney, fmtShort, todayISO, toNumber } from "@/lib/format";
 import { useAmountVisibility } from "@/lib/privacy";
 import { withCurrency } from "@/lib/preferences";
+import { useTheme } from "@/lib/theme";
 
-const THIS_COLOR = "#a02a1a"; // accent — current period
-const LAST_COLOR = "#877e6a"; // muted ink — previous period
+// Chart colours can't ride CSS variables (Recharts writes SVG presentation
+// attributes), so mirror the editorial palette per theme here.
+const COLORS = {
+  light: {
+    grid: "#d9cdb4",
+    angle: "#4a4437",
+    radius: "#877e6a",
+    current: "#a02a1a",
+    previous: "#877e6a",
+    tip: "#f5efe3",
+    tipBorder: "#19170f",
+    tipText: "#19170f",
+  },
+  dark: {
+    grid: "#4a4130",
+    angle: "#d2c9b2",
+    radius: "#a59a80",
+    current: "#f08a66",
+    previous: "#a59a80",
+    tip: "#242019",
+    tipBorder: "#4a4130",
+    tipText: "#f4ecdb",
+  },
+} as const;
 
 type Granularity = "monthly" | "weekly" | "daily";
 
@@ -113,6 +136,8 @@ export default function SpendRadar({
   month: number;
 }) {
   const { showAmounts } = useAmountVisibility();
+  const { theme } = useTheme();
+  const c = COLORS[theme === "dark" ? "dark" : "light"];
   const [granularity, setGranularity] = useState<Granularity>("monthly");
   const r = buildRanges(granularity, year, month);
 
@@ -142,7 +167,7 @@ export default function SpendRadar({
       (lastByName.get(b) ?? 0) -
       ((thisByName.get(a) ?? 0) + (lastByName.get(a) ?? 0))
   );
-  const chartData = names.slice(0, 8).map((name) => ({
+  const chartData = names.slice(0, 6).map((name) => ({
     category: name,
     current: thisByName.get(name) ?? 0,
     previous: lastByName.get(name) ?? 0,
@@ -168,55 +193,83 @@ export default function SpendRadar({
 
       {enough ? (
         <>
-          <div className="h-[260px] mt-2">
+          <div className="h-[280px] lg:h-[380px] mt-2">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart
                 data={chartData}
-                outerRadius="68%"
-                margin={{ top: 8, right: 24, bottom: 8, left: 24 }}
+                outerRadius="72%"
+                margin={{ top: 16, right: 36, bottom: 16, left: 36 }}
               >
-                <PolarGrid stroke="#d9cdb4" />
+                <PolarGrid stroke={c.grid} strokeOpacity={0.7} />
                 <PolarAngleAxis
                   dataKey="category"
-                  tick={{ fill: "#4a4437", fontSize: 9, fontFamily: "Instrument Sans" }}
-                  tickFormatter={(v: string) => (v.length > 9 ? v.slice(0, 8) + "…" : v)}
+                  tick={({ x, y, textAnchor, payload }: {
+                    x: number;
+                    y: number;
+                    textAnchor: "start" | "middle" | "end" | "inherit";
+                    payload: { value: string };
+                  }) => {
+                    const label =
+                      payload.value.length > 11
+                        ? payload.value.slice(0, 10) + "…"
+                        : payload.value;
+                    return (
+                      <text
+                        x={x}
+                        y={y}
+                        textAnchor={textAnchor}
+                        dominantBaseline="central"
+                        fill={c.angle}
+                        fontSize={10}
+                        fontFamily="Instrument Sans"
+                      >
+                        {label}
+                      </text>
+                    );
+                  }}
                 />
                 {showAmounts && (
                   <PolarRadiusAxis
                     angle={90}
                     tickCount={4}
                     axisLine={false}
-                    tick={{ fill: "#877e6a", fontSize: 8, fontFamily: "JetBrains Mono" }}
+                    tick={{ fill: c.radius, fontSize: 8, fontFamily: "JetBrains Mono" }}
                     tickFormatter={(v: number) => fmtShort(Math.round(v), reportCurrency)}
                   />
                 )}
                 <Radar
                   name={r.prevLabel}
                   dataKey="previous"
-                  stroke={LAST_COLOR}
-                  fill={LAST_COLOR}
-                  fillOpacity={0.12}
-                  strokeWidth={1}
+                  stroke={c.previous}
+                  strokeWidth={1.5}
+                  strokeDasharray="4 3"
+                  fill={c.previous}
+                  fillOpacity={0.04}
+                  dot={false}
                   isAnimationActive={false}
                 />
                 <Radar
                   name={r.curLabel}
                   dataKey="current"
-                  stroke={THIS_COLOR}
-                  fill={THIS_COLOR}
-                  fillOpacity={0.3}
-                  strokeWidth={1.5}
+                  stroke={c.current}
+                  strokeWidth={2}
+                  fill={c.current}
+                  fillOpacity={0.22}
+                  dot={{ r: 2.5, fill: c.current, stroke: "none" }}
                   isAnimationActive={false}
                 />
                 {showAmounts && (
                   <Tooltip
                     contentStyle={{
-                      background: "#f5efe3",
-                      border: "1px solid #19170f",
+                      background: c.tip,
+                      border: `1px solid ${c.tipBorder}`,
                       borderRadius: 0,
                       fontFamily: "Instrument Sans",
                       fontSize: 12,
+                      color: c.tipText,
                     }}
+                    itemStyle={{ color: c.tipText }}
+                    labelStyle={{ color: c.tipText }}
                     formatter={(v: number, name: string) => [fmtCompactMoney(v, reportCurrency), name]}
                   />
                 )}
@@ -225,11 +278,14 @@ export default function SpendRadar({
           </div>
           <div className="mt-1 flex items-center gap-4 smallcaps text-ink-mute">
             <span className="inline-flex items-center gap-1.5">
-              <span className="inline-block w-2.5 h-2.5" style={{ background: THIS_COLOR }} />
+              <span className="inline-block w-2.5 h-2.5" style={{ background: c.current }} />
               {r.curLabel}
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="inline-block w-2.5 h-2.5" style={{ background: LAST_COLOR }} />
+              <span
+                className="inline-block w-3 h-0 border-t-2"
+                style={{ borderColor: c.previous, borderStyle: "dashed" }}
+              />
               {r.prevLabel}
             </span>
           </div>

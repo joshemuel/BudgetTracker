@@ -8,7 +8,10 @@ import Daily from "@/pages/Daily";
 import Categories from "@/pages/Categories";
 import Budgets from "@/pages/Budgets";
 import Transactions from "@/pages/Transactions";
-import Settings from "@/pages/Settings";
+import Settings, {
+  CategoriesSettingsPage,
+  AccountSettingsPage,
+} from "@/pages/Settings";
 
 export default function App() {
   return (
@@ -24,6 +27,8 @@ export default function App() {
         <Route path="subscriptions" element={<Navigate to="/budgets" replace />} />
         <Route path="transactions" element={<Transactions />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="settings/categories" element={<CategoriesSettingsPage />} />
+        <Route path="settings/account" element={<AccountSettingsPage />} />
       </Route>
     </Routes>
   );

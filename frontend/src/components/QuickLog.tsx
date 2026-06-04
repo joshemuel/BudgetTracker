@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Category, CurrencyBalance, Me, Source, TxType } from "@/types";
-import { fmtMoney } from "@/lib/format";
+import { fmtMoney, formatAmountLive, handleAmountChange } from "@/lib/format";
 
 function nowLocalISO(): string {
   const d = new Date();
@@ -350,13 +350,9 @@ export default function QuickLog({ open, onClose }: Props) {
                 <span className="smallcaps text-ink-mute min-w-10">{amountSymbol}</span>
                 <input
                   value={amountInput}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v.includes(",")) return;
-                    setAmountInput(v);
-                  }}
+                  onChange={(e) => handleAmountChange(e.currentTarget, amountCurrency, setAmountInput)}
                   onBlur={() => setAmountInput(displayAmount(normalizeByCurrency(amountInput, amountCurrency), amountCurrency))}
-                  onFocus={() => setAmountInput(normalizeByCurrency(parseRawAmount(amountInput), amountCurrency))}
+                  onFocus={() => setAmountInput(formatAmountLive(amountInput, amountCurrency))}
                   placeholder="0"
                   autoFocus
                   inputMode="decimal"

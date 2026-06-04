@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Budget, Category, Me } from "@/types";
-import { fmtMoney } from "@/lib/format";
+import { fmtMoney, formatAmountLive, handleAmountChange, parseAmountInput } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 import { useAmountVisibility } from "@/lib/privacy";
 import Subscriptions from "@/pages/Subscriptions";
@@ -97,7 +97,7 @@ export default function BudgetsPage() {
     mutationFn: () =>
       api.post("/budgets", {
         category_id: Number(categoryId),
-        monthly_limit: limit,
+        monthly_limit: parseAmountInput(limit),
       }),
     onSuccess: () => {
       setCategoryId("");
@@ -140,10 +140,6 @@ export default function BudgetsPage() {
           {showAmounts ? "Hide" : "Show"}
         </button>
       </div>
-      <p className="text-ink-mute text-sm mb-4">
-        Use the eye icon in the header to hide or reveal numeric values while sharing.
-      </p>
-
       <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
         <table className="ledger-table mb-4 w-full text-[11px] sm:text-[13px]">
           <thead>
@@ -164,7 +160,7 @@ export default function BudgetsPage() {
                   <button
                     onClick={() => {
                       setEditing(b);
-                      setEditLimit(String(b.monthly_limit));
+                      setEditLimit(formatAmountLive(String(b.monthly_limit), userDefault));
                     }}
                     className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2 mr-1"
                   >
@@ -200,9 +196,10 @@ export default function BudgetsPage() {
                 <div className="flex items-center gap-2">
                   <span className="smallcaps text-ink-mute min-w-10">{currencySymbol(userDefault)}</span>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     value={editLimit}
-                    onChange={(e) => setEditLimit(e.target.value)}
+                    onChange={(e) => handleAmountChange(e.currentTarget, userDefault, setEditLimit)}
                     className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full num"
                   />
                 </div>
@@ -212,8 +209,9 @@ export default function BudgetsPage() {
                   onClick={() => {
                     if (!editing) return;
                     const body: Record<string, unknown> = {};
-                    if (!isSameNumeric(editLimit, editing.monthly_limit)) {
-                      body.monthly_limit = editLimit || "0";
+                    const parsedLimit = parseAmountInput(editLimit);
+                    if (!isSameNumeric(parsedLimit, editing.monthly_limit)) {
+                      body.monthly_limit = parsedLimit || "0";
                     }
                     if (Object.keys(body).length === 0) {
                       setEditing(null);
@@ -264,9 +262,10 @@ export default function BudgetsPage() {
           <div className="flex items-center gap-2">
             <span className="smallcaps text-ink-mute min-w-10">{currencySymbol(userDefault)}</span>
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={limit}
-              onChange={(e) => setLimit(e.target.value)}
+              onChange={(e) => handleAmountChange(e.currentTarget, userDefault, setLimit)}
               className="bg-transparent border-b border-ink py-1 w-full num"
             />
           </div>

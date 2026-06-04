@@ -2,11 +2,13 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { AdminUser, Category, CurrencyBalance, Me, Source } from "@/types";
-import { fmtMoney } from "@/lib/format";
+import { fmtMoney, formatAmountLive, handleAmountChange } from "@/lib/format";
 import { useAmountVisibility } from "@/lib/privacy";
+import { useIsMobile } from "@/lib/mediaQuery";
 import { SectionTitle } from "@/components/Figure";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import TrackAsOtherDialog from "@/components/TrackAsOtherDialog";
+import PreferencesForm from "@/components/PreferencesForm";
 
 const CURRENCIES = ["IDR", "SGD", "JPY", "AUD", "TWD"] as const;
 type CurrencyCode = (typeof CURRENCIES)[number];
@@ -157,11 +159,15 @@ function CurrencyBlock({ sourcesEnabled }: { sourcesEnabled: boolean }) {
                 </span>
                 <input
                   value={currentFundsInput}
-                  onChange={(e) => setCurrentFundsInput(e.target.value)}
+                  onChange={(e) =>
+                    handleAmountChange(e.currentTarget, editing.currency, setCurrentFundsInput)
+                  }
                   onBlur={() =>
                     setCurrentFundsInput(normalizeInput(currentFundsInput, editing.currency))
                   }
-                  onFocus={() => setCurrentFundsInput(parseDisplayAmount(currentFundsInput))}
+                  onFocus={() =>
+                    setCurrentFundsInput(formatAmountLive(currentFundsInput, editing.currency))
+                  }
                   className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full num"
                 />
               </div>
@@ -341,10 +347,12 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
                   <span className="smallcaps text-ink-mute min-w-10">{currencySymbol(editCurrency)}</span>
                   <input
                     value={editCurrentFundsInput}
-                    onChange={(e) => setEditCurrentFundsInput(e.target.value)}
+                    onChange={(e) =>
+                      handleAmountChange(e.currentTarget, editCurrency, setEditCurrentFundsInput)
+                    }
                     onBlur={() => setEditCurrentFundsInput(normalizeInput(editCurrentFundsInput, editCurrency))}
                     onFocus={() =>
-                      setEditCurrentFundsInput(parseDisplayAmount(editCurrentFundsInput))
+                      setEditCurrentFundsInput(formatAmountLive(editCurrentFundsInput, editCurrency))
                     }
                     className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full num"
                   />
@@ -466,9 +474,9 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
             <span className="smallcaps text-ink-mute min-w-10">{currencySymbol(currency)}</span>
             <input
               value={currentFundsInput}
-              onChange={(e) => setCurrentFundsInput(e.target.value)}
+              onChange={(e) => handleAmountChange(e.currentTarget, currency, setCurrentFundsInput)}
               onBlur={() => setCurrentFundsInput(normalizeInput(currentFundsInput, currency))}
-              onFocus={() => setCurrentFundsInput(parseDisplayAmount(currentFundsInput))}
+              onFocus={() => setCurrentFundsInput(formatAmountLive(currentFundsInput, currency))}
               className="bg-transparent border-b border-ink py-1 w-full sm:w-40 num"
             />
           </div>
@@ -761,12 +769,55 @@ function AdminBlock() {
   );
 }
 
-export default function SettingsPage() {
-  const { data: me } = useQuery<Me>({
+function useMe() {
+  return useQuery<Me>({
     queryKey: ["me"],
     queryFn: () => api.get<Me>("/auth/me"),
   });
+}
+
+// Mobile Manage → "Sources" sub-tab: currencies + named sources.
+export function SourcesSettingsPage() {
+  const { data: me } = useMe();
   const sourcesEnabled = me?.sources_enabled !== false;
+  return (
+    <div className="max-w-3xl">
+      <CurrencyBlock sourcesEnabled={sourcesEnabled} />
+      <SourcesBlock enabled={sourcesEnabled} />
+    </div>
+  );
+}
+
+// Mobile Manage → "Categories" sub-tab.
+export function CategoriesSettingsPage() {
+  return (
+    <div className="max-w-3xl">
+      <CategoriesBlock />
+    </div>
+  );
+}
+
+// Mobile Manage → "Account" sub-tab: preferences + (admin) member approvals.
+export function AccountSettingsPage() {
+  const { data: me } = useMe();
+  return (
+    <div className="max-w-md">
+      <section className="mb-12">
+        <PreferencesForm me={me} />
+      </section>
+      {me?.is_admin && <AdminBlock />}
+    </div>
+  );
+}
+
+export default function SettingsPage() {
+  const isMobile = useIsMobile();
+  const { data: me } = useMe();
+  const sourcesEnabled = me?.sources_enabled !== false;
+
+  // On mobile the Manage tab fans these out into sibling sub-tabs, so /settings
+  // is just the "Sources" sub-tab. Desktop keeps the full single-page stack.
+  if (isMobile) return <SourcesSettingsPage />;
 
   return (
     <div className="max-w-3xl">

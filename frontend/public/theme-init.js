@@ -11,6 +11,6 @@
         window.matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", dark ? "#14110a" : "#f5efe3");
+    if (meta) meta.setAttribute("content", dark ? "#1b1813" : "#f5efe3");
   } catch (_) {}
 })();

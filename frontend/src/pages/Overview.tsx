@@ -218,11 +218,9 @@ export default function OverviewPage() {
         </section>
       )}
 
-      {isMobile && (
-        <section className="col-span-12">
-          <SpendRadar currency={ov.currency} year={ov.year} month={ov.month} />
-        </section>
-      )}
+      <section className="col-span-12">
+        <SpendRadar currency={ov.currency} year={ov.year} month={ov.month} />
+      </section>
 
       <section className="col-span-12 lg:col-span-8 mt-4 sm:mt-6">
         <SectionTitle kicker="The running totals">By Category</SectionTitle>

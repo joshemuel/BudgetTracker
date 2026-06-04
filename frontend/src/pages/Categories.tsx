@@ -13,6 +13,7 @@ import { fmtCompactMoney, fmtMoney, fmtPct, todayISO, toNumber } from "@/lib/for
 import { SectionTitle } from "@/components/Figure";
 import { useAmountVisibility } from "@/lib/privacy";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
+import { useTheme } from "@/lib/theme";
 
 export const PALETTE = [
   "#a02a1a",
@@ -25,6 +26,21 @@ export const PALETTE = [
   "#6b4e2e",
   "#7d2a2a",
   "#2a5d4e",
+];
+
+// Night-mode palette: the near-black/dark inks above disappear on a dark
+// ground, so brighten them while keeping each hue distinct.
+export const PALETTE_DARK = [
+  "#e2674f",
+  "#7fa64f",
+  "#d99a3f",
+  "#cdbf9e",
+  "#9a8f76",
+  "#b6ab90",
+  "#e08a3f",
+  "#bb8a55",
+  "#cf6a5e",
+  "#5fa48c",
 ];
 
 function firstOfMonthISO(): string {
@@ -44,6 +60,13 @@ export function CategoriesBreakdown({
   compact?: boolean;
 }) {
   const { showAmounts } = useAmountVisibility();
+  const { theme } = useTheme();
+  const dark = theme === "dark";
+  const palette = dark ? PALETTE_DARK : PALETTE;
+  const sliceGap = dark ? "#1b1813" : "#f5efe3";
+  const tipBg = dark ? "#242019" : "#f5efe3";
+  const tipBorder = dark ? "#4a4130" : "#19170f";
+  const tipText = dark ? "#f4ecdb" : "#19170f";
   const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
 
   const { data } = useQuery<CategoryStats>({
@@ -92,20 +115,23 @@ export function CategoriesBreakdown({
               nameKey="name"
               innerRadius={pieInnerRadius}
               outerRadius={pieOuterRadius}
-              stroke="#f5efe3"
+              stroke={sliceGap}
               strokeWidth={1}
             >
               {pieData.map((_, i) => (
-                <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
+                <Cell key={i} fill={palette[i % palette.length]} />
               ))}
             </Pie>
             <Tooltip
               contentStyle={{
-                background: "#f5efe3",
-                border: "1px solid #19170f",
+                background: tipBg,
+                border: `1px solid ${tipBorder}`,
                 borderRadius: 0,
                 fontFamily: "Instrument Sans",
+                color: tipText,
               }}
+              itemStyle={{ color: tipText }}
+              labelStyle={{ color: tipText }}
               formatter={(v: number) =>
                 showAmounts ? fmtMoney(v, reportCurrency) : "••••••"
               }
@@ -133,7 +159,7 @@ export function CategoriesBreakdown({
                     <td className="font-[450] flex items-center gap-2">
                       <span
                         className="inline-block w-2 h-2"
-                        style={{ background: PALETTE[i % PALETTE.length] }}
+                        style={{ background: palette[i % palette.length] }}
                       />
                       {r.category_name}
                     </td>
