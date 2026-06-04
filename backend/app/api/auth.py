@@ -1,6 +1,8 @@
+import re
 from decimal import Decimal, ROUND_HALF_UP
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import SESSION_COOKIE, get_current_user, get_db
@@ -12,10 +14,28 @@ from app.schemas.auth import (
     UserOut,
     UserPreferencesUpdate,
 )
-from app.services import fx
+from app.services import fx, google_oauth, provisioning
 from app.services.auth import SESSION_TTL, create_session, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+OAUTH_STATE_COOKIE = "oauth_state"
+
+
+def _frontend_redirect(path: str) -> RedirectResponse:
+    base = get_settings().frontend_base_url.rstrip("/")
+    return RedirectResponse(f"{base}{path}" if base else path, status_code=302)
+
+
+def _unique_username(db: Session, name: str, email: str | None) -> str:
+    seed = name or (email.split("@")[0] if email else "")
+    base = re.sub(r"[^a-z0-9]+", "", seed.lower())[:40] or "user"
+    candidate = base
+    n = 1
+    while db.query(User).filter_by(username=candidate).one_or_none() is not None:
+        n += 1
+        candidate = f"{base}{n}"
+    return candidate
 
 
 def _round_currency(amount: Decimal, currency: str) -> Decimal:
@@ -63,6 +83,108 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
         secure=get_settings().session_cookie_secure,
     )
     return user
+
+
+@router.get("/config")
+def auth_config():
+    """Public: lets the login page know whether to show the Google button."""
+    s = get_settings()
+    return {"google_enabled": bool(s.google_client_id and s.google_redirect_uri)}
+
+
+@router.get("/google/login")
+def google_login():
+    s = get_settings()
+    if not s.google_client_id or not s.google_redirect_uri:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Google sign-in is not configured")
+    state = google_oauth.make_state()
+    resp = RedirectResponse(google_oauth.authorize_url(state), status_code=302)
+    resp.set_cookie(
+        OAUTH_STATE_COOKIE,
+        state,
+        max_age=google_oauth.STATE_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+        secure=s.session_cookie_secure,
+        path="/",
+    )
+    return resp
+
+
+@router.get("/google/callback")
+def google_callback(
+    code: str | None = None,
+    state: str | None = None,
+    oauth_state: str | None = Cookie(default=None, alias=OAUTH_STATE_COOKIE),
+    db: Session = Depends(get_db),
+):
+    s = get_settings()
+    if not s.google_client_id:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Google sign-in is not configured")
+    # CSRF: the state must be present, match the cookie, and carry a valid signature.
+    if (
+        not code
+        or not state
+        or not oauth_state
+        or state != oauth_state
+        or not google_oauth.verify_state(state)
+    ):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid OAuth state")
+    try:
+        tokens = google_oauth.exchange_code(code)
+        claims = google_oauth.decode_id_token(tokens.get("id_token"))
+    except google_oauth.OAuthError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Google sign-in failed")
+
+    sub = claims.get("sub")
+    if not sub:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Google did not return an account id")
+    email = (claims.get("email") or "").lower() or None
+    email_verified = bool(claims.get("email_verified"))
+    name = claims.get("name") or claims.get("given_name") or ""
+
+    user = db.query(User).filter_by(google_sub=sub).one_or_none()
+    # Link to a pre-existing account only on a *verified* matching email.
+    if user is None and email and email_verified:
+        existing = db.query(User).filter_by(email=email).one_or_none()
+        if existing is not None and existing.google_sub is None:
+            existing.google_sub = sub
+            user = existing
+
+    if user is None:
+        # Avoid colliding with an email already on another account.
+        create_email = email
+        if create_email and db.query(User).filter_by(email=create_email).one_or_none() is not None:
+            create_email = None
+        user = User(
+            username=_unique_username(db, name, email),
+            email=create_email,
+            google_sub=sub,
+            password_hash=None,
+            status="pending",
+            is_admin=False,
+        )
+        db.add(user)
+        db.flush()
+        provisioning.seed_new_user_defaults(db, user)
+
+    if user.status != "approved":
+        db.commit()
+        return _frontend_redirect("/pending")
+
+    token = create_session(db, user)
+    db.commit()
+    resp = _frontend_redirect("/")
+    resp.set_cookie(
+        SESSION_COOKIE,
+        token.token,
+        max_age=int(SESSION_TTL.total_seconds()),
+        httponly=True,
+        samesite="lax",
+        secure=s.session_cookie_secure,
+    )
+    resp.delete_cookie(OAUTH_STATE_COOKIE)
+    return resp
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

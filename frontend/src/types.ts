@@ -11,6 +11,14 @@ export type Me = {
   sources_enabled: boolean;
 };
 
+export type AdminUser = {
+  id: number;
+  username: string;
+  email: string | null;
+  is_admin: boolean;
+  status: "pending" | "approved" | "rejected";
+};
+
 export type Source = {
   id: number;
   name: string;
