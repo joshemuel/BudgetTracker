@@ -19,7 +19,21 @@ class Settings(BaseSettings):
 
     telegram_token: str = Field(default="", alias="TELEGRAM_TOKEN")
     telegram_chat_id: str = Field(default="", alias="TELEGRAM_CHAT_ID")
+    # Shared secret echoed by Telegram in X-Telegram-Bot-Api-Secret-Token. When
+    # set, inbound webhook updates that don't carry it are rejected.
     telegram_webhook_secret: str = Field(default="", alias="TELEGRAM_WEBHOOK_SECRET")
+
+    # Google OAuth (Authorization Code flow). Empty disables Google sign-in.
+    google_client_id: str = Field(default="", alias="GOOGLE_CLIENT_ID")
+    google_client_secret: str = Field(default="", alias="GOOGLE_CLIENT_SECRET")
+    google_redirect_uri: str = Field(default="", alias="GOOGLE_REDIRECT_URI")
+    # Extra ID-token audiences to accept besides GOOGLE_CLIENT_ID, comma-separated.
+    # The web client id is always accepted; add an Android/iOS OAuth client id here
+    # (when a native app ships) so its tokens verify with no code change.
+    google_allowed_audiences: str = Field(default="", alias="GOOGLE_ALLOWED_AUDIENCES")
+    # Where to send the browser after the OAuth callback. Empty = same-origin
+    # relative redirect ("/"), correct for the single-origin nginx prod setup.
+    frontend_base_url: str = Field(default="", alias="FRONTEND_BASE_URL")
 
     llm_api_key: str = Field(
         default="",

@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from sqlalchemy import text
 
 from app.api import (
+    admin,
     auth,
     budgets,
     categories,
@@ -42,6 +43,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="BudgetTracker API", version="0.1.0", lifespan=lifespan)
 
 app.include_router(auth.router)
+app.include_router(admin.router)
 app.include_router(sources.router)
 app.include_router(currencies.router)
 app.include_router(categories.router)

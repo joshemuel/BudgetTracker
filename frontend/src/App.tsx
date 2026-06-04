@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import AppShell from "@/layout/AppShell";
 import Login from "@/pages/Login";
+import Pending from "@/pages/Pending";
 import Overview from "@/pages/Overview";
 import Monthly from "@/pages/Monthly";
 import Daily from "@/pages/Daily";
@@ -13,6 +14,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/pending" element={<Pending />} />
       <Route element={<AppShell />}>
         <Route index element={<Overview />} />
         <Route path="monthly" element={<Monthly />} />

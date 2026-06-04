@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Category, CurrencyBalance, Me, Source } from "@/types";
+import type { AdminUser, Category, CurrencyBalance, Me, Source } from "@/types";
 import { fmtMoney } from "@/lib/format";
 import { useAmountVisibility } from "@/lib/privacy";
 import { SectionTitle } from "@/components/Figure";
@@ -676,6 +676,91 @@ function CategoriesBlock() {
   );
 }
 
+function statusTone(status: AdminUser["status"]): string {
+  if (status === "pending") return "text-accent";
+  if (status === "rejected") return "text-ink-mute line-through";
+  return "text-ink-soft";
+}
+
+function AdminBlock() {
+  const qc = useQueryClient();
+  const { data: users } = useQuery<AdminUser[]>({
+    queryKey: ["admin-users"],
+    queryFn: () => api.get<AdminUser[]>("/admin/users"),
+  });
+
+  const approve = useMutation({
+    mutationFn: (id: number) => api.post(`/admin/users/${id}/approve`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
+  });
+  const reject = useMutation({
+    mutationFn: (id: number) => api.post(`/admin/users/${id}/reject`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
+  });
+
+  const pending = (users ?? []).filter((u) => u.status === "pending");
+
+  return (
+    <section className="mt-12">
+      <SectionTitle>Members</SectionTitle>
+      <p className="text-ink-mute text-sm mb-4">
+        {pending.length > 0
+          ? `${pending.length} account${pending.length > 1 ? "s" : ""} awaiting your approval.`
+          : "Approve or revoke access for people who signed in with Google."}
+      </p>
+      <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
+        <table className="ledger-table w-full text-[11px] sm:text-[13px]">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {(users ?? []).map((u) => (
+              <tr key={u.id}>
+                <td className="font-[450]">
+                  {u.username}
+                  {u.is_admin && <span className="smallcaps text-ink-mute"> · admin</span>}
+                </td>
+                <td className="text-ink-soft">{u.email ?? "—"}</td>
+                <td className={`smallcaps ${statusTone(u.status)}`}>{u.status}</td>
+                <td className="text-right whitespace-nowrap">
+                  {u.status !== "approved" && (
+                    <button
+                      onClick={() => approve.mutate(u.id)}
+                      className="smallcaps text-ink-mute hover:text-gain inline-block p-2 -m-2 mr-1"
+                    >
+                      approve
+                    </button>
+                  )}
+                  {u.status !== "rejected" && !u.is_admin && (
+                    <button
+                      onClick={() => reject.mutate(u.id)}
+                      className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
+                    >
+                      reject
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {users && users.length === 0 && (
+              <tr>
+                <td colSpan={4} className="text-center text-ink-mute py-8">
+                  No members yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export default function SettingsPage() {
   const { data: me } = useQuery<Me>({
     queryKey: ["me"],
@@ -688,6 +773,7 @@ export default function SettingsPage() {
       <CurrencyBlock sourcesEnabled={sourcesEnabled} />
       <SourcesBlock enabled={sourcesEnabled} />
       <CategoriesBlock />
+      {me?.is_admin && <AdminBlock />}
     </div>
   );
 }
