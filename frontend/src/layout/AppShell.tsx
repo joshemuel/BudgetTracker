@@ -42,10 +42,11 @@ const navGroups: NavGroup[] = [
     key: "manage",
     label: "Manage",
     to: "/budgets",
-    routes: ["/budgets", "/settings", "/settings/categories", "/settings/account"],
+    routes: ["/budgets", "/subscriptions", "/settings", "/settings/categories", "/settings/account"],
     sub: [
       { to: "/budgets", label: "Budgets" },
-      { to: "/settings", label: "Sources", end: true },
+      { to: "/subscriptions", label: "Subscriptions" },
+      { to: "/settings", label: "Wallets", end: true },
       { to: "/settings/categories", label: "Categories" },
       { to: "/settings/account", label: "Account" },
     ],
@@ -143,7 +144,7 @@ function GroupSubNav() {
   const group = navGroups.find((g) => g.routes.includes(pathname));
   if (!group?.sub) return null;
   return (
-    <nav className="sm:hidden pt-3 pb-1">
+    <nav className="sm:hidden pt-3 pb-1 overflow-x-auto -mx-3 px-3">
       <div className="inline-flex border border-ink smallcaps nav-tabs">
         {group.sub.map((s, i) => (
           <NavLink
@@ -194,7 +195,7 @@ function Masthead({
     today.getFullYear();
 
   return (
-    <header className="relative pt-5 sm:pt-7 md:pt-9 lg:pt-11 pb-6 sm:pb-8">
+    <header className="relative pt-5 sm:pt-7 md:pt-9 lg:pt-11 pb-6 sm:pb-0">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-baseline sm:justify-between smallcaps text-ink-mute border-t border-paper-rule pt-4 sm:pt-5">
         <span className="order-1">Beta Version</span>
         <span className="order-3 sm:order-2 hidden sm:inline">{dateStr}</span>
@@ -288,7 +289,7 @@ function Masthead({
         </h1>
       </div>
 
-      <div className="mt-6 sm:mt-8 relative h-[6px]">
+      <div className="mt-6 sm:mt-8 sm:-mx-4 md:-mx-6 lg:-mx-8 xl:-mx-10 relative h-[6px]">
         <div className="anim-rule absolute inset-x-0 top-0 h-[3px] bg-ink" />
         <div
           className="anim-rule absolute inset-x-0 top-[5px] h-[1px] bg-ink"
@@ -492,7 +493,7 @@ export default function AppShell() {
       </div>
       <div className="sm:flex">
         <Sidebar />
-        <div className={`min-w-0 flex-1 ${pad}`}>
+        <div className={`min-w-0 flex-1 ${pad} sm:pt-4`}>
           <SubTabNav />
           <GroupSubNav />
           <main className="py-7 sm:py-10 md:py-12 lg:py-14">

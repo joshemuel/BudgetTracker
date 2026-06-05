@@ -5,7 +5,6 @@ import type { Budget, Category, Me } from "@/types";
 import { fmtMoney, formatAmountLive, handleAmountChange, parseAmountInput } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 import { useAmountVisibility } from "@/lib/privacy";
-import Subscriptions from "@/pages/Subscriptions";
 
 type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD" | "USD";
 
@@ -276,7 +275,6 @@ export default function BudgetsPage() {
         </button>
       </form>
       </div>
-      <Subscriptions />
     </div>
   );
 }

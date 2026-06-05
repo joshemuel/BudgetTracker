@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type TouchEvent as ReactTouchEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bar,
@@ -49,6 +49,14 @@ export default function MonthlyPage() {
   const [byCategory, setByCategory] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Long-press (mobile) shows a small in/out box for the held bar, mirroring the
+  // desktop hover tooltip; a short tap still opens the spending pie.
+  const chartBoxRef = useRef<HTMLDivElement>(null);
+  const pressTimer = useRef<number | null>(null);
+  const pressStartRef = useRef<{ x: number; y: number } | null>(null);
+  const longPressedRef = useRef(false);
+  const movedRef = useRef(false);
+  const [pressBox, setPressBox] = useState<{ index: number; x: number; y: number } | null>(null);
   const { theme } = useTheme();
   const palette = theme === "dark" ? PALETTE_DARK : PALETTE;
   const { data: me } = useQuery<Me>({
@@ -132,6 +140,62 @@ export default function MonthlyPage() {
   const pieTo = selectedMonth
     ? toISO(year, selectedMonth, new Date(year, selectedMonth, 0).getDate())
     : "";
+
+  // Which bar sits under a touch X. The chart has left/right margins of 0 and a
+  // 72px YAxis, so the plot starts 72px in; map the rest evenly across the months.
+  const clearPressTimer = () => {
+    if (pressTimer.current !== null) {
+      window.clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  };
+  const indexFromTouch = (clientX: number): number | null => {
+    const el = chartBoxRef.current;
+    if (!el || chartData.length === 0) return null;
+    const rect = el.getBoundingClientRect();
+    const plotLeft = 72;
+    const plotW = rect.width - plotLeft;
+    if (plotW <= 0) return null;
+    const i = Math.floor(((clientX - rect.left - plotLeft) / plotW) * chartData.length);
+    return i < 0 || i >= chartData.length ? null : i;
+  };
+  const handleTouchStart = (e: ReactTouchEvent) => {
+    const t = e.touches[0];
+    if (!t) return;
+    longPressedRef.current = false;
+    movedRef.current = false;
+    pressStartRef.current = { x: t.clientX, y: t.clientY };
+    const { clientX, clientY } = t;
+    clearPressTimer();
+    pressTimer.current = window.setTimeout(() => {
+      const idx = indexFromTouch(clientX);
+      if (idx == null) return;
+      longPressedRef.current = true;
+      setPressBox({ index: idx, x: clientX, y: clientY });
+    }, 450);
+  };
+  const handleTouchMove = (e: ReactTouchEvent) => {
+    const t = e.touches[0];
+    const start = pressStartRef.current;
+    if (!t || !start) return;
+    if (longPressedRef.current) {
+      const idx = indexFromTouch(t.clientX);
+      if (idx != null) setPressBox({ index: idx, x: t.clientX, y: t.clientY });
+      return;
+    }
+    if (Math.abs(t.clientX - start.x) > 8 || Math.abs(t.clientY - start.y) > 8) {
+      movedRef.current = true;
+      clearPressTimer();
+    }
+  };
+  const handleTouchEnd = () => {
+    clearPressTimer();
+    pressStartRef.current = null;
+    setPressBox(null);
+  };
+
+  // Tidy the pending long-press timer if the page unmounts mid-hold.
+  useEffect(() => () => clearPressTimer(), []);
 
   // On mobile, open the year scrolled so the current month sits in view rather
   // than starting at January. Runs once the bars have laid out (rAF) and again
@@ -222,14 +286,26 @@ export default function MonthlyPage() {
 
       <div ref={scrollRef} className="mt-8 overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
         <div
-          className="h-[240px] sm:h-[360px]"
-          style={isMobile ? { minWidth: 680 } : undefined}
+          ref={chartBoxRef}
+          className="h-[240px] sm:h-[360px] select-none"
+          style={isMobile ? { minWidth: 680, touchAction: "pan-x" } : undefined}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+          onContextMenu={(e) => e.preventDefault()}
         >
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}
             margin={{ top: 20, right: 0, left: 0, bottom: 0 }}
             onClick={(next) => {
+              // A long-press (in/out box) or a scroll must not also open the pie.
+              if (longPressedRef.current || movedRef.current) {
+                longPressedRef.current = false;
+                movedRef.current = false;
+                return;
+              }
               const idx = (next as { activeTooltipIndex?: number | null })
                 .activeTooltipIndex;
               if (idx == null || idx < 0 || idx >= chartData.length) return;
@@ -254,7 +330,7 @@ export default function MonthlyPage() {
             />
               {/* In category mode the per-category hover boxes are noise — the
                   pop-up pie covers that — so the tooltip is totals-only. */}
-              {!byCategory && (
+              {!byCategory && !isMobile && (
                 <Tooltip
                   contentStyle={{
                     background: "#f5efe3",
@@ -338,7 +414,7 @@ export default function MonthlyPage() {
         </div>
       </div>
       <p className="smallcaps text-[10px] text-ink-mute mt-2">
-        Tap a bar to see that month's spending breakdown.
+        Tap a bar to see that month's spending breakdown{isMobile ? " · hold for in vs out" : ""}.
       </p>
 
       <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
@@ -378,6 +454,39 @@ export default function MonthlyPage() {
         currency={reportCurrency}
         onClose={() => setSelectedMonth(null)}
       />
+
+      {isMobile && pressBox && chartData[pressBox.index] && (
+        <div
+          className="fixed z-50 pointer-events-none -translate-x-1/2 -translate-y-full bg-paper border border-ink px-3 py-2 shadow-sm"
+          style={{
+            left: Math.min(
+              Math.max(pressBox.x, 92),
+              (typeof window !== "undefined" ? window.innerWidth : 360) - 92
+            ),
+            top: pressBox.y - 12,
+          }}
+        >
+          <p className="smallcaps text-ink-mute text-[10px] leading-none mb-1">
+            {monthName(Number(chartData[pressBox.index].month))}
+          </p>
+          <div className="flex items-baseline justify-between gap-5 text-[12px]">
+            <span className="smallcaps text-ink-mute">In</span>
+            <span className="num text-gain">
+              {showAmounts
+                ? fmtCompactMoney(Number(chartData[pressBox.index].Income), reportCurrency)
+                : "••••••"}
+            </span>
+          </div>
+          <div className="flex items-baseline justify-between gap-5 text-[12px]">
+            <span className="smallcaps text-ink-mute">Out</span>
+            <span className="num text-accent">
+              {showAmounts
+                ? fmtCompactMoney(Number(chartData[pressBox.index].Expense), reportCurrency)
+                : "••••••"}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

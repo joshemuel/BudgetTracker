@@ -158,7 +158,6 @@ export default function PreferencesForm({
 
   return (
     <>
-      <p className="smallcaps text-ink-mute mb-2">Preferences</p>
       <label className="block mb-2">
         <span className="smallcaps text-ink-mute block mb-1">Default Currency</span>
         <select

@@ -218,11 +218,11 @@ export default function OverviewPage() {
         </section>
       )}
 
-      <section className="col-span-12">
+      <section className="col-span-12 lg:col-span-7 lg:order-1">
         <SpendRadar currency={ov.currency} year={ov.year} month={ov.month} />
       </section>
 
-      <section className="col-span-12 lg:col-span-8 mt-4 sm:mt-6">
+      <section className="col-span-12 lg:order-3 mt-4 sm:mt-6">
         <SectionTitle kicker="The running totals">By Category</SectionTitle>
         {ov.budgets.length === 0 ? (
           <p className="text-ink-soft">
@@ -299,7 +299,7 @@ export default function OverviewPage() {
         )}
       </section>
 
-      <aside className="col-span-12 lg:col-span-4 mt-6 space-y-8 text-sm">
+      <aside className="col-span-12 lg:col-span-5 lg:order-2 mt-6 lg:mt-0 space-y-8 text-sm">
         <div className="border-t-2 border-ink pt-4">
           <p className="smallcaps text-ink-mute">Credit Card</p>
           <p className="num text-2xl sm:text-3xl mt-1 text-accent break-words">
