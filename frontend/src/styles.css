@@ -13,6 +13,8 @@
   --color-gain: #3f5d2e;        /* deep olive, for income / positive */
   --color-warn: #b4721f;        /* amber, for warnings / behind */
   --color-highlight: #f1e6cc;   /* soft highlight strip */
+  --color-rail: #1c1910;        /* dark left-sidebar panel */
+  --color-rail-ink: #f4ecdb;    /* sidebar text / icons */
 
   --font-display: "Fraunces", "Playfair Display", ui-serif, Georgia, serif;
   --font-sans: "Instrument Sans", "Helvetica Neue", system-ui, sans-serif;
@@ -35,6 +37,8 @@
   --color-gain: #abcb80;
   --color-warn: #e6ad5f;
   --color-highlight: #2c2618;
+  --color-rail: #100d08;        /* deeper than the espresso page so the panel still reads */
+  --color-rail-ink: #f4ecdb;
 }
 
 :root {

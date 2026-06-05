@@ -349,53 +349,55 @@ function Sidebar() {
   return (
     <aside
       className={
-        "hidden sm:flex flex-col shrink-0 sticky top-4 self-start border-r border-paper-rule pr-3 mr-1 transition-[width] " +
+        "hidden sm:block shrink-0 bg-rail text-rail-ink border-r border-rail-ink/10 transition-[width] " +
         (collapsed ? "w-14" : "w-44")
       }
     >
-      <button
-        type="button"
-        onClick={toggle}
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        aria-expanded={!collapsed}
-        title={collapsed ? "Expand" : "Collapse"}
-        className="self-end mb-2 w-7 h-7 rounded-sm border border-paper-rule text-ink-mute hover:text-ink hover:border-ink transition-colors flex items-center justify-center"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          {collapsed ? <path d="M9 6l6 6-6 6" /> : <path d="M15 6l-6 6 6 6" />}
-        </svg>
-      </button>
-      <nav>
-        <ul className="flex flex-col gap-1">
-          {navGroups.map((g) => {
-            const active = g.routes.includes(pathname);
-            return (
-              <li key={g.key}>
-                <Link
-                  to={g.to}
-                  aria-current={active ? "page" : undefined}
-                  title={collapsed ? g.label : undefined}
-                  className={
-                    "flex items-center gap-3 rounded-sm border-l-2 py-2 transition-colors " +
-                    (collapsed ? "justify-center px-0" : "px-2.5") +
-                    " " +
-                    (active
-                      ? "border-accent text-accent bg-accent/5"
-                      : "border-transparent text-ink-soft hover:text-ink hover:border-paper-rule")
-                  }
-                >
-                  <span className="shrink-0">
-                    <NavIcon name={g.key} />
-                  </span>
-                  {!collapsed && (
-                    <span className="smallcaps nav-tabs whitespace-nowrap">{g.label}</span>
-                  )}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+      <div className="sticky top-0 flex flex-col px-2.5 py-4">
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!collapsed}
+          title={collapsed ? "Expand" : "Collapse"}
+          className="self-end mb-2 w-7 h-7 rounded-sm border border-rail-ink/25 text-rail-ink/70 hover:text-rail-ink hover:border-rail-ink/50 transition-colors flex items-center justify-center"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {collapsed ? <path d="M9 6l6 6-6 6" /> : <path d="M15 6l-6 6 6 6" />}
+          </svg>
+        </button>
+        <nav>
+          <ul className="flex flex-col gap-1">
+            {navGroups.map((g) => {
+              const active = g.routes.includes(pathname);
+              return (
+                <li key={g.key}>
+                  <Link
+                    to={g.to}
+                    aria-current={active ? "page" : undefined}
+                    title={collapsed ? g.label : undefined}
+                    className={
+                      "flex items-center gap-3 rounded-sm border-l-2 py-2 transition-colors " +
+                      (collapsed ? "justify-center px-0" : "px-2.5") +
+                      " " +
+                      (active
+                        ? "border-accent text-rail-ink bg-rail-ink/10"
+                        : "border-transparent text-rail-ink/65 hover:text-rail-ink hover:bg-rail-ink/5")
+                    }
+                  >
+                    <span className="shrink-0">
+                      <NavIcon name={g.key} />
+                    </span>
+                    {!collapsed && (
+                      <span className="smallcaps nav-tabs whitespace-nowrap">{g.label}</span>
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      </div>
     </aside>
   );
 }
@@ -480,12 +482,17 @@ export default function AppShell() {
         }
       : null;
 
+  // Full-width shell: the masthead and footer span the display with their own
+  // padding, while the sidebar runs flush against the left edge between them.
+  const pad = "px-3 sm:px-4 md:px-6 lg:px-8 xl:px-10";
   return (
-    <div className="max-w-[1160px] lg:max-w-[1220px] mx-auto px-3 sm:px-4 md:px-5 lg:px-6 xl:px-8 pb-24 sm:pb-0">
-      <Masthead me={me} onLog={() => setLogOpen(true)} install={installCta} />
-      <div className="sm:flex sm:gap-6 lg:gap-8">
+    <div className="pb-24 sm:pb-0">
+      <div className={pad}>
+        <Masthead me={me} onLog={() => setLogOpen(true)} install={installCta} />
+      </div>
+      <div className="sm:flex">
         <Sidebar />
-        <div className="min-w-0 flex-1">
+        <div className={`min-w-0 flex-1 ${pad}`}>
           <SubTabNav />
           <GroupSubNav />
           <main className="py-7 sm:py-10 md:py-12 lg:py-14">
@@ -493,11 +500,13 @@ export default function AppShell() {
           </main>
         </div>
       </div>
-      <footer className="py-10 sm:py-14 border-t border-paper-rule flex sm:justify-end smallcaps text-ink-mute">
-        <span>
-          Press <kbd className="px-1 border border-paper-rule num">N</kbd> to log
-        </span>
-      </footer>
+      <div className={pad}>
+        <footer className="py-10 sm:py-14 border-t border-paper-rule flex sm:justify-end smallcaps text-ink-mute">
+          <span>
+            Press <kbd className="px-1 border border-paper-rule num">N</kbd> to log
+          </span>
+        </footer>
+      </div>
       <QuickLog open={logOpen} onClose={() => setLogOpen(false)} />
       <WebChat />
       <BottomNav />
