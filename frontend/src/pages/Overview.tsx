@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "@/api";
@@ -85,6 +85,13 @@ export default function OverviewPage() {
   const { showAmounts, toggleAmounts } = useAmountVisibility();
   const isMobile = useIsMobile();
   const [freshPulse, setFreshPulse] = useState(false);
+  // Desktop: pin the Credit Card column to the radar's height and tuck the
+  // overflowing accounts behind a "show all" toggle so the row stays compact.
+  const radarRef = useRef<HTMLElement>(null);
+  const accountsRef = useRef<HTMLUListElement>(null);
+  const [radarH, setRadarH] = useState<number | null>(null);
+  const [creditOpen, setCreditOpen] = useState(false);
+  const [canExpand, setCanExpand] = useState(false);
 
   useEffect(() => {
     let timer: number | null = null;
@@ -122,6 +129,29 @@ export default function OverviewPage() {
     queryKey: ["summary"],
     queryFn: () => api.get<Summary>("/stats/summary"),
   });
+
+  // Track the radar's rendered height so the Credit Card column can mirror it.
+  // The radar is `lg:self-start` (never stretched), so this stays its natural
+  // height even when the expanded credit column makes the grid row taller.
+  useLayoutEffect(() => {
+    const el = radarRef.current;
+    if (!el) return;
+    const measure = () => setRadarH(el.getBoundingClientRect().height);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ov, isMobile]);
+
+  // Only offer the "show all" toggle when the accounts list is actually clipped.
+  useLayoutEffect(() => {
+    const el = accountsRef.current;
+    if (!el || isMobile) {
+      setCanExpand(false);
+      return;
+    }
+    setCanExpand(el.scrollHeight - el.clientHeight > 1);
+  }, [ov, isMobile, radarH, creditOpen, sources, currencies]);
 
   if (!ov) return <p className="smallcaps text-ink-mute">Loading…</p>;
 
@@ -218,7 +248,7 @@ export default function OverviewPage() {
         </section>
       )}
 
-      <section className="col-span-12 lg:col-span-7 lg:order-1">
+      <section ref={radarRef} className="col-span-12 lg:col-span-8 lg:order-1 lg:self-start">
         <SpendRadar currency={ov.currency} year={ov.year} month={ov.month} />
       </section>
 
@@ -299,8 +329,11 @@ export default function OverviewPage() {
         )}
       </section>
 
-      <aside className="col-span-12 lg:col-span-5 lg:order-2 mt-6 lg:mt-0 space-y-8 text-sm">
-        <div className="border-t-2 border-ink pt-4">
+      <aside
+        className="col-span-12 lg:col-span-4 lg:order-2 mt-6 lg:mt-0 text-sm flex flex-col gap-6 lg:overflow-hidden"
+        style={!isMobile && !creditOpen && radarH ? { height: radarH } : undefined}
+      >
+        <div className="border-t-2 border-ink pt-4 shrink-0">
           <p className="smallcaps text-ink-mute">Credit Card</p>
           <p className="num text-2xl sm:text-3xl mt-1 text-accent break-words">
             {masked(fmtAmount(ov.credit.outstanding))}
@@ -329,9 +362,15 @@ export default function OverviewPage() {
           <p className="text-ink-mute text-[10px] mt-2">carried + paid − charges = outstanding</p>
         </div>
 
-        <div>
-          <p className="smallcaps text-ink-mute">{me?.sources_enabled === false ? "Currencies" : "Accounts"}</p>
-          <ul className="mt-2 divide-y divide-paper-rule">
+        <div className="flex flex-col min-h-0 lg:flex-1">
+          <p className="smallcaps text-ink-mute shrink-0">{me?.sources_enabled === false ? "Currencies" : "Accounts"}</p>
+          <ul
+            ref={accountsRef}
+            className={
+              "mt-2 divide-y divide-paper-rule min-h-0 " +
+              (!isMobile && !creditOpen ? "lg:flex-1 lg:overflow-hidden" : "")
+            }
+          >
             {me?.sources_enabled === false
               ? (currencies ?? []).map((c) => (
                   <li key={c.currency} className="py-2 flex justify-between items-baseline">
@@ -377,6 +416,30 @@ export default function OverviewPage() {
                 </li>
               ))}
           </ul>
+          {!isMobile && (canExpand || creditOpen) && (
+            <button
+              type="button"
+              onClick={() => setCreditOpen((o) => !o)}
+              aria-expanded={creditOpen}
+              className="shrink-0 mt-2 self-start smallcaps text-ink-mute hover:text-accent inline-flex items-center gap-1"
+            >
+              {creditOpen ? "Show less" : "Show all accounts"}
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                className={"transition-transform " + (creditOpen ? "rotate-180" : "")}
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+          )}
         </div>
       </aside>
     </div>
