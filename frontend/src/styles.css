@@ -205,6 +205,17 @@ select:focus-visible {
   background: rgba(160, 42, 26, 0.04);
 }
 
+/* Transactions: the body scrolls inside a bounded box so the desktop page
+   length stays put; the header sticks to the top. border-collapse drops a
+   sticky cell's border, so paint the header hairline as an inset shadow. */
+.tx-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-paper);
+  box-shadow: inset 0 -1px 0 var(--color-ink);
+}
+
 /* Decorative cross */
 .deco-cross {
   position: absolute;

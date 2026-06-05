@@ -11,7 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { api } from "@/api";
-import type { Me, Monthly } from "@/types";
+import type { CurrencyCode, Me, Monthly } from "@/types";
 import { fmtCompactMoney, fmtMoney, fmtShort, monthName, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 import { useAmountVisibility } from "@/lib/privacy";
@@ -42,6 +42,35 @@ type ChartRow = {
   Net: number;
   [key: string]: number | string;
 };
+
+// Recharts clones this into the chart and injects `active`/`payload`; we keep
+// the rest of the props bound from the page so it can format amounts. Shows the
+// hovered month's income/expense totals (works in plain and by-category modes).
+function TotalsTooltip({
+  active,
+  payload,
+  showAmounts,
+  currency,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: ChartRow }>;
+  showAmounts: boolean;
+  currency: CurrencyCode;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const row = payload[0].payload;
+  return (
+    <div className="bg-paper border border-ink px-3 py-2 text-[12px] shadow-sm">
+      <p className="smallcaps text-ink-mute mb-1">{monthName(Number(row.month))}</p>
+      <p className="num text-gain">
+        In · {showAmounts ? fmtMoney(Number(row.Income), currency) : "••••••"}
+      </p>
+      <p className="num text-accent">
+        Out · {showAmounts ? fmtMoney(Number(row.Expense), currency) : "••••••"}
+      </p>
+    </div>
+  );
+}
 
 export default function MonthlyPage() {
   const { showAmounts } = useAmountVisibility();
@@ -328,19 +357,13 @@ export default function MonthlyPage() {
               tickLine={false}
               width={72}
             />
-              {/* In category mode the per-category hover boxes are noise — the
-                  pop-up pie covers that — so the tooltip is totals-only. */}
-              {!byCategory && !isMobile && (
+              {/* Desktop hover shows the month's income/expense totals in both
+                  plain and by-category modes (the stacked segments alone don't
+                  reveal the totals). */}
+              {!isMobile && (
                 <Tooltip
-                  contentStyle={{
-                    background: "#f5efe3",
-                    border: "1px solid #19170f",
-                    borderRadius: 0,
-                    fontFamily: "Instrument Sans",
-                  }}
-                  formatter={(v: number) =>
-                    showAmounts ? fmtMoney(v, reportCurrency) : "••••••"
-                  }
+                  content={<TotalsTooltip showAmounts={showAmounts} currency={reportCurrency} />}
+                  cursor={{ fill: "rgba(120,110,90,0.12)" }}
                 />
               )}
             {byCategory ? (
@@ -352,7 +375,7 @@ export default function MonthlyPage() {
                     stackId="income"
                     name={tc.name}
                     fill={colorFor(i)}
-                    fillOpacity={0.55}
+                    fillOpacity={1}
                   />
                 ))}
                 <Bar
@@ -360,7 +383,7 @@ export default function MonthlyPage() {
                   stackId="income"
                   name="Other"
                   fill={OTHER_COLOR}
-                  fillOpacity={0.4}
+                  fillOpacity={1}
                   legendType="none"
                 />
                 {topCats.map((tc, i) => (
@@ -370,7 +393,7 @@ export default function MonthlyPage() {
                     stackId="expense"
                     name={tc.name}
                     fill={colorFor(i)}
-                    fillOpacity={0.55}
+                    fillOpacity={1}
                     legendType="none"
                   />
                 ))}
@@ -379,7 +402,7 @@ export default function MonthlyPage() {
                   stackId="expense"
                   name="Other"
                   fill={OTHER_COLOR}
-                  fillOpacity={0.4}
+                  fillOpacity={1}
                   legendType="none"
                 />
               </>

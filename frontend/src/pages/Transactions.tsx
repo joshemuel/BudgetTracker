@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Category, Me, Source, Transaction, TransactionList, TxType } from "@/types";
@@ -46,6 +46,7 @@ export default function TransactionsPage() {
   const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const isMobile = useIsMobile();
+  const tableScrollRef = useRef<HTMLDivElement>(null);
 
   const { data: cats } = useQuery<Category[]>({
     queryKey: ["categories"],
@@ -312,7 +313,11 @@ export default function TransactionsPage() {
           )}
         </ul>
       ) : (
-        <div>
+        <div
+          ref={tableScrollRef}
+          className="tx-scroll overflow-y-auto"
+          style={{ maxHeight: "calc(100vh - 30rem)" }}
+        >
           <table className="ledger-table w-full text-[13px]">
             <thead>
               <tr>
@@ -403,7 +408,8 @@ export default function TransactionsPage() {
                 e.preventDefault();
                 if (canPrev) {
                   setPage((p) => p - 1);
-                  window.scrollTo({ top: document.body.scrollHeight, behavior: "instant" });
+                  if (tableScrollRef.current) tableScrollRef.current.scrollTop = 0;
+                  else window.scrollTo({ top: 0, behavior: "instant" });
                 }
               }}
               disabled={!canPrev}
@@ -417,7 +423,8 @@ export default function TransactionsPage() {
                 e.preventDefault();
                 if (canNext) {
                   setPage((p) => p + 1);
-                  window.scrollTo({ top: 0, behavior: "instant" });
+                  if (tableScrollRef.current) tableScrollRef.current.scrollTop = 0;
+                  else window.scrollTo({ top: 0, behavior: "instant" });
                 }
               }}
               disabled={!canNext}

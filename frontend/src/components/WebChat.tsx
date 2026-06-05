@@ -107,10 +107,15 @@ function MicIcon() {
   );
 }
 
-export default function WebChat() {
+export default function WebChat({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const isMobile = useIsMobile();
-
-  const [open, setOpen] = useState(false);
+  const setOpen = onOpenChange;
   const [text, setText] = useState("");
   const [items, setItems] = useState<ChatItem[]>([
     { id: uid(), role: "leo", text: INITIAL_MESSAGE },

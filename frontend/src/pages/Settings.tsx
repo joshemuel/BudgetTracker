@@ -794,7 +794,7 @@ export function SourcesSettingsPage() {
   const { data: me } = useMe();
   const sourcesEnabled = me?.sources_enabled !== false;
   return (
-    <div className="max-w-3xl mx-auto">
+    <div>
       <CurrencyBlock sourcesEnabled={sourcesEnabled} />
       <SourcesBlock enabled={sourcesEnabled} />
     </div>
@@ -804,7 +804,7 @@ export function SourcesSettingsPage() {
 // Mobile Manage → "Categories" sub-tab.
 export function CategoriesSettingsPage() {
   return (
-    <div className="max-w-3xl mx-auto">
+    <div>
       <CategoriesBlock />
     </div>
   );
@@ -814,7 +814,7 @@ export function CategoriesSettingsPage() {
 export function AccountSettingsPage() {
   const { data: me } = useMe();
   return (
-    <div className="max-w-md prefs-compact mx-auto">
+    <div className="prefs-compact">
       <section className="mb-12">
         <PreferencesForm me={me} />
       </section>

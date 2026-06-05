@@ -372,7 +372,9 @@ export default function OverviewPage() {
             }
           >
             {me?.sources_enabled === false
-              ? (currencies ?? []).map((c) => (
+              ? [...(currencies ?? [])]
+                  .sort((a, b) => toNumber(b.current_balance) - toNumber(a.current_balance))
+                  .map((c) => (
                   <li key={c.currency} className="py-2 flex justify-between items-baseline">
                     <span className="font-[450]">{c.currency}</span>
                     <span className={`num ${toNumber(c.current_balance) < 0 ? "text-accent" : ""}`}>
@@ -387,6 +389,7 @@ export default function OverviewPage() {
                 ))
               : (sources ?? [])
               .filter((s) => s.active)
+              .sort((a, b) => toNumber(b.current_balance) - toNumber(a.current_balance))
               .map((s) => (
                 <li key={s.id} className="py-2 flex justify-between items-baseline">
                   <span className="font-[450]">

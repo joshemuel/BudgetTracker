@@ -344,7 +344,7 @@ function useSidebarCollapsed(): [boolean, () => void] {
 
 // Desktop left sidebar — the four top-level groups. Collapses to an icon rail.
 // Mobile uses BottomNav + GroupSubNav instead (this is hidden under sm).
-function Sidebar() {
+function Sidebar({ onOpenChat }: { onOpenChat: () => void }) {
   const { pathname } = useLocation();
   const [collapsed, toggle] = useSidebarCollapsed();
   return (
@@ -396,6 +396,35 @@ function Sidebar() {
                 </li>
               );
             })}
+            <li>
+              <button
+                type="button"
+                onClick={onOpenChat}
+                title={collapsed ? "Chat" : undefined}
+                className={
+                  "w-full flex items-center gap-3 rounded-sm border-l-2 border-transparent py-2 transition-colors text-rail-ink/65 hover:text-rail-ink hover:bg-rail-ink/5 " +
+                  (collapsed ? "justify-center px-0" : "px-2.5")
+                }
+              >
+                <span className="shrink-0">
+                  <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 12a8 8 0 0 1-12.2 6.8L3 20l1.3-4.8A8 8 0 1 1 21 12Z" />
+                  </svg>
+                </span>
+                {!collapsed && (
+                  <span className="smallcaps nav-tabs whitespace-nowrap">Chat</span>
+                )}
+              </button>
+            </li>
           </ul>
         </nav>
       </div>
@@ -444,6 +473,7 @@ export default function AppShell() {
     retry: false,
   });
   const [logOpen, setLogOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -496,7 +526,7 @@ export default function AppShell() {
             sidebar stretches all the way to the bottom edge, with the footer
             tucked into the content column rather than stranded beside it. */}
         <div className="sm:flex sm:flex-1">
-          <Sidebar />
+          <Sidebar onOpenChat={() => setChatOpen(true)} />
           <div className={`min-w-0 flex-1 ${pad} sm:pt-4`}>
             <SubTabNav />
             <GroupSubNav />
@@ -507,7 +537,7 @@ export default function AppShell() {
         </div>
       </div>
       <QuickLog open={logOpen} onClose={() => setLogOpen(false)} />
-      <WebChat />
+      <WebChat open={chatOpen} onOpenChange={setChatOpen} />
       <BottomNav />
       <IosInstallHelp
         open={isMobile && pwaInstall.showIosInstructions}
