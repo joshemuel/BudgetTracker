@@ -5,6 +5,7 @@ import {
   Pie,
   PieChart,
   ResponsiveContainer,
+  Sector,
   Tooltip,
 } from "recharts";
 import { api } from "@/api";
@@ -12,6 +13,7 @@ import type { CategoryStats, CurrencyCode, Me } from "@/types";
 import { fmtCompactMoney, fmtMoney, fmtPct, todayISO, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 import { useAmountVisibility } from "@/lib/privacy";
+import { useIsMobile } from "@/lib/mediaQuery";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
 import { useTheme } from "@/lib/theme";
 
@@ -43,6 +45,17 @@ export const PALETTE_DARK = [
   "#5fa48c",
 ];
 
+// Pick black or near-white text so an in-slice % label stays legible on any
+// palette colour (relative-luminance threshold).
+function labelColor(hex: string): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6 ? "#19170f" : "#f7f1e3";
+}
+
 function firstOfMonthISO(): string {
   const d = new Date();
   return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
@@ -67,7 +80,8 @@ export function CategoriesBreakdown({
   const tipBg = dark ? "#242019" : "#f5efe3";
   const tipBorder = dark ? "#4a4130" : "#19170f";
   const tipText = dark ? "#f4ecdb" : "#19170f";
-  const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
+  const isMobile = useIsMobile();
+  const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
 
   const { data } = useQuery<CategoryStats>({
     queryKey: ["category-stats", from, to, currency],
@@ -96,6 +110,71 @@ export function CategoriesBreakdown({
   const pieInnerRadius = compact ? (isMobile ? 38 : 54) : isMobile ? 46 : 70;
   const pieOuterRadius = compact ? (isMobile ? 72 : 104) : isMobile ? 86 : 130;
 
+  // Percentage printed inside each slice — the only place phone users can read
+  // shares (the mobile list drops the %). Tiny slices are skipped to avoid
+  // overlap; the % is a ratio, so it shows even when amounts are hidden.
+  const renderPieLabel = (props: {
+    cx: number;
+    cy: number;
+    midAngle: number;
+    innerRadius: number;
+    outerRadius: number;
+    percent: number;
+    index: number;
+  }) => {
+    const { cx, cy, midAngle, innerRadius, outerRadius, percent, index } = props;
+    if (percent < 0.06) return null;
+    const RAD = Math.PI / 180;
+    const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + r * Math.cos(-midAngle * RAD);
+    const y = cy + r * Math.sin(-midAngle * RAD);
+    return (
+      <text
+        x={x}
+        y={y}
+        fill={labelColor(palette[index % palette.length])}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontFamily="Instrument Sans"
+        fontWeight={600}
+        fontSize={compact && isMobile ? 9 : 11}
+      >
+        {Math.round(percent * 100)}%
+      </text>
+    );
+  };
+
+  // Tap/hover highlight: enlarge the active slice and draw a thin ink ring just
+  // outside it — outlines THAT segment instead of the old rectangular tooltip.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Recharts types activeShape as (props: unknown).
+  const renderActiveSector = (props: any) => {
+    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+    return (
+      <g>
+        <Sector
+          cx={cx}
+          cy={cy}
+          innerRadius={innerRadius}
+          outerRadius={outerRadius + 6}
+          startAngle={startAngle}
+          endAngle={endAngle}
+          fill={fill}
+          stroke={sliceGap}
+          strokeWidth={1}
+        />
+        <Sector
+          cx={cx}
+          cy={cy}
+          innerRadius={outerRadius + 7}
+          outerRadius={outerRadius + 9}
+          startAngle={startAngle}
+          endAngle={endAngle}
+          fill={dark ? "#f4ecdb" : "#19170f"}
+        />
+      </g>
+    );
+  };
+
   if (rows.length === 0) {
     return (
       <p className="text-ink-mute text-sm py-6 text-center border-t border-paper-rule">
@@ -117,25 +196,36 @@ export function CategoriesBreakdown({
               outerRadius={pieOuterRadius}
               stroke={sliceGap}
               strokeWidth={1}
+              label={renderPieLabel}
+              labelLine={false}
+              activeIndex={activeIndex}
+              activeShape={renderActiveSector}
+              onClick={(_, i) =>
+                setActiveIndex((prev) => (prev === i ? undefined : i))
+              }
+              onMouseEnter={isMobile ? undefined : (_, i) => setActiveIndex(i)}
+              onMouseLeave={isMobile ? undefined : () => setActiveIndex(undefined)}
             >
               {pieData.map((_, i) => (
                 <Cell key={i} fill={palette[i % palette.length]} />
               ))}
             </Pie>
-            <Tooltip
-              contentStyle={{
-                background: tipBg,
-                border: `1px solid ${tipBorder}`,
-                borderRadius: 0,
-                fontFamily: "Instrument Sans",
-                color: tipText,
-              }}
-              itemStyle={{ color: tipText }}
-              labelStyle={{ color: tipText }}
-              formatter={(v: number) =>
-                showAmounts ? fmtMoney(v, reportCurrency) : "••••••"
-              }
-            />
+            {!isMobile && (
+              <Tooltip
+                contentStyle={{
+                  background: tipBg,
+                  border: `1px solid ${tipBorder}`,
+                  borderRadius: 0,
+                  fontFamily: "Instrument Sans",
+                  color: tipText,
+                }}
+                itemStyle={{ color: tipText }}
+                labelStyle={{ color: tipText }}
+                formatter={(v: number) =>
+                  showAmounts ? fmtMoney(v, reportCurrency) : "••••••"
+                }
+              />
+            )}
           </PieChart>
         </ResponsiveContainer>
       </div>

@@ -4,7 +4,6 @@ import { api } from "@/api";
 import type { AdminUser, Category, CurrencyBalance, Me, Source } from "@/types";
 import { fmtMoney, formatAmountLive, handleAmountChange } from "@/lib/format";
 import { useAmountVisibility } from "@/lib/privacy";
-import { useIsMobile } from "@/lib/mediaQuery";
 import { SectionTitle } from "@/components/Figure";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import TrackAsOtherDialog from "@/components/TrackAsOtherDialog";
@@ -825,20 +824,8 @@ export function AccountSettingsPage() {
 }
 
 export default function SettingsPage() {
-  const isMobile = useIsMobile();
-  const { data: me } = useMe();
-  const sourcesEnabled = me?.sources_enabled !== false;
-
-  // On mobile the Manage tab fans these out into sibling sub-tabs, so /settings
-  // is just the "Sources" sub-tab. Desktop keeps the full single-page stack.
-  if (isMobile) return <SourcesSettingsPage />;
-
-  return (
-    <div className="max-w-3xl">
-      <CurrencyBlock sourcesEnabled={sourcesEnabled} />
-      <SourcesBlock enabled={sourcesEnabled} />
-      <CategoriesBlock />
-      {me?.is_admin && <AdminBlock />}
-    </div>
-  );
+  // The Manage group fans Settings into sibling sub-tabs on both mobile and
+  // desktop, so /settings is just the "Sources" sub-tab; Categories and Account
+  // live at their own routes.
+  return <SourcesSettingsPage />;
 }

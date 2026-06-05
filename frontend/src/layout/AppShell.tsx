@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
@@ -13,19 +13,11 @@ import QuickLog from "@/components/QuickLog";
 import UserPrefsMenu from "@/components/UserPrefsMenu";
 import WebChat from "@/components/WebChat";
 
-const nav = [
-  { to: "/", label: "Overview", end: true },
-  { to: "/monthly", label: "Monthly" },
-  { to: "/daily", label: "Daily" },
-  { to: "/transactions", label: "Transactions" },
-  { to: "/budgets", label: "Budgets" },
-  { to: "/settings", label: "Settings" },
-];
-
-// Mobile collapses the seven sections into four bottom-bar tabs. Multi-page
-// tabs expose their members through a segmented sub-nav (see GroupSubNav).
+// Single source of truth for navigation. Desktop renders these as a collapsible
+// left sidebar (top-level) plus a sub-tab strip (group.sub); mobile renders the
+// same groups as the bottom bar (BottomNav) + a segmented sub-nav (GroupSubNav).
 type SubLink = { to: string; label: string; end?: boolean };
-type MobileGroup = {
+type NavGroup = {
   key: "overview" | "activity" | "ledger" | "manage";
   label: string;
   to: string; // landing route when the tab is tapped
@@ -33,7 +25,7 @@ type MobileGroup = {
   sub?: SubLink[];
 };
 
-const mobileGroups: MobileGroup[] = [
+const navGroups: NavGroup[] = [
   { key: "overview", label: "Overview", to: "/", routes: ["/"] },
   {
     key: "activity",
@@ -60,7 +52,7 @@ const mobileGroups: MobileGroup[] = [
   },
 ];
 
-function NavIcon({ name }: { name: MobileGroup["key"] }) {
+function NavIcon({ name }: { name: NavGroup["key"] }) {
   const stroke = {
     fill: "none",
     stroke: "currentColor",
@@ -121,7 +113,7 @@ function BottomNav() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <ul className="grid grid-cols-4">
-        {mobileGroups.map((g) => {
+        {navGroups.map((g) => {
           const active = g.routes.includes(pathname);
           return (
             <li key={g.key}>
@@ -148,7 +140,7 @@ function BottomNav() {
 
 function GroupSubNav() {
   const { pathname } = useLocation();
-  const group = mobileGroups.find((g) => g.routes.includes(pathname));
+  const group = navGroups.find((g) => g.routes.includes(pathname));
   if (!group?.sub) return null;
   return (
     <nav className="sm:hidden pt-3 pb-1">
@@ -329,16 +321,100 @@ function IosInstallHelp({ open, onClose }: { open: boolean; onClose: () => void 
   );
 }
 
-// Desktop section nav. Mobile uses the BottomNav + GroupSubNav instead.
-function SectionNav() {
+// Persisted collapsed/expanded state for the desktop sidebar (mirrors the
+// localStorage pattern used by the theme toggle).
+const SIDEBAR_KEY = "bt_sidebar_collapsed";
+function useSidebarCollapsed(): [boolean, () => void] {
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(SIDEBAR_KEY) === "1";
+  });
+  const toggle = useCallback(() => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        localStorage.setItem(SIDEBAR_KEY, next ? "1" : "0");
+      }
+      return next;
+    });
+  }, []);
+  return [collapsed, toggle];
+}
+
+// Desktop left sidebar — the four top-level groups. Collapses to an icon rail.
+// Mobile uses BottomNav + GroupSubNav instead (this is hidden under sm).
+function Sidebar() {
+  const { pathname } = useLocation();
+  const [collapsed, toggle] = useSidebarCollapsed();
   return (
-    <nav className="hidden sm:block py-3 border-b border-paper-rule">
+    <aside
+      className={
+        "hidden sm:flex flex-col shrink-0 sticky top-4 self-start border-r border-paper-rule pr-3 mr-1 transition-[width] " +
+        (collapsed ? "w-14" : "w-44")
+      }
+    >
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        aria-expanded={!collapsed}
+        title={collapsed ? "Expand" : "Collapse"}
+        className="self-end mb-2 w-7 h-7 rounded-sm border border-paper-rule text-ink-mute hover:text-ink hover:border-ink transition-colors flex items-center justify-center"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {collapsed ? <path d="M9 6l6 6-6 6" /> : <path d="M15 6l-6 6 6 6" />}
+        </svg>
+      </button>
+      <nav>
+        <ul className="flex flex-col gap-1">
+          {navGroups.map((g) => {
+            const active = g.routes.includes(pathname);
+            return (
+              <li key={g.key}>
+                <Link
+                  to={g.to}
+                  aria-current={active ? "page" : undefined}
+                  title={collapsed ? g.label : undefined}
+                  className={
+                    "flex items-center gap-3 rounded-sm border-l-2 py-2 transition-colors " +
+                    (collapsed ? "justify-center px-0" : "px-2.5") +
+                    " " +
+                    (active
+                      ? "border-accent text-accent bg-accent/5"
+                      : "border-transparent text-ink-soft hover:text-ink hover:border-paper-rule")
+                  }
+                >
+                  <span className="shrink-0">
+                    <NavIcon name={g.key} />
+                  </span>
+                  {!collapsed && (
+                    <span className="smallcaps nav-tabs whitespace-nowrap">{g.label}</span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+    </aside>
+  );
+}
+
+// Desktop sub-tabs for the active group (Activity → Monthly/Daily, Manage →
+// Budgets/Sources/Categories/Account). Mirrors the old top-nav underline look.
+// Mobile uses GroupSubNav (segmented pills) instead.
+function SubTabNav() {
+  const { pathname } = useLocation();
+  const group = navGroups.find((g) => g.routes.includes(pathname));
+  if (!group?.sub) return null;
+  return (
+    <nav className="hidden sm:block pb-3 mb-2 border-b border-paper-rule">
       <ul className="flex flex-wrap gap-x-6 gap-y-2 smallcaps nav-tabs">
-        {nav.map((n) => (
-          <li key={n.to}>
+        {group.sub.map((s) => (
+          <li key={s.to}>
             <NavLink
-              to={n.to}
-              end={n.end}
+              to={s.to}
+              end={s.end}
               className={({ isActive }) =>
                 "block pb-1 border-b-2 whitespace-nowrap transition-colors " +
                 (isActive
@@ -346,7 +422,7 @@ function SectionNav() {
                   : "text-ink-soft hover:text-ink border-transparent")
               }
             >
-              {n.label}
+              {s.label}
             </NavLink>
           </li>
         ))}
@@ -407,11 +483,16 @@ export default function AppShell() {
   return (
     <div className="max-w-[1160px] lg:max-w-[1220px] mx-auto px-3 sm:px-4 md:px-5 lg:px-6 xl:px-8 pb-24 sm:pb-0">
       <Masthead me={me} onLog={() => setLogOpen(true)} install={installCta} />
-      <SectionNav />
-      <GroupSubNav />
-      <main className="py-7 sm:py-10 md:py-12 lg:py-14">
-        <Outlet />
-      </main>
+      <div className="sm:flex sm:gap-6 lg:gap-8">
+        <Sidebar />
+        <div className="min-w-0 flex-1">
+          <SubTabNav />
+          <GroupSubNav />
+          <main className="py-7 sm:py-10 md:py-12 lg:py-14">
+            <Outlet />
+          </main>
+        </div>
+      </div>
       <footer className="py-10 sm:py-14 border-t border-paper-rule flex sm:justify-end smallcaps text-ink-mute">
         <span>
           Press <kbd className="px-1 border border-paper-rule num">N</kbd> to log
