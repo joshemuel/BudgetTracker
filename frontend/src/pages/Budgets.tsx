@@ -7,13 +7,14 @@ import { SectionTitle } from "@/components/Figure";
 import { useAmountVisibility } from "@/lib/privacy";
 import Subscriptions from "@/pages/Subscriptions";
 
-type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
+type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD" | "USD";
 
 function currencySymbol(c: CurrencyCode): string {
   if (c === "IDR") return "Rp";
   if (c === "SGD") return "S$";
   if (c === "JPY") return "JP¥";
   if (c === "TWD") return "NT$";
+  if (c === "USD") return "US$";
   return "A$";
 }
 

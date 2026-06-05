@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
-from app.db.models import Category, Source, Subscription, SubscriptionCharge, User
+from app.db.models import Category, Source, Subscription, SubscriptionCharge, Transaction, User
 from app.schemas.subscriptions import (
     ChargeOut,
     SubscriptionIn,
@@ -21,7 +21,7 @@ from app.services.currency_mode import default_source_for_currency, normalize_cu
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
-SUPPORTED_CURRENCIES = {"IDR", "SGD", "JPY", "AUD", "TWD"}
+SUPPORTED_CURRENCIES = {"IDR", "SGD", "JPY", "AUD", "TWD", "USD"}
 
 
 def _report_currency(user: User, currency: str | None) -> str:
@@ -188,6 +188,18 @@ def delete_subscription(
     sub = db.query(Subscription).filter_by(id=sub_id, user_id=user.id).one_or_none()
     if sub is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Subscription not found")
+    # Confirmed charges materialize into transactions that hold an FK back to
+    # the charge (transactions.subscription_charge_id, RESTRICT). Detach them
+    # first so the charges cascade-delete cleanly; the transactions (real
+    # spending history) are preserved.
+    charge_ids = [
+        cid
+        for (cid,) in db.query(SubscriptionCharge.id).filter_by(subscription_id=sub_id).all()
+    ]
+    if charge_ids:
+        db.query(Transaction).filter(
+            Transaction.subscription_charge_id.in_(charge_ids)
+        ).update({Transaction.subscription_charge_id: None}, synchronize_session=False)
     db.delete(sub)
     db.commit()
 

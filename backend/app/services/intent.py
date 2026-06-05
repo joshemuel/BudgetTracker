@@ -46,18 +46,23 @@ def classify(text: str, categories: list[str], sources: list[str]) -> dict[str, 
     - "query": Asking a question about finances, requesting a summary, or asking for analysis
     - "show_credit": Asking about credit card balance/due (e.g., "how much do I owe on credit", "show credit card balance")
     - "delete_last": Deleting the most recent transaction ("delete last transaction", "undo last log")
+    - "manage": MANAGING the user's setup — creating/renaming/deleting a category or source (account/wallet/card), or deleting a subscription. Examples: "add a category called Pets", "rename source BCA to BCA Debit", "delete the Coffee category", "remove my Netflix subscription", "create a new wallet GoPay".
+    - "unsupported": The user asks the bot to do something it cannot do (e.g., "export my data to Excel", "change my password", "email me a report", "edit a budget limit").
 
     Current categories: {cats}
     Current sources: {srcs}
 
     Transfers like "transferred 10k from BCA to GoPay" are always "log".
-    "Credit payment 500k" or "paid credit card bill" are "log" (they're transactions).
+    "Credit payment 500k" or "paid credit card bill" are "log" (they're transactions), NOT manage.
+    Recording money is "log"; changing the LIST of categories/sources or deleting a subscription is "manage".
 
     Return a JSON object based on intent:
     - log: {{"type": "log"}}
     - query: {{"type": "query"}}
     - show_credit: {{"type": "show_credit"}}
     - delete_last: {{"type": "delete_last"}}
+    - manage: {{"type": "manage", "entity": "category"|"source"|"subscription"|"currency", "action": "create"|"rename"|"delete", "name": "<target name exactly as the user said>", "new_name": "<new name, only for rename, else null>"}}
+    - unsupported: {{"type": "unsupported"}}
     """
     try:
         raw = llm.call_logging(prompt, json_mode=True)

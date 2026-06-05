@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "@/api";
 import type { Me, Source } from "@/types";
 
-const CURRENCIES = ["IDR", "SGD", "JPY", "AUD", "TWD"] as const;
+const CURRENCIES = ["IDR", "SGD", "JPY", "AUD", "TWD", "USD"] as const;
 
 /**
  * The preferences body — default currency/source, tracking mode, save, and the
@@ -163,7 +163,7 @@ export default function PreferencesForm({
             type="button"
             onClick={() => setSourcesEnabled(true)}
             aria-pressed={sourcesEnabled}
-            className={`min-h-[40px] py-1.5 smallcaps border-r border-ink ${
+            className={`min-h-[28px] sm:min-h-[40px] py-1 sm:py-1.5 smallcaps border-r border-ink ${
               sourcesEnabled ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
             }`}
           >
@@ -173,7 +173,7 @@ export default function PreferencesForm({
             type="button"
             onClick={() => setSourcesEnabled(false)}
             aria-pressed={!sourcesEnabled}
-            className={`min-h-[40px] py-1.5 smallcaps ${
+            className={`min-h-[28px] sm:min-h-[40px] py-1 sm:py-1.5 smallcaps ${
               !sourcesEnabled ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
             }`}
           >

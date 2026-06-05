@@ -28,6 +28,7 @@ const SYMBOL_BY_CURRENCY: Record<string, string> = {
   JPY: "JP¥",
   AUD: "A$",
   TWD: "NT$",
+  USD: "US$",
 };
 
 function parseRawAmount(raw: string): string {
@@ -41,7 +42,7 @@ function parseRawAmount(raw: string): string {
 }
 
 function displayAmount(raw: string, currency: string): string {
-  const code = (currency || "IDR") as "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
+  const code = (currency || "IDR") as "IDR" | "SGD" | "JPY" | "AUD" | "TWD" | "USD";
   const symbol = SYMBOL_BY_CURRENCY[code] ?? code;
   return fmtMoney(parseRawAmount(raw), code).replace(`${symbol} `, "");
 }

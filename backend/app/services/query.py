@@ -20,7 +20,7 @@ def _tx_csv(db: Session, user_id: int) -> str:
         db.query(Transaction)
         .filter(Transaction.user_id == user_id, Transaction.deleted_at.is_(None))
         .order_by(Transaction.occurred_at.desc())
-        .limit(500)
+        .limit(250)
         .all()
     )
     cats = {c.id: c.name for c in db.query(Category).filter_by(user_id=user_id).all()}

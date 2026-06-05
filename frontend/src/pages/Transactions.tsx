@@ -16,8 +16,8 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { useAmountVisibility } from "@/lib/privacy";
 import { useIsMobile } from "@/lib/mediaQuery";
 
-type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
-const CURRENCIES: CurrencyCode[] = ["IDR", "SGD", "JPY", "AUD", "TWD"];
+type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD" | "USD";
+const CURRENCIES: CurrencyCode[] = ["IDR", "SGD", "JPY", "AUD", "TWD", "USD"];
 
 function toLocalDateTimeInput(iso: string): string {
   const d = new Date(iso);

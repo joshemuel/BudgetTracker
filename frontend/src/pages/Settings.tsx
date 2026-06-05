@@ -10,7 +10,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import TrackAsOtherDialog from "@/components/TrackAsOtherDialog";
 import PreferencesForm from "@/components/PreferencesForm";
 
-const CURRENCIES = ["IDR", "SGD", "JPY", "AUD", "TWD"] as const;
+const CURRENCIES = ["IDR", "SGD", "JPY", "AUD", "TWD", "USD"] as const;
 type CurrencyCode = (typeof CURRENCIES)[number];
 
 function currencySymbol(c: CurrencyCode): string {
@@ -18,6 +18,7 @@ function currencySymbol(c: CurrencyCode): string {
   if (c === "SGD") return "S$";
   if (c === "JPY") return "JP¥";
   if (c === "TWD") return "NT$";
+  if (c === "USD") return "US$";
   return "A$";
 }
 
@@ -236,6 +237,7 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
   const [editName, setEditName] = useState("");
   const [editCurrentFundsInput, setEditCurrentFundsInput] = useState("0");
   const [editCurrency, setEditCurrency] = useState<CurrencyCode>("IDR");
+  const [editIsCc, setEditIsCc] = useState(false);
   const [confirmTrack, setConfirmTrack] = useState<{
     id: number;
     body: Record<string, unknown>;
@@ -245,7 +247,7 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
     mutationFn: () =>
       api.post("/sources", {
         name,
-        is_credit_card: isCc,
+        is_credit_card: isCc || /credit\s*card/i.test(name),
         current_balance: parseDisplayAmount(currentFundsInput),
         currency,
       }),
@@ -311,6 +313,7 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
                       setEditName(s.name);
                       setEditCurrentFundsInput(normalizeInput(String(s.current_balance), s.currency));
                       setEditCurrency(s.currency);
+                      setEditIsCc(s.is_credit_card);
                     }}
                     className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2 mr-1"
                   >
@@ -376,6 +379,14 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
                   ))}
                 </select>
               </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={editIsCc}
+                  onChange={(e) => setEditIsCc(e.target.checked)}
+                />
+                <span className="smallcaps text-ink-mute">Credit card</span>
+              </label>
               <div className="flex gap-2 mt-4">
                 <button
                   onClick={() => {
@@ -395,6 +406,9 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
                     }
                     if (editCurrency !== editing.currency) {
                       body.currency = editCurrency;
+                    }
+                    if (editIsCc !== editing.is_credit_card) {
+                      body.is_credit_card = editIsCc;
                     }
                     if (Object.keys(body).length === 0) {
                       setEditing(null);
@@ -801,7 +815,7 @@ export function CategoriesSettingsPage() {
 export function AccountSettingsPage() {
   const { data: me } = useMe();
   return (
-    <div className="max-w-md">
+    <div className="max-w-md prefs-compact">
       <section className="mb-12">
         <PreferencesForm me={me} />
       </section>

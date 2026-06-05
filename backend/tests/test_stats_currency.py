@@ -44,7 +44,7 @@ def test_monthly_and_daily_accept_currency_override(auth_client: TestClient):
 
 
 def test_stats_reject_unsupported_currency(auth_client: TestClient):
-    r = auth_client.get("/stats/overview?currency=USD")
+    r = auth_client.get("/stats/overview?currency=EUR")
     assert r.status_code == 400
 
 

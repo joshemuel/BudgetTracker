@@ -60,6 +60,6 @@ def test_create_budget_rejects_unsupported_currency(auth_client: TestClient):
 
     r = auth_client.post(
         "/budgets",
-        json={"category_id": cat_id, "monthly_limit": "100", "currency": "USD"},
+        json={"category_id": cat_id, "monthly_limit": "100", "currency": "EUR"},
     )
     assert r.status_code == 422

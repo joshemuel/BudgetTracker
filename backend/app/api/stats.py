@@ -11,7 +11,7 @@ from app.services import daily_summary, fx
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
-SUPPORTED_CURRENCIES = {"IDR", "SGD", "JPY", "AUD", "TWD"}
+SUPPORTED_CURRENCIES = {"IDR", "SGD", "JPY", "AUD", "TWD", "USD"}
 
 
 def _round_currency(v: Decimal, currency: str) -> Decimal:
@@ -320,6 +320,7 @@ def monthly(
     db: Session = Depends(get_db),
     year: int = Query(default=None),
     currency: str | None = Query(default=None),
+    breakdown: str | None = Query(default=None),
 ):
     if year is None:
         year = datetime.now(timezone.utc).year
@@ -339,32 +340,66 @@ def monthly(
     if excluded_category_ids:
         conditions.append(~Transaction.category_id.in_(excluded_category_ids))
 
+    want_categories = breakdown == "category"
+
     rows = db.execute(
-        select(Transaction.occurred_at, Transaction.type, Transaction.amount, Transaction.currency)
-        .where(*conditions)
+        select(
+            Transaction.occurred_at,
+            Transaction.type,
+            Transaction.amount,
+            Transaction.currency,
+            Transaction.category_id,
+        ).where(*conditions)
     ).all()
 
     by_month: dict[int, dict[str, Decimal]] = {
         m: {"income": Decimal("0"), "expense": Decimal("0")} for m in range(1, 13)
     }
-    for occurred_at, t_type, amount, currency in rows:
+    # by_month_cat[month][category_id] = {"income": Decimal, "expense": Decimal}
+    by_month_cat: dict[int, dict[int, dict[str, Decimal]]] = {m: {} for m in range(1, 13)}
+    cat_totals: dict[int, Decimal] = {}
+    for occurred_at, t_type, amount, t_currency, category_id in rows:
         m = int(occurred_at.month)
-        amount_report = fx.convert(Decimal(amount), currency or "IDR", report_currency, rates)
-        by_month[m]["income" if t_type == "income" else "expense"] += amount_report
+        kind = "income" if t_type == "income" else "expense"
+        amount_report = fx.convert(Decimal(amount), t_currency or "IDR", report_currency, rates)
+        by_month[m][kind] += amount_report
+        if want_categories:
+            slot = by_month_cat[m].setdefault(
+                category_id, {"income": Decimal("0"), "expense": Decimal("0")}
+            )
+            slot[kind] += amount_report
+            cat_totals[category_id] = cat_totals.get(category_id, Decimal("0")) + amount_report
 
     out = []
     for m in range(1, 13):
         inc = by_month[m]["income"]
         exp = by_month[m]["expense"]
-        out.append(
-            {
-                "month": m,
-                "income": str(_round_currency(inc, report_currency)),
-                "expense": str(_round_currency(exp, report_currency)),
-                "net": str(_round_currency(inc - exp, report_currency)),
-            }
-        )
-    return {"year": year, "currency": report_currency, "months": out}
+        row = {
+            "month": m,
+            "income": str(_round_currency(inc, report_currency)),
+            "expense": str(_round_currency(exp, report_currency)),
+            "net": str(_round_currency(inc - exp, report_currency)),
+        }
+        if want_categories:
+            row["categories"] = [
+                {
+                    "category_id": cid,
+                    "income": str(_round_currency(vals["income"], report_currency)),
+                    "expense": str(_round_currency(vals["expense"], report_currency)),
+                }
+                for cid, vals in by_month_cat[m].items()
+            ]
+        out.append(row)
+
+    result = {"year": year, "currency": report_currency, "months": out}
+    if want_categories:
+        names = {c.id: c.name for c in db.query(Category).filter_by(user_id=user.id).all()}
+        # Sorted by yearly total so the frontend can take the most significant.
+        ordered = sorted(cat_totals.items(), key=lambda kv: kv[1], reverse=True)
+        result["categories"] = [
+            {"category_id": cid, "name": names.get(cid, "")} for cid, _total in ordered
+        ]
+    return result
 
 
 @router.get("/daily")

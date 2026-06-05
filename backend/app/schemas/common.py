@@ -10,7 +10,7 @@ class SourceIn(BaseModel):
     name: str = Field(min_length=1, max_length=64)
     current_balance: Decimal | None = None
     starting_balance: Decimal = Decimal("0")
-    currency: str = Field(default="IDR", pattern="^(IDR|SGD|JPY|AUD|TWD)$")
+    currency: str = Field(default="IDR", pattern="^(IDR|SGD|JPY|AUD|TWD|USD)$")
     is_credit_card: bool = False
     active: bool = True
 
@@ -19,7 +19,7 @@ class SourceUpdate(BaseModel):
     name: str | None = None
     current_balance: Decimal | None = None
     starting_balance: Decimal | None = None
-    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD)$")
+    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD|USD)$")
     is_credit_card: bool | None = None
     active: bool | None = None
     # When a manual balance change creates a reconciliation delta, record it under
@@ -73,12 +73,12 @@ class CategoryOut(BaseModel):
 class BudgetIn(BaseModel):
     category_id: int
     monthly_limit: Decimal
-    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD)$")
+    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD|USD)$")
 
 
 class BudgetUpdate(BaseModel):
     monthly_limit: Decimal | None = None
-    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD)$")
+    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD|USD)$")
 
 
 class BudgetOut(BaseModel):
@@ -98,7 +98,7 @@ class TransactionIn(BaseModel):
     category_id: int
     amount: Decimal
     source_id: int | None = None
-    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD)$")
+    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD|USD)$")
     description: str | None = None
     transfer_group_id: UUID | None = None
 
@@ -117,7 +117,7 @@ class TransactionUpdate(BaseModel):
     category_id: int | None = None
     amount: Decimal | None = None
     source_id: int | None = None
-    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD)$")
+    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD|USD)$")
     description: str | None = None
 
 

@@ -11,7 +11,7 @@ ChargeStatus = Literal["pending", "confirmed", "skipped"]
 class SubscriptionIn(BaseModel):
     name: str = Field(min_length=1, max_length=128)
     amount: Decimal
-    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD)$")
+    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD|USD)$")
     source_id: int | None = None
     category_id: int
     billing_day: int = Field(ge=1, le=31)
@@ -25,7 +25,7 @@ class SubscriptionIn(BaseModel):
 class SubscriptionUpdate(BaseModel):
     name: str | None = None
     amount: Decimal | None = None
-    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD)$")
+    currency: str | None = Field(default=None, pattern="^(IDR|SGD|JPY|AUD|TWD|USD)$")
     source_id: int | None = None
     category_id: int | None = None
     billing_day: int | None = Field(default=None, ge=1, le=31)

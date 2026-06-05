@@ -9,6 +9,7 @@ const CURRENCY_SYMBOL: Record<string, string> = {
   JPY: "JP¥",
   AUD: "A$",
   TWD: "NT$",
+  USD: "US$",
 };
 
 function compactKM(n: number): string | null {
@@ -34,7 +35,7 @@ export function fmtIDR(v: string | number | null | undefined): string {
 
 export function fmtMoney(
   v: string | number | null | undefined,
-  currency: "IDR" | "SGD" | "JPY" | "AUD" | "TWD" = "IDR"
+  currency: "IDR" | "SGD" | "JPY" | "AUD" | "TWD" | "USD" = "IDR"
 ): string {
   const n = toNumber(v);
   const fixedDecimals = currency === "JPY" ? 0 : 2;
@@ -47,7 +48,7 @@ export function fmtMoney(
 
 export function fmtCompactMoney(
   v: string | number | null | undefined,
-  currency: "IDR" | "SGD" | "JPY" | "AUD" | "TWD" = "IDR"
+  currency: "IDR" | "SGD" | "JPY" | "AUD" | "TWD" | "USD" = "IDR"
 ): string {
   const n = toNumber(v);
   const symbol = CURRENCY_SYMBOL[currency] ?? currency;
@@ -58,7 +59,7 @@ export function fmtCompactMoney(
 
 export function fmtShort(
   v: string | number | null | undefined,
-  currency: "IDR" | "SGD" | "JPY" | "AUD" | "TWD" = "IDR"
+  currency: "IDR" | "SGD" | "JPY" | "AUD" | "TWD" | "USD" = "IDR"
 ): string {
   const n = toNumber(v);
   const symbol = CURRENCY_SYMBOL[currency] ?? currency;
@@ -77,7 +78,7 @@ export function fmtPct(v: number): string {
   return (v * 100).toFixed(0) + "%";
 }
 
-type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
+type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD" | "USD";
 
 function groupDigits(digits: string): string {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -138,15 +139,17 @@ export function handleAmountChange(
 ): void {
   const prev = el.value;
   const caret = el.selectionStart ?? prev.length;
-  const digitsBefore = prev.slice(0, caret).replace(/[^0-9]/g, "").length;
+  // Count "significant" characters before the caret — digits, the decimal
+  // point and a leading minus — since those survive reformatting in order.
+  // Only grouping commas are inserted/removed, so they're the lone exception.
+  const sigBefore = prev.slice(0, caret).replace(/[^0-9.\-]/g, "").length;
   const next = formatAmountLive(prev, currency);
   setValue(next);
   requestAnimationFrame(() => {
     let pos = 0;
     let seen = 0;
-    while (pos < next.length && seen < digitsBefore) {
-      const code = next.charCodeAt(pos);
-      if (code >= 48 && code <= 57) seen++;
+    while (pos < next.length && seen < sigBefore) {
+      if (next[pos] !== ",") seen++;
       pos++;
     }
     try {

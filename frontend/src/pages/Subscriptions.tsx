@@ -10,8 +10,8 @@ import { useAmountVisibility } from "@/lib/privacy";
 import { useIsMobile } from "@/lib/mediaQuery";
 
 type Frequency = "monthly" | "yearly";
-type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
-const CURRENCIES: CurrencyCode[] = ["IDR", "SGD", "JPY", "AUD", "TWD"];
+type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD" | "USD";
+const CURRENCIES: CurrencyCode[] = ["IDR", "SGD", "JPY", "AUD", "TWD", "USD"];
 type Subscription = {
   id: number;
   name: string;
@@ -273,6 +273,10 @@ export default function SubscriptionsPage() {
       setPendingDelete(null);
     },
   });
+  const deleteError =
+    del.isError && pendingDelete
+      ? (del.error as Error)?.message || "Could not delete subscription"
+      : null;
   const confirmCharge = useMutation({
     mutationFn: (id: number) => api.post(`/subscriptions/charges/${id}/confirm`),
     onSuccess: () => {
@@ -516,8 +520,12 @@ export default function SubscriptionsPage() {
         message="This removes the recurring definition and future scheduled charges."
         confirmLabel="Delete"
         busy={del.isPending}
+        error={deleteError}
         onClose={() => {
-          if (!del.isPending) setPendingDelete(null);
+          if (!del.isPending) {
+            del.reset();
+            setPendingDelete(null);
+          }
         }}
         onConfirm={() => {
           if (pendingDelete) del.mutate(pendingDelete.id);

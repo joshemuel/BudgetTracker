@@ -13,7 +13,7 @@ from app.db.session import SessionLocal
 
 log = logging.getLogger(__name__)
 
-SUPPORTED = {"IDR", "SGD", "JPY", "AUD", "TWD"}
+SUPPORTED = {"IDR", "SGD", "JPY", "AUD", "TWD", "USD"}
 STATE_KEY = "FX_RATES_USD"
 
 

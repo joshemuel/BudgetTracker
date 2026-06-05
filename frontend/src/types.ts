@@ -1,4 +1,4 @@
-export type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD";
+export type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD" | "USD";
 
 export type Me = {
   id: number;
@@ -99,8 +99,20 @@ export type Overview = {
   credit: { outstanding: string; month_charges: string; month_payments: string };
 };
 
-export type MonthlyRow = { month: number; income: string; expense: string; net: string };
-export type Monthly = { year: number; currency: CurrencyCode; months: MonthlyRow[] };
+export type MonthlyCategoryAmount = { category_id: number; income: string; expense: string };
+export type MonthlyRow = {
+  month: number;
+  income: string;
+  expense: string;
+  net: string;
+  categories?: MonthlyCategoryAmount[];
+};
+export type Monthly = {
+  year: number;
+  currency: CurrencyCode;
+  months: MonthlyRow[];
+  categories?: { category_id: number; name: string }[];
+};
 
 export type DailyRow = { day: number; income: string; expense: string };
 export type Daily = { year: number; month: number; currency: CurrencyCode; days: DailyRow[] };

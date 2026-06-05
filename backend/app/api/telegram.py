@@ -6,13 +6,14 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Callable
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin, get_current_user, get_db
 from app.config import get_settings
-from app.db.models import AppState, Category, Source, Transaction, User
+from app.db.models import AppState, Category, Source, Subscription, Transaction, User
+from app.db.session import SessionLocal
 from app.services import financial, intent, query, telegram
 from app.services.auth import verify_password
 from app.services.currency_mode import default_source_for_currency
@@ -39,7 +40,18 @@ CREDIT_HELP_EMPTY = "No credit cards configured yet."
 PENDING_SOURCE_PREFIX = "PENDING_SOURCE_CREATE"
 PENDING_SOURCE_CHOICE_PREFIX = "PENDING_SOURCE_CHOICE"
 PENDING_TX_EDIT_PREFIX = "PENDING_TX_EDIT"
+PENDING_MANAGE_PREFIX = "PENDING_MANAGE"
 SendFn = Callable[[int | str, str], None]
+
+# Shown when the user asks for something the bot can't do, or attempts a
+# management action outside its scope. Keep it honest about the boundaries.
+CAPABILITIES_MSG = (
+    "I can't do that one here. From Telegram I can log spending/income, answer "
+    "questions about your finances, show your credit card balance, delete the last "
+    "entry, and manage your setup: create/rename/delete categories and sources, and "
+    "delete subscriptions. For budgets, password, exports, or editing a subscription, "
+    "use the app."
+)
 
 
 def _emit_message(
@@ -211,6 +223,234 @@ def _clear_pending_tx_edit_state(db: Session, user_id: int) -> None:
     if state is not None:
         db.delete(state)
         db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Management flow (create/rename/delete categories & sources, delete subs).
+# Reuses the AppState pending-state pattern + an inline Confirm/Cancel keyboard
+# so destructive changes always require a second tap.
+# ---------------------------------------------------------------------------
+
+
+def _pending_manage_key(user_id: int) -> str:
+    return f"{PENDING_MANAGE_PREFIX}:{user_id}"
+
+
+def _pending_manage_state(db: Session, user_id: int) -> AppState | None:
+    return db.query(AppState).filter_by(key=_pending_manage_key(user_id)).one_or_none()
+
+
+def _set_pending_manage_state(db: Session, user_id: int, payload: dict[str, Any]) -> None:
+    state = _pending_manage_state(db, user_id)
+    if state is None:
+        db.add(AppState(key=_pending_manage_key(user_id), value=payload))
+    else:
+        state.value = payload
+    db.commit()
+
+
+def _clear_pending_manage_state(db: Session, user_id: int) -> None:
+    state = _pending_manage_state(db, user_id)
+    if state is not None:
+        db.delete(state)
+        db.commit()
+
+
+def _manage_keyboard() -> dict:
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "✅ Confirm", "callback_data": "mng:confirm"},
+                {"text": "✖️ Cancel", "callback_data": "mng:cancel"},
+            ]
+        ]
+    }
+
+
+def _find_by_name(rows: list, name: str):
+    """Case-insensitive exact match on a `.name` attribute."""
+    needle = name.strip().lower()
+    for row in rows:
+        if (row.name or "").strip().lower() == needle:
+            return row
+    return None
+
+
+def _handle_manage(
+    db: Session,
+    user: User,
+    chat_id: int | str,
+    itn: dict[str, Any],
+    send_fn: SendFn | None = None,
+) -> None:
+    # The confirmation step relies on inline-keyboard callbacks, which only exist
+    # on Telegram. Web chat has the full Manage UI, so point users there.
+    if send_fn is not None:
+        _emit_message(chat_id, "Manage categories, sources, and subscriptions from the Manage tab in the app.", send_fn)
+        return
+
+    entity = str(itn.get("entity") or "").strip().lower()
+    action = str(itn.get("action") or "").strip().lower()
+    name = str(itn.get("name") or "").strip()
+    new_name = str(itn.get("new_name") or "").strip() or None
+
+    if entity == "currency":
+        _emit_message(
+            chat_id,
+            "Currencies come from your sources — add a source in that currency to start using it "
+            "(e.g. \"create a wallet USD Cash\"). I can't add a bare currency here.",
+        )
+        return
+
+    if entity not in {"category", "source", "subscription"} or action not in {"create", "rename", "delete"}:
+        _emit_message(chat_id, CAPABILITIES_MSG)
+        return
+
+    if not name:
+        _emit_message(chat_id, "Which one? Tell me the name, e.g. \"delete the Coffee category\".")
+        return
+
+    payload: dict[str, Any] = {"entity": entity, "action": action, "name": name, "new_name": new_name}
+
+    if entity == "subscription":
+        if action != "delete":
+            _emit_message(chat_id, "I can delete subscriptions here; create or edit them in the app.")
+            return
+        sub = _find_by_name(
+            db.query(Subscription).filter_by(user_id=user.id, active=True).all(), name
+        )
+        if sub is None:
+            _emit_message(chat_id, f"I couldn't find an active subscription called '{name}'.")
+            return
+        payload["target_id"] = sub.id
+        preview = f"Delete subscription '{sub.name}'? This stops future charges."
+
+    elif entity == "category":
+        rows = db.query(Category).filter_by(user_id=user.id).all()
+        target = _find_by_name(rows, name)
+        if action == "create":
+            if target is not None:
+                _emit_message(chat_id, f"Category '{target.name}' already exists.")
+                return
+            preview = f"Create category '{name}'?"
+        elif action == "rename":
+            if target is None:
+                _emit_message(chat_id, f"I couldn't find a category called '{name}'.")
+                return
+            if not new_name:
+                _emit_message(chat_id, f"Rename '{name}' to what? Try \"rename category {name} to <new name>\".")
+                return
+            payload["target_id"] = target.id
+            preview = f"Rename category '{target.name}' to '{new_name}'?"
+        else:  # delete
+            if target is None:
+                _emit_message(chat_id, f"I couldn't find a category called '{name}'.")
+                return
+            payload["target_id"] = target.id
+            preview = f"Delete category '{target.name}'? (Only works if nothing uses it.)"
+
+    else:  # source
+        rows = db.query(Source).filter_by(user_id=user.id, active=True).all()
+        target = _find_by_name(rows, name)
+        if action == "create":
+            if target is not None:
+                _emit_message(chat_id, f"Source '{target.name}' already exists.")
+                return
+            preview = f"Create source '{name}'?"
+        elif action == "rename":
+            if target is None:
+                _emit_message(chat_id, f"I couldn't find a source called '{name}'.")
+                return
+            if not new_name:
+                _emit_message(chat_id, f"Rename '{name}' to what? Try \"rename source {name} to <new name>\".")
+                return
+            payload["target_id"] = target.id
+            preview = f"Rename source '{target.name}' to '{new_name}'?"
+        else:  # delete
+            if target is None:
+                _emit_message(chat_id, f"I couldn't find a source called '{name}'.")
+                return
+            payload["target_id"] = target.id
+            preview = f"Delete source '{target.name}'? (Sources with history are archived instead.)"
+
+    _set_pending_manage_state(db, user.id, payload)
+    _emit_message(chat_id, preview, reply_markup=_manage_keyboard())
+
+
+def _execute_manage(db: Session, user: User, op: dict[str, Any]) -> str:
+    """Run a confirmed management op via the existing API handlers. Returns a
+    user-facing result line. Raises nothing — conflicts become messages."""
+    from app.api import categories as cat_api
+    from app.api import sources as src_api
+    from app.api import subscriptions as sub_api
+    from app.schemas.common import CategoryIn, CategoryUpdate, SourceIn, SourceUpdate
+
+    entity = op.get("entity")
+    action = op.get("action")
+    name = str(op.get("name") or "")
+    new_name = op.get("new_name")
+    target_id = op.get("target_id")
+
+    try:
+        if entity == "category":
+            if action == "create":
+                cat_api.create_category(CategoryIn(name=name), user, db)
+                return f"Created category '{name}'."
+            if action == "rename":
+                cat_api.update_category(int(target_id), CategoryUpdate(name=new_name), user, db)
+                return f"Renamed category to '{new_name}'."
+            cat_api.delete_category(int(target_id), user, db)
+            return f"Deleted category '{name}'."
+        if entity == "source":
+            if action == "create":
+                src_api.create_source(
+                    SourceIn(name=name, is_credit_card=_contains_credit_card_phrase(name)), user, db
+                )
+                return f"Created source '{name}'."
+            if action == "rename":
+                src_api.update_source(int(target_id), SourceUpdate(name=new_name), user, db)
+                return f"Renamed source to '{new_name}'."
+            src_api.delete_source(int(target_id), user, db)
+            return f"Deleted source '{name}'."
+        if entity == "subscription" and action == "delete":
+            sub_api.delete_subscription(int(target_id), user, db)
+            return f"Deleted subscription '{name}'."
+    except HTTPException as e:
+        db.rollback()
+        return f"Couldn't do that: {e.detail}"
+    except Exception as e:  # pragma: no cover - defensive
+        db.rollback()
+        log.exception("manage execute failed: %s", e)
+        return "Something went wrong applying that change."
+    return "Nothing to do."
+
+
+def _handle_manage_callback(db: Session, user: User, cb: dict[str, Any]) -> None:
+    data = cb.get("data", "")
+    chat_id = cb["message"]["chat"]["id"]
+    message_id = cb["message"].get("message_id")
+    action = data.split(":", 1)[1] if ":" in data else ""
+
+    state = _pending_manage_state(db, user.id)
+    if state is None:
+        telegram.answer_callback_query(cb["id"], "Nothing pending.")
+        return
+    op = dict(state.value)
+
+    if action == "cancel":
+        _clear_pending_manage_state(db, user.id)
+        telegram.answer_callback_query(cb["id"], "Cancelled.")
+        if chat_id and message_id:
+            telegram.edit_message_text(chat_id, message_id, "Cancelled — no changes made.")
+        return
+
+    result = _execute_manage(db, user, op)
+    _clear_pending_manage_state(db, user.id)
+    telegram.answer_callback_query(cb["id"], "Done.")
+    if chat_id and message_id:
+        telegram.edit_message_text(chat_id, message_id, result)
+    elif chat_id:
+        telegram.send_message(chat_id, result)
 
 
 def _tx_keyboard(summaries: list) -> dict:
@@ -582,7 +822,7 @@ def _handle_pending_source_reply(
         name=source_name,
         currency=(user.default_currency or "IDR").upper(),
         starting_balance=0,
-        is_credit_card=False,
+        is_credit_card=_contains_credit_card_phrase(source_name),
         active=True,
     )
     db.add(src)
@@ -868,6 +1108,14 @@ def _handle_text(
     itn = intent.classify(t, cats, srcs)
     kind = itn.get("type", "log")
 
+    if kind == "manage":
+        _handle_manage(db, user, chat_id, itn, send_fn=send_fn)
+        return
+
+    if kind == "unsupported":
+        _emit_message(chat_id, CAPABILITIES_MSG, send_fn)
+        return
+
     default_src = default_source_for_currency(db, user, user.default_currency or "IDR")
     default_src_name = default_src.name if default_src is not None else None
 
@@ -1043,6 +1291,8 @@ def dispatch_update(db: Session, update: dict[str, Any]) -> None:
         data = cb.get("data", "")
         if data.startswith("tx:"):
             _handle_tx_callback(db, user, cb)
+        elif data.startswith("mng:"):
+            _handle_manage_callback(db, user, cb)
         else:
             from app.services import subscriptions  # lazy to avoid import cycles
             subscriptions.handle_callback(db, user, cb)
@@ -1079,9 +1329,26 @@ def dispatch_update(db: Session, update: dict[str, Any]) -> None:
         _handle_text(db, user, chat_id, text)
 
 
+def _process_update_in_background(update: dict[str, Any]) -> None:
+    """Run dispatch in its own DB session, off the request path.
+
+    The webhook returns 200 to Telegram immediately and the (synchronous,
+    LLM-bound) work happens here in Starlette's threadpool — so a slow model
+    call no longer blocks the worker or holds the webhook connection open.
+    """
+    db = SessionLocal()
+    try:
+        dispatch_update(db, update)
+    except Exception:  # pragma: no cover - background safety net
+        log.exception("background telegram dispatch failed")
+    finally:
+        db.close()
+
+
 @router.post("/webhook")
 async def webhook(
     update: dict[str, Any],
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     x_telegram_bot_api_secret_token: str | None = Header(default=None),
 ):
@@ -1093,7 +1360,8 @@ async def webhook(
     update_id = update.get("update_id")
     if update_id is None or not _ensure_update_new(db, int(update_id)):
         return {"ok": True}
-    dispatch_update(db, update)
+    # Ack Telegram instantly; do the heavy lifting after the response is sent.
+    background_tasks.add_task(_process_update_in_background, update)
     return {"ok": True}
 
 

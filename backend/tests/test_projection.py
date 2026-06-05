@@ -142,5 +142,5 @@ def test_projection_no_prior_history_is_zero(auth_client: TestClient):
 
 
 def test_projection_rejects_unsupported_currency(auth_client: TestClient):
-    r = auth_client.get("/stats/projection?currency=USD")
+    r = auth_client.get("/stats/projection?currency=EUR")
     assert r.status_code == 400

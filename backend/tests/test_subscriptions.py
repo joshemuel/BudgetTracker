@@ -86,7 +86,7 @@ def test_monthly_total_respects_currency_query(auth_client: TestClient):
 
 
 def test_monthly_total_rejects_unsupported_currency(auth_client: TestClient):
-    r = auth_client.get("/subscriptions/monthly-total?currency=USD")
+    r = auth_client.get("/subscriptions/monthly-total?currency=EUR")
     assert r.status_code == 400
 
 

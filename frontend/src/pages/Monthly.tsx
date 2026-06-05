@@ -5,6 +5,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -17,10 +18,32 @@ import { SectionTitle } from "@/components/Figure";
 import { useAmountVisibility } from "@/lib/privacy";
 import { useIsMobile } from "@/lib/mediaQuery";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
+import { useTheme } from "@/lib/theme";
+import { PALETTE, PALETTE_DARK } from "@/pages/Categories";
+
+// How many top categories to draw individually before bundling the rest into
+// an "Other" segment, so each monthly bar stays readable.
+const TOP_CATEGORIES = 8;
+const OTHER_COLOR = "#877e6a";
+
+// Explicit numeric fields win over the index signature, so totals/arithmetic
+// stay typed as `number` while the dynamic `inc_<id>`/`exp_<id>` category keys
+// can still be assigned.
+type ChartRow = {
+  name: string;
+  month: number;
+  Income: number;
+  Expense: number;
+  Net: number;
+  [key: string]: number | string;
+};
 
 export default function MonthlyPage() {
   const { showAmounts } = useAmountVisibility();
   const [year, setYear] = useState(new Date().getFullYear());
+  const [byCategory, setByCategory] = useState(false);
+  const { theme } = useTheme();
+  const palette = theme === "dark" ? PALETTE_DARK : PALETTE;
   const { data: me } = useQuery<Me>({
     queryKey: ["me"],
     queryFn: () => api.get<Me>("/auth/me"),
@@ -28,8 +51,14 @@ export default function MonthlyPage() {
   const currency = preferredCurrency(me);
 
   const { data } = useQuery<Monthly>({
-    queryKey: ["monthly", year, currency],
-    queryFn: () => api.get<Monthly>(withCurrency(`/stats/monthly?year=${year}`, currency)),
+    queryKey: ["monthly", year, currency, byCategory],
+    queryFn: () =>
+      api.get<Monthly>(
+        withCurrency(
+          `/stats/monthly?year=${year}${byCategory ? "&breakdown=category" : ""}`,
+          currency
+        )
+      ),
   });
   const reportCurrency = data?.currency ?? currency;
 
@@ -44,14 +73,38 @@ export default function MonthlyPage() {
   const masked = (value: string) =>
     showAmounts ? value : <span className="masked-amount">••••••</span>;
 
-  const chartData =
-    data?.months.map((m) => ({
-      name: monthName(m.month, true),
-      month: m.month,
-      Income: toNumber(m.income),
-      Expense: toNumber(m.expense),
-      Net: toNumber(m.net),
-    })) ?? [];
+  // Top categories (already sorted by yearly total server-side); the rest get
+  // folded into an "Other" segment so the stacks don't sprout 18 colours.
+  const topCats = (data?.categories ?? []).slice(0, TOP_CATEGORIES);
+  const colorFor = (idx: number) => palette[idx % palette.length];
+
+  const chartData: ChartRow[] =
+    data?.months.map((m): ChartRow => {
+      const row: ChartRow = {
+        name: monthName(m.month, true),
+        month: m.month,
+        Income: toNumber(m.income),
+        Expense: toNumber(m.expense),
+        Net: toNumber(m.net),
+      };
+      if (byCategory) {
+        const byId = new Map((m.categories ?? []).map((c) => [c.category_id, c]));
+        let incOther = toNumber(m.income);
+        let expOther = toNumber(m.expense);
+        topCats.forEach((tc) => {
+          const c = byId.get(tc.category_id);
+          const inc = toNumber(c?.income);
+          const exp = toNumber(c?.expense);
+          row[`inc_${tc.category_id}`] = inc;
+          row[`exp_${tc.category_id}`] = exp;
+          incOther -= inc;
+          expOther -= exp;
+        });
+        row.inc_other = Math.max(0, incOther);
+        row.exp_other = Math.max(0, expOther);
+      }
+      return row;
+    }) ?? [];
 
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -61,8 +114,8 @@ export default function MonthlyPage() {
 
   const totals = chartData.reduce(
     (acc, r) => ({
-      income: acc.income + r.Income,
-      expense: acc.expense + r.Expense,
+      income: acc.income + Number(r.Income),
+      expense: acc.expense + Number(r.Expense),
     }),
     { income: 0, expense: 0 }
   );
@@ -73,6 +126,29 @@ export default function MonthlyPage() {
         <SectionTitle>
           {year} — Month by Month
         </SectionTitle>
+        <div className="flex items-center gap-4">
+          <div className="grid grid-cols-2 border border-ink text-[10px] smallcaps">
+            <button
+              type="button"
+              onClick={() => setByCategory(false)}
+              aria-pressed={!byCategory}
+              className={`px-2 py-1 border-r border-ink ${
+                !byCategory ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
+              }`}
+            >
+              Totals
+            </button>
+            <button
+              type="button"
+              onClick={() => setByCategory(true)}
+              aria-pressed={byCategory}
+              className={`px-2 py-1 ${
+                byCategory ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
+              }`}
+            >
+              By category
+            </button>
+          </div>
         <div className="flex gap-2 smallcaps">
           {[year - 2, year - 1, year, year + 1].map((y) => (
             <button
@@ -88,6 +164,7 @@ export default function MonthlyPage() {
               {y}
             </button>
           ))}
+        </div>
         </div>
       </div>
 
@@ -149,28 +226,76 @@ export default function MonthlyPage() {
                   showAmounts ? fmtMoney(v, reportCurrency) : "••••••"
                 }
               />
-            <Bar dataKey="Income">
-              {chartData.map((row) => (
-                <Cell
-                  key={`inc-${row.month}`}
-                  fill={isFuture(row.month) ? "transparent" : "#3f5d2e"}
-                  stroke={isFuture(row.month) ? "#3f5d2e" : "none"}
-                  strokeDasharray={isFuture(row.month) ? "2 2" : undefined}
-                  strokeOpacity={isFuture(row.month) ? 0.35 : 1}
+            {byCategory ? (
+              <>
+                <Legend
+                  wrapperStyle={{ fontFamily: "Instrument Sans", fontSize: 11 }}
+                  iconType="square"
                 />
-              ))}
-            </Bar>
-            <Bar dataKey="Expense">
-              {chartData.map((row) => (
-                <Cell
-                  key={`exp-${row.month}`}
-                  fill={isFuture(row.month) ? "transparent" : "#a02a1a"}
-                  stroke={isFuture(row.month) ? "#a02a1a" : "none"}
-                  strokeDasharray={isFuture(row.month) ? "2 2" : undefined}
-                  strokeOpacity={isFuture(row.month) ? 0.35 : 1}
+                {topCats.map((tc, i) => (
+                  <Bar
+                    key={`inc_${tc.category_id}`}
+                    dataKey={`inc_${tc.category_id}`}
+                    stackId="income"
+                    name={tc.name}
+                    fill={colorFor(i)}
+                    fillOpacity={0.55}
+                  />
+                ))}
+                <Bar
+                  dataKey="inc_other"
+                  stackId="income"
+                  name="Other"
+                  fill={OTHER_COLOR}
+                  fillOpacity={0.4}
+                  legendType="none"
                 />
-              ))}
-            </Bar>
+                {topCats.map((tc, i) => (
+                  <Bar
+                    key={`exp_${tc.category_id}`}
+                    dataKey={`exp_${tc.category_id}`}
+                    stackId="expense"
+                    name={tc.name}
+                    fill={colorFor(i)}
+                    fillOpacity={0.55}
+                    legendType="none"
+                  />
+                ))}
+                <Bar
+                  dataKey="exp_other"
+                  stackId="expense"
+                  name="Other"
+                  fill={OTHER_COLOR}
+                  fillOpacity={0.4}
+                  legendType="none"
+                />
+              </>
+            ) : (
+              <>
+                <Bar dataKey="Income">
+                  {chartData.map((row) => (
+                    <Cell
+                      key={`inc-${row.month}`}
+                      fill={isFuture(Number(row.month)) ? "transparent" : "#3f5d2e"}
+                      stroke={isFuture(Number(row.month)) ? "#3f5d2e" : "none"}
+                      strokeDasharray={isFuture(Number(row.month)) ? "2 2" : undefined}
+                      strokeOpacity={isFuture(Number(row.month)) ? 0.35 : 1}
+                    />
+                  ))}
+                </Bar>
+                <Bar dataKey="Expense">
+                  {chartData.map((row) => (
+                    <Cell
+                      key={`exp-${row.month}`}
+                      fill={isFuture(Number(row.month)) ? "transparent" : "#a02a1a"}
+                      stroke={isFuture(Number(row.month)) ? "#a02a1a" : "none"}
+                      strokeDasharray={isFuture(Number(row.month)) ? "2 2" : undefined}
+                      strokeOpacity={isFuture(Number(row.month)) ? 0.35 : 1}
+                    />
+                  ))}
+                </Bar>
+              </>
+            )}
           </BarChart>
         </ResponsiveContainer>
         </div>

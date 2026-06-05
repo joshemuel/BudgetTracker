@@ -7,6 +7,7 @@ type Props = {
   confirmLabel?: string;
   cancelLabel?: string;
   busy?: boolean;
+  error?: string | null;
   onConfirm: () => void;
   onClose: () => void;
 };
@@ -18,6 +19,7 @@ export default function ConfirmDialog({
   confirmLabel = "Delete",
   cancelLabel = "Cancel",
   busy = false,
+  error,
   onConfirm,
   onClose,
 }: Props) {
@@ -37,6 +39,7 @@ export default function ConfirmDialog({
       <div className="modal-card w-full max-w-md p-6">
         <h3 className="font-semibold mb-4">{title}</h3>
         {message && <p className="text-sm text-ink-soft mb-4">{message}</p>}
+        {error && <p className="text-sm text-accent mb-4">{error}</p>}
         <div className="flex gap-2 mt-5 justify-end">
           <button
             type="button"

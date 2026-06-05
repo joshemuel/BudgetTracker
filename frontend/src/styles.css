@@ -296,6 +296,19 @@ select:focus-visible {
     font-size: 10px;
   }
 
+  /* Mobile Manage → Account preferences: shrink the form so it doesn't dominate
+     the page. Native selects open a picker, so the iOS-zoom guard isn't needed
+     here. Scoped to the Account tab only — the shared header gear dropdown keeps
+     its 16px controls. */
+  .prefs-compact select {
+    font-size: 12px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+  .prefs-compact .text-xs {
+    font-size: 10px;
+  }
+
   .display {
     letter-spacing: 0;
     line-height: 1;
