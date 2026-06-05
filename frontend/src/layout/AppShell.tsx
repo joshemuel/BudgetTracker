@@ -412,7 +412,7 @@ function SubTabNav() {
   if (!group?.sub) return null;
   return (
     <nav className="hidden sm:block pb-3 mb-2 border-b border-paper-rule">
-      <ul className="flex flex-wrap gap-x-6 lg:gap-x-8 gap-y-2 smallcaps nav-tabs">
+      <ul className="flex flex-wrap gap-x-6 lg:gap-x-8 gap-y-2 smallcaps nav-tabs sub-tabs">
         {group.sub.map((s) => (
           <li key={s.to}>
             <NavLink
@@ -497,17 +497,12 @@ export default function AppShell() {
             tucked into the content column rather than stranded beside it. */}
         <div className="sm:flex sm:flex-1">
           <Sidebar />
-          <div className={`min-w-0 flex-1 ${pad} sm:pt-4 flex flex-col`}>
+          <div className={`min-w-0 flex-1 ${pad} sm:pt-4`}>
             <SubTabNav />
             <GroupSubNav />
             <main className="py-7 sm:py-10 md:py-12 lg:py-14">
               <Outlet />
             </main>
-            <footer className="mt-auto py-10 sm:py-14 border-t border-paper-rule flex sm:justify-end smallcaps text-ink-mute">
-              <span>
-                Press <kbd className="px-1 border border-paper-rule num">N</kbd> to log
-              </span>
-            </footer>
           </div>
         </div>
       </div>

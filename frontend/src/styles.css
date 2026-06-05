@@ -357,12 +357,13 @@ select:focus-visible {
   }
 }
 
-/* Desktop section sub-tabs (Activity → Monthly/Daily, Manage → Budgets/…):
-   the default .smallcaps 10–11px reads too small here, so scale them up
-   fluidly with the viewport width. Higher specificity than .smallcaps wins
-   over the size set in the 768–1366px block above. */
+/* Desktop horizontal sub-tab strip only (Activity → Monthly/Daily, Manage →
+   Budgets/…): the default .smallcaps 10–11px reads too small here, so scale it
+   up fluidly with the viewport width. Scoped to `.sub-tabs` so the vertical
+   left-rail labels (which also carry `nav-tabs`) keep their original size.
+   Higher specificity than .smallcaps wins over the 768–1366px block above. */
 @media (min-width: 641px) {
-  .nav-tabs.smallcaps {
+  .sub-tabs.smallcaps {
     font-size: clamp(13px, 1.2vw, 18px);
     letter-spacing: 0.1em;
   }
