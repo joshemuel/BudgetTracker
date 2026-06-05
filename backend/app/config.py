@@ -5,7 +5,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-GEMINI_OPENAI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 
 class Settings(BaseSettings):
@@ -37,15 +37,23 @@ class Settings(BaseSettings):
 
     llm_api_key: str = Field(
         default="",
-        validation_alias=AliasChoices("GEMINI_API_KEY", "DASHSCOPE_API_KEY"),
+        validation_alias=AliasChoices("OPENROUTER_API_KEY", "LLM_API_KEY"),
     )
     llm_base_url: str = Field(
-        default=GEMINI_OPENAI_BASE_URL,
+        default=OPENROUTER_BASE_URL,
         alias="LLM_BASE_URL",
     )
-    llm_model: str = Field(default="gemini-2.5-flash-lite", alias="LLM_MODEL")
-    llm_log_model: str = Field(default="gemini-2.5-flash-lite", alias="LLM_LOG_MODEL")
-    llm_query_model: str = Field(default="gemini-2.5-flash", alias="LLM_QUERY_MODEL")
+    # Text path (intent classify, transaction extraction, queries, daily summary).
+    llm_model: str = Field(default="deepseek/deepseek-v4-flash", alias="LLM_MODEL")
+    llm_log_model: str = Field(default="deepseek/deepseek-v4-flash", alias="LLM_LOG_MODEL")
+    llm_query_model: str = Field(default="deepseek/deepseek-v4-flash", alias="LLM_QUERY_MODEL")
+    # Media paths — kept on a Google multimodal slug (audio + vision). OCR is a
+    # separate knob so it can later point at a cheaper vision model with no code change.
+    llm_media_model: str = Field(default="google/gemini-2.5-flash-lite", alias="LLM_MEDIA_MODEL")
+    llm_ocr_model: str = Field(default="google/gemini-2.5-flash-lite", alias="LLM_OCR_MODEL")
+    # OpenRouter ranking headers (https://openrouter.ai/docs/api-reference/overview).
+    llm_referer: str = Field(default="https://budgettracker.ddns.net", alias="LLM_REFERER")
+    llm_app_title: str = Field(default="BudgetTracker", alias="LLM_APP_TITLE")
 
     tz: str = Field(default="Asia/Jakarta", alias="TZ")
 

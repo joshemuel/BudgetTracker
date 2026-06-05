@@ -68,9 +68,13 @@ def _transcode_audio_to_mp3(b64_in: str, mime_type: str) -> str:
 
 
 def _headers() -> dict[str, str]:
+    s = get_settings()
     return {
-        "Authorization": f"Bearer {get_settings().llm_api_key}",
+        "Authorization": f"Bearer {s.llm_api_key}",
         "Content-Type": "application/json",
+        # OpenRouter ranking/analytics headers (ignored by other providers).
+        "HTTP-Referer": s.llm_referer,
+        "X-Title": s.llm_app_title,
     }
 
 
@@ -107,6 +111,8 @@ def call(prompt: str, json_mode: bool = True, timeout: float = 45.0) -> str:
     }
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
+        # Only route to providers that honor response_format (json reliability).
+        payload["provider"] = {"require_parameters": True}
     with httpx.Client(timeout=timeout) as c:
         r = c.post(_url(), json=payload, headers=_headers())
         if r.status_code == 429:
@@ -116,13 +122,14 @@ def call(prompt: str, json_mode: bool = True, timeout: float = 45.0) -> str:
 
 
 def call_logging(prompt: str, json_mode: bool = True, timeout: float = 25.0) -> str:
-    """Dedicated Flash-Lite path for intent classification and transaction extraction."""
+    """Dedicated low-cost path for intent classification and transaction extraction."""
     payload: dict[str, Any] = {
         "model": get_settings().llm_log_model,
         "messages": [{"role": "user", "content": prompt}],
     }
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
+        payload["provider"] = {"require_parameters": True}
     with httpx.Client(timeout=timeout) as c:
         r = c.post(_url(), json=payload, headers=_headers())
         if r.status_code == 429:
@@ -132,7 +139,7 @@ def call_logging(prompt: str, json_mode: bool = True, timeout: float = 25.0) -> 
 
 
 def call_query(prompt: str, timeout: float = 45.0) -> str:
-    """Uses Gemini Flash for natural language questions about finances."""
+    """Uses llm_query_model for natural-language questions about finances."""
     payload: dict[str, Any] = {
         "model": get_settings().llm_query_model,
         "messages": [{"role": "user", "content": prompt}],
@@ -146,7 +153,7 @@ def call_query(prompt: str, timeout: float = 45.0) -> str:
 
 
 def call_with_media(prompt: str, base64_data: str, mime_type: str, timeout: float = 45.0) -> str:
-    """Uses Gemini Flash-Lite for everyday audio and image logging."""
+    """Audio → llm_media_model, image → llm_ocr_model (both default to a Gemini multimodal slug)."""
     is_audio = mime_type.startswith("audio")
     media: dict[str, Any]
     if is_audio:
@@ -167,8 +174,9 @@ def call_with_media(prompt: str, base64_data: str, mime_type: str, timeout: floa
             "type": "image_url",
             "image_url": {"url": f"data:{mime_type};base64,{base64_data}"},
         }
+    settings = get_settings()
     payload: dict[str, Any] = {
-        "model": get_settings().llm_log_model,
+        "model": settings.llm_media_model if is_audio else settings.llm_ocr_model,
         "messages": [
             {
                 "role": "user",
@@ -176,6 +184,7 @@ def call_with_media(prompt: str, base64_data: str, mime_type: str, timeout: floa
             }
         ],
         "response_format": {"type": "json_object"},
+        "provider": {"require_parameters": True},
     }
     with httpx.Client(timeout=timeout) as c:
         r = c.post(_url(), json=payload, headers=_headers())

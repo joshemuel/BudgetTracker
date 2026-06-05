@@ -32,11 +32,13 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      LLM_BASE_URL: https://generativelanguage.googleapis.com/v1beta/openai
-      LLM_LOG_MODEL: gemini-2.5-flash-lite
-      LLM_MODEL: gemini-2.5-flash-lite
-      LLM_QUERY_MODEL: gemini-2.5-flash
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://openrouter.ai/api/v1}
+      LLM_LOG_MODEL: ${LLM_LOG_MODEL:-deepseek/deepseek-v4-flash}
+      LLM_MODEL: ${LLM_MODEL:-deepseek/deepseek-v4-flash}
+      LLM_QUERY_MODEL: ${LLM_QUERY_MODEL:-deepseek/deepseek-v4-flash}
+      LLM_MEDIA_MODEL: ${LLM_MEDIA_MODEL:-google/gemini-2.5-flash-lite}
+      LLM_OCR_MODEL: ${LLM_OCR_MODEL:-google/gemini-2.5-flash-lite}
       TZ: ${TZ}
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
