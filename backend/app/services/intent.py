@@ -8,6 +8,30 @@ from app.services import llm
 log = logging.getLogger(__name__)
 
 
+def _as_item_list(parsed: Any) -> list[dict[str, Any]]:
+    """Normalize an LLM JSON payload into a flat list of item dicts.
+
+    ``response_format: json_object`` forces a top-level OBJECT, so some models
+    (e.g. DeepSeek) wrap the requested array under a key like
+    ``{"transactions": [...]}`` while others (e.g. Gemini) return the array
+    directly. Accept a bare array, a single item object, or an array wrapped
+    under an arbitrary key — so the extractor is provider-agnostic.
+    """
+    if isinstance(parsed, list):
+        return [x for x in parsed if isinstance(x, dict)]
+    if isinstance(parsed, dict):
+        if not parsed:
+            return []
+        # A single item object returned without an array wrapper.
+        if any(k in parsed for k in ("type", "amount", "category", "description", "intent")):
+            return [parsed]
+        # An array wrapped under an arbitrary key, e.g. {"transactions": [...]}.
+        for value in parsed.values():
+            if isinstance(value, list):
+                return [x for x in value if isinstance(x, dict)]
+    return []
+
+
 def classify(text: str, categories: list[str], sources: list[str]) -> dict[str, Any]:
     """Port of classifyIntent. Returns { type: "log"|"query"|... , ... }."""
     cats = ", ".join(categories)
@@ -129,12 +153,7 @@ Each object:
 If no clear financial data, return an empty array [].
 """
     raw = llm.call_logging(prompt, json_mode=True)
-    parsed = llm.parse_json(raw)
-    if isinstance(parsed, dict):
-        return [parsed] if parsed else []
-    if isinstance(parsed, list):
-        return parsed
-    return []
+    return _as_item_list(llm.parse_json(raw))
 
 
 def extract_from_media(
@@ -185,19 +204,15 @@ If nothing financial, return [].
     raw = llm.call_with_media(prompt, base64_data, mime_type)
     parsed = llm.parse_json(raw)
 
-    if isinstance(parsed, dict):
-        if parsed.get("intent") == "query" and parsed.get("question"):
-            return {"kind": "query", "question": parsed["question"]}
-        if not parsed:
-            return {"kind": "none"}
-        parsed = [parsed]
+    # Spoken/scanned question → route to the query path.
+    if isinstance(parsed, dict) and parsed.get("intent") == "query" and parsed.get("question"):
+        return {"kind": "query", "question": parsed["question"]}
+    if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict) \
+            and parsed[0].get("intent") == "query":
+        return {"kind": "query", "question": parsed[0].get("question", "")}
 
-    if isinstance(parsed, list):
-        if parsed and isinstance(parsed[0], dict) and parsed[0].get("intent") == "query":
-            return {"kind": "query", "question": parsed[0].get("question", "")}
-        items = [x for x in parsed if isinstance(x, dict) and x.get("intent") != "query"]
-        if not items:
-            return {"kind": "none"}
-        return {"kind": "log", "items": items}
-
-    return {"kind": "none"}
+    # Otherwise treat as logging — tolerate bare arrays and wrapped arrays alike.
+    items = [x for x in _as_item_list(parsed) if x.get("intent") != "query"]
+    if not items:
+        return {"kind": "none"}
+    return {"kind": "log", "items": items}
