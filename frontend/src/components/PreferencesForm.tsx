@@ -26,6 +26,9 @@ export default function PreferencesForm({
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
   const [pwError, setPwError] = useState<string | null>(null);
+  const [unameOpen, setUnameOpen] = useState(false);
+  const [uname, setUname] = useState("");
+  const [unameError, setUnameError] = useState<string | null>(null);
   const [currency, setCurrency] = useState<Me["default_currency"]>("IDR");
   const [sourcesEnabled, setSourcesEnabled] = useState(true);
   const [sourceId, setSourceId] = useState<number | "">("");
@@ -95,22 +98,49 @@ export default function PreferencesForm({
     },
   });
 
+  const changeUsername = useMutation({
+    mutationFn: (username: string) =>
+      api.post<Me>("/auth/change-username", { username }),
+    onSuccess: (updated) => {
+      // Sessions are keyed by user id, so no logout — just refresh the cache;
+      // the masthead reads the same ["me"] query and updates reactively.
+      qc.setQueryData(["me"], updated);
+      setUnameOpen(false);
+    },
+    onError: (err: Error) => {
+      setUnameError(err.message || "Couldn't change username");
+    },
+  });
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && pwOpen && !changePw.isPending) {
+      if (e.key !== "Escape") return;
+      if (pwOpen && !changePw.isPending) {
         setPwOpen(false);
         resetPwForm();
+      } else if (unameOpen && !changeUsername.isPending) {
+        setUnameOpen(false);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [changePw.isPending, pwOpen]);
+  }, [changePw.isPending, pwOpen, changeUsername.isPending, unameOpen]);
 
   function resetPwForm() {
     setCurrentPw("");
     setNewPw("");
     setConfirmPw("");
     setPwError(null);
+  }
+
+  function submitUsername() {
+    setUnameError(null);
+    const candidate = uname.trim().toLowerCase();
+    if (!/^[a-z0-9._-]{3,30}$/.test(candidate)) {
+      setUnameError("Username must be 3–30 characters: letters, numbers, . _ -");
+      return;
+    }
+    changeUsername.mutate(candidate);
   }
 
   function submitPw() {
@@ -200,7 +230,17 @@ export default function PreferencesForm({
           {save.isPending ? "Saving…" : "Save"}
         </button>
       </div>
-      <div className="mt-3 pt-3 border-t border-paper-rule">
+      <div className="mt-3 pt-3 border-t border-paper-rule flex flex-col items-start gap-2">
+        <button
+          className="smallcaps text-ink-mute hover:text-accent"
+          onClick={() => {
+            setUname(me?.username ?? "");
+            setUnameError(null);
+            setUnameOpen(true);
+          }}
+        >
+          Change username →
+        </button>
         <button
           className="smallcaps text-ink-mute hover:text-accent"
           onClick={() => {
@@ -211,6 +251,53 @@ export default function PreferencesForm({
           Reset password →
         </button>
       </div>
+
+      {unameOpen && (
+        <div className="modal-backdrop fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="modal-card w-full max-w-md p-6">
+            <h3 className="font-semibold mb-4">Change username</h3>
+            <div className="space-y-3">
+              <label className="block">
+                <span className="smallcaps text-ink-mute block mb-1">New username</span>
+                <input
+                  type="text"
+                  value={uname}
+                  onChange={(e) => setUname(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !changeUsername.isPending) submitUsername();
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                  autoFocus
+                />
+              </label>
+              {unameError && <p className="text-accent text-sm">{unameError}</p>}
+              <p className="text-xs text-ink-mute">
+                3–30 characters: letters, numbers, . _ - (stored lowercase). It's
+                the name you sign in with — you'll stay logged in.
+              </p>
+            </div>
+            <div className="flex gap-2 mt-5 justify-end">
+              <button
+                onClick={() => setUnameOpen(false)}
+                className="smallcaps px-3 py-1 border border-ink/30 rounded"
+                disabled={changeUsername.isPending}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitUsername}
+                className="smallcaps px-3 py-1 bg-ink text-paper rounded disabled:opacity-60"
+                disabled={changeUsername.isPending || !uname.trim()}
+              >
+                {changeUsername.isPending ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {pwOpen && (
         <div className="modal-backdrop fixed inset-0 z-[60] flex items-center justify-center p-4">

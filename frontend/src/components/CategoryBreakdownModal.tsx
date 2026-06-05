@@ -41,7 +41,7 @@ export default function CategoryBreakdownModal({
       onClick={onClose}
     >
       <div
-        className="modal-card w-full max-w-2xl p-5 sm:p-6 max-h-[90vh] overflow-y-auto"
+        className="modal-card w-full max-w-2xl sm:max-w-3xl p-5 sm:p-6 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 mb-4">

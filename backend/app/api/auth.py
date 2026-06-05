@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.db.models import Budget, CurrencySourceDefault, SessionToken, Source, User
 from app.schemas.auth import (
     ChangePasswordRequest,
+    ChangeUsernameRequest,
     LoginRequest,
     UserOut,
     UserPreferencesUpdate,
@@ -262,3 +263,32 @@ def change_password(
     db.query(SessionToken).filter_by(user_id=user.id).delete()
     db.commit()
     response.delete_cookie(SESSION_COOKIE)
+
+
+@router.post("/change-username", response_model=UserOut)
+def change_username(
+    payload: ChangeUsernameRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # Stored lowercase (matching the OAuth provisioning convention in
+    # _unique_username), with the charset widened to allow . _ - separators.
+    candidate = payload.username.strip().lower()
+    if not re.fullmatch(r"[a-z0-9._-]{3,30}", candidate):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Username must be 3–30 characters: letters, numbers, . _ -",
+        )
+    if candidate != user.username:
+        taken = (
+            db.query(User)
+            .filter(User.username == candidate, User.id != user.id)
+            .first()
+        )
+        if taken is not None:
+            raise HTTPException(status.HTTP_409_CONFLICT, "That username is taken")
+        # Sessions are keyed by user.id, so a rename keeps the user logged in.
+        user.username = candidate
+        db.commit()
+        db.refresh(user)
+    return user

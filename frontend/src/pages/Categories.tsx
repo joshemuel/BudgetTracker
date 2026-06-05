@@ -141,49 +141,86 @@ export function CategoriesBreakdown({
       </div>
 
       <div className="col-span-12 md:col-span-7">
-        <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
-          <table className="ledger-table w-full text-[11px] sm:text-[13px]">
-            <thead>
-              <tr>
-                <th>Category</th>
-                <th className="text-right">Spent</th>
-                <th className="text-right">Share</th>
-                <th className="text-right">#</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => {
-                const share = total ? toNumber(r.expense) / total : 0;
-                return (
-                  <tr key={r.category_id}>
-                    <td className="font-[450] flex items-center gap-2">
-                      <span
-                        className="inline-block w-2 h-2"
-                        style={{ background: palette[i % palette.length] }}
-                      />
-                      {r.category_name}
-                    </td>
-                    <td className="text-right num text-accent">
-                      {masked(fmtAmount(r.expense))}
-                    </td>
-                    <td className="text-right num text-ink-mute">
+        {compact ? (
+          // Pop-up view: a plain swatch + category + amount list (with % on
+          // desktop, dropped on phone) rather than the dense 4-column table.
+          <ul className="text-[12px] sm:text-[13px]">
+            {rows.map((r, i) => {
+              const share = total ? toNumber(r.expense) / total : 0;
+              return (
+                <li
+                  key={r.category_id}
+                  className="flex items-center gap-2.5 py-1 sm:py-1.5 border-b border-paper-rule last:border-0"
+                >
+                  <span
+                    className="inline-block w-2.5 h-2.5 rounded-[2px] shrink-0"
+                    style={{ background: palette[i % palette.length] }}
+                  />
+                  <span className="font-[450] flex-1 truncate">{r.category_name}</span>
+                  <span className="num text-accent text-right whitespace-nowrap">
+                    {masked(fmtAmount(r.expense))}
+                  </span>
+                  {!isMobile && (
+                    <span className="num text-ink-mute text-right w-12 shrink-0">
                       {fmtPct(share)}
-                    </td>
-                    <td className="text-right num text-ink-mute">
-                      {r.transactions}
-                    </td>
-                  </tr>
-                );
-              })}
-              <tr className="font-[500]">
-                <td className="smallcaps">Total</td>
-                <td className="text-right num">{masked(fmtAmount(total))}</td>
-                <td></td>
-                <td></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+            <li className="flex items-center gap-2.5 pt-2 mt-1 border-t border-ink font-[500]">
+              <span className="smallcaps flex-1">Total</span>
+              <span className="num text-right whitespace-nowrap">
+                {masked(fmtAmount(total))}
+              </span>
+              {!isMobile && <span className="w-12 shrink-0" />}
+            </li>
+          </ul>
+        ) : (
+          <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
+            <table className="ledger-table w-full text-[11px] sm:text-[13px]">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th className="text-right">Spent</th>
+                  <th className="text-right">Share</th>
+                  <th className="text-right">#</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => {
+                  const share = total ? toNumber(r.expense) / total : 0;
+                  return (
+                    <tr key={r.category_id}>
+                      <td className="font-[450] flex items-center gap-2">
+                        <span
+                          className="inline-block w-2 h-2"
+                          style={{ background: palette[i % palette.length] }}
+                        />
+                        {r.category_name}
+                      </td>
+                      <td className="text-right num text-accent">
+                        {masked(fmtAmount(r.expense))}
+                      </td>
+                      <td className="text-right num text-ink-mute">
+                        {fmtPct(share)}
+                      </td>
+                      <td className="text-right num text-ink-mute">
+                        {r.transactions}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr className="font-[500]">
+                  <td className="smallcaps">Total</td>
+                  <td className="text-right num">{masked(fmtAmount(total))}</td>
+                  <td></td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
