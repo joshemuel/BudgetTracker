@@ -307,7 +307,14 @@ export default function OverviewPage() {
           </p>
           <p className="text-xs text-ink-soft mt-1">Outstanding balance (negative means payable)</p>
 
-          <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+          <div className="mt-4 flex items-baseline justify-between text-xs border-t border-paper-rule pt-2">
+            <span className="smallcaps text-ink-mute">Carried over</span>
+            <span className={`num ${toNumber(ov.credit.carried) < 0 ? "text-accent" : "text-gain"}`}>
+              {masked(fmtAmount(ov.credit.carried))}
+            </span>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
             <div>
               <p className="smallcaps text-ink-mute">This Month</p>
               <p className="num text-accent">{masked(fmtAmount(ov.credit.month_charges))}</p>
@@ -319,6 +326,7 @@ export default function OverviewPage() {
               <p className="text-ink-mute text-xs">payments</p>
             </div>
           </div>
+          <p className="text-ink-mute text-[10px] mt-2">carried + paid − charges = outstanding</p>
         </div>
 
         <div>

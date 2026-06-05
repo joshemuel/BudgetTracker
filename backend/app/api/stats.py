@@ -146,20 +146,28 @@ def _credit_summary(
     if not cc_sources:
         return {
             "outstanding": "0",
+            "carried": "0",
             "month_charges": "0",
             "month_payments": "0",
         }
     cc_ids = [s.id for s in cc_sources]
     curr_by_id = {s.id: s.currency or "IDR" for s in cc_sources}
 
+    # `outstanding` is the all-time balance; `carried` is the balance brought
+    # into the selected month (everything dated before `start`). The panel then
+    # reconciles as: carried + payments(this month) − charges(this month) =
+    # outstanding. Both seed from the starting balances.
     outstanding = Decimal("0")
+    carried = Decimal("0")
     for s in cc_sources:
-        outstanding += fx.convert(
+        sb = fx.convert(
             Decimal(s.starting_balance),
             s.currency or "IDR",
             report_currency,
             rates,
         )
+        outstanding += sb
+        carried += sb
 
     # Count EVERY non-deleted transaction on the card — including credit-card
     # payments, which are booked as "Untrackable" income transfers (intent.py).
@@ -174,19 +182,24 @@ def _credit_summary(
     ]
 
     all_rows = db.execute(
-        select(Transaction.source_id, Transaction.type, Transaction.amount).where(*all_conditions)
+        select(
+            Transaction.source_id,
+            Transaction.type,
+            Transaction.amount,
+            Transaction.occurred_at,
+        ).where(*all_conditions)
     ).all()
-    for source_id, t_type, amount in all_rows:
+    for source_id, t_type, amount, occurred_at in all_rows:
         amount_report = fx.convert(
             Decimal(amount),
             curr_by_id.get(source_id, "IDR"),
             report_currency,
             rates,
         )
-        if t_type == "income":
-            outstanding += amount_report
-        else:
-            outstanding -= amount_report
+        signed = amount_report if t_type == "income" else -amount_report
+        outstanding += signed
+        if occurred_at < start:
+            carried += signed
 
     month_conditions = [
         *all_conditions,
@@ -215,6 +228,8 @@ def _credit_summary(
         "outstanding": str(
             _round_currency(outstanding, report_currency) if outstanding < 0 else Decimal("0")
         ),
+        # Signed balance carried into the month (negative = debt, positive = credit).
+        "carried": str(_round_currency(carried, report_currency)),
         "month_charges": str(_round_currency(month_charges, report_currency)),
         "month_payments": str(_round_currency(month_payments, report_currency)),
     }

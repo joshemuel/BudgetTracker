@@ -96,7 +96,7 @@ export type Overview = {
   today_day: number;
   totals: { income: string; expense: string; net: string };
   budgets: OverviewBudget[];
-  credit: { outstanding: string; month_charges: string; month_payments: string };
+  credit: { outstanding: string; carried: string; month_charges: string; month_payments: string };
 };
 
 export type MonthlyCategoryAmount = { category_id: number; income: string; expense: string };

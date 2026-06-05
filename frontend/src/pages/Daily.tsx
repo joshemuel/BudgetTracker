@@ -16,12 +16,19 @@ import { fmtMoney, fmtShort, monthName, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 import { useAmountVisibility } from "@/lib/privacy";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
+import CategoryBreakdownModal from "@/components/CategoryBreakdownModal";
+
+function toISO(y: number, m: number, d: number): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${y}-${pad(m)}-${pad(d)}`;
+}
 
 export default function DailyPage() {
   const { showAmounts } = useAmountVisibility();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const { data: me } = useQuery<Me>({
     queryKey: ["me"],
     queryFn: () => api.get<Me>("/auth/me"),
@@ -237,8 +244,17 @@ export default function DailyPage() {
           return (
             <div
               key={d.day}
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelectedDay(d.day)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setSelectedDay(d.day);
+                }
+              }}
               title={`${monthName(month, true)} ${d.day} · ${showAmounts ? fmtMoney(d.expense, reportCurrency) : "••••••"}`}
-              className="aspect-square relative border border-paper-rule p-1"
+              className="aspect-square relative border border-paper-rule p-1 cursor-pointer hover:outline hover:outline-1 hover:outline-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
               style={{ backgroundColor: bg }}
             >
               <span
@@ -261,6 +277,19 @@ export default function DailyPage() {
           );
         })}
       </div>
+
+      <CategoryBreakdownModal
+        open={selectedDay !== null}
+        title={
+          selectedDay !== null
+            ? `${monthName(month, true)} ${selectedDay}, ${year} · spending`
+            : ""
+        }
+        from={selectedDay !== null ? toISO(year, month, selectedDay) : ""}
+        to={selectedDay !== null ? toISO(year, month, selectedDay) : ""}
+        currency={reportCurrency}
+        onClose={() => setSelectedDay(null)}
+      />
     </div>
   );
 }

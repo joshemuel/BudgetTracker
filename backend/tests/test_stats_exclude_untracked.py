@@ -293,3 +293,61 @@ def test_overview_credit_summary_counts_untrackable_payments(auth_client: TestCl
         for tx_id in tx_ids:
             auth_client.delete(f"/transactions/{tx_id}")
         auth_client.delete(f"/sources/{source_id}")
+
+
+def test_credit_summary_carried_over(auth_client: TestClient, db):
+    """A charge dated before the selected month lands in `carried` (the balance
+    brought into the month), not in this month's charges — so the panel
+    reconciles as carried + paid − charges = outstanding."""
+    _seed_fx_rates(db)
+    categories = auth_client.get("/categories").json()
+    tracked = next(
+        c
+        for c in categories
+        if str(c["name"]).strip().lower() not in {"untrackable", "untracked"}
+    )
+
+    created = auth_client.post(
+        "/sources",
+        json={
+            "name": f"pytest_cc_carry_{uuid4().hex[:8]}",
+            "starting_balance": "0",
+            "currency": "IDR",
+            "is_credit_card": True,
+        },
+    )
+    assert created.status_code == 201, created.text
+    source_id = int(created.json()["id"])
+
+    now = datetime.now(timezone.utc)
+    year, month = now.year, now.month
+    pm = month - 1 if month > 1 else 12
+    py = year if month > 1 else year - 1
+    prior = datetime(py, pm, 10, 9, 0, 0, tzinfo=timezone.utc)
+
+    before = auth_client.get(
+        f"/stats/overview?year={year}&month={month}&currency=IDR"
+    ).json()["credit"]
+    tx_id: int | None = None
+    try:
+        tx_id = _create_tx(
+            auth_client,
+            occurred_at=prior,
+            tx_type="expense",
+            category_id=int(tracked["id"]),
+            amount="500",
+            source_id=source_id,
+            description=f"pytest-prior-charge-{uuid4().hex[:8]}",
+        )
+        after = auth_client.get(
+            f"/stats/overview?year={year}&month={month}&currency=IDR"
+        ).json()["credit"]
+        assert _to_decimal(after["carried"]) - _to_decimal(before["carried"]) == Decimal("-500")
+        assert (
+            _to_decimal(after["month_charges"]) - _to_decimal(before["month_charges"])
+            == Decimal("0")
+        )
+    finally:
+        if tx_id is not None:
+            auth_client.delete(f"/transactions/{tx_id}")
+        auth_client.delete(f"/sources/{source_id}")

@@ -18,7 +18,8 @@ import { useAmountVisibility } from "@/lib/privacy";
 import { useIsMobile } from "@/lib/mediaQuery";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
 import { useTheme } from "@/lib/theme";
-import { CategoriesBreakdown, PALETTE, PALETTE_DARK } from "@/pages/Categories";
+import { PALETTE, PALETTE_DARK } from "@/pages/Categories";
+import CategoryBreakdownModal from "@/components/CategoryBreakdownModal";
 
 // How many top categories to draw individually before bundling the rest into
 // an "Other" segment, so each monthly bar stays readable.
@@ -126,12 +127,11 @@ export default function MonthlyPage() {
     { income: 0, expense: 0 }
   );
 
-  // Date range powering the spending-division pie: a clicked month, else the
-  // whole selected year.
-  const pieFrom = selectedMonth ? toISO(year, selectedMonth, 1) : toISO(year, 1, 1);
+  // Date range for the spending-division pop-up: the clicked month.
+  const pieFrom = selectedMonth ? toISO(year, selectedMonth, 1) : "";
   const pieTo = selectedMonth
     ? toISO(year, selectedMonth, new Date(year, selectedMonth, 0).getDate())
-    : toISO(year, 12, 31);
+    : "";
 
   // On mobile, open the year scrolled so the current month sits in view rather
   // than starting at January. Runs once the bars have laid out (rAF) and again
@@ -233,9 +233,9 @@ export default function MonthlyPage() {
               const idx = (next as { activeTooltipIndex?: number | null })
                 .activeTooltipIndex;
               if (idx == null || idx < 0 || idx >= chartData.length) return;
-              const m = Number(chartData[idx].month);
-              setSelectedMonth((prev) => (prev === m ? null : m));
+              setSelectedMonth(Number(chartData[idx].month));
             }}
+            className="cursor-pointer"
           >
             <CartesianGrid stroke="#d9cdb4" vertical={false} />
             <XAxis
@@ -252,17 +252,21 @@ export default function MonthlyPage() {
               tickLine={false}
               width={72}
             />
-              <Tooltip
-                contentStyle={{
-                  background: "#f5efe3",
-                  border: "1px solid #19170f",
-                  borderRadius: 0,
-                  fontFamily: "Instrument Sans",
-                }}
-                formatter={(v: number) =>
-                  showAmounts ? fmtMoney(v, reportCurrency) : "••••••"
-                }
-              />
+              {/* In category mode the per-category hover boxes are noise — the
+                  pop-up pie covers that — so the tooltip is totals-only. */}
+              {!byCategory && (
+                <Tooltip
+                  contentStyle={{
+                    background: "#f5efe3",
+                    border: "1px solid #19170f",
+                    borderRadius: 0,
+                    fontFamily: "Instrument Sans",
+                  }}
+                  formatter={(v: number) =>
+                    showAmounts ? fmtMoney(v, reportCurrency) : "••••••"
+                  }
+                />
+              )}
             {byCategory ? (
               <>
                 {topCats.map((tc, i) => (
@@ -333,29 +337,9 @@ export default function MonthlyPage() {
         </ResponsiveContainer>
         </div>
       </div>
-
-      <div className="mt-10">
-        <div className="flex items-center justify-between gap-3">
-          <SectionTitle>
-            Spending Division — {selectedMonth ? `${monthName(selectedMonth)} ${year}` : year}
-          </SectionTitle>
-          {selectedMonth !== null && (
-            <button
-              type="button"
-              onClick={() => setSelectedMonth(null)}
-              className="smallcaps text-[10px] text-ink-mute hover:text-accent border-b border-transparent hover:border-accent shrink-0"
-            >
-              ← whole year
-            </button>
-          )}
-        </div>
-        <p className="smallcaps text-[10px] text-ink-mute mt-1">
-          Tap a bar above to focus a single month.
-        </p>
-        <div className="mt-4">
-          <CategoriesBreakdown from={pieFrom} to={pieTo} currency={reportCurrency} compact />
-        </div>
-      </div>
+      <p className="smallcaps text-[10px] text-ink-mute mt-2">
+        Tap a bar to see that month's spending breakdown.
+      </p>
 
       <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
         <table className="ledger-table mt-10 w-full text-[11px] sm:text-[13px]">
@@ -385,6 +369,15 @@ export default function MonthlyPage() {
           </tbody>
         </table>
       </div>
+
+      <CategoryBreakdownModal
+        open={selectedMonth !== null}
+        title={selectedMonth ? `${monthName(selectedMonth)} ${year} · spending` : ""}
+        from={pieFrom}
+        to={pieTo}
+        currency={reportCurrency}
+        onClose={() => setSelectedMonth(null)}
+      />
     </div>
   );
 }
