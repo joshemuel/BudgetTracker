@@ -16,12 +16,6 @@ import { fmtMoney, fmtShort, monthName, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 import { useAmountVisibility } from "@/lib/privacy";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
-import { CategoriesBreakdown } from "@/pages/Categories";
-
-function toISO(y: number, m: number, d: number): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${y}-${pad(m)}-${pad(d)}`;
-}
 
 export default function DailyPage() {
   const { showAmounts } = useAmountVisibility();
@@ -53,9 +47,6 @@ export default function DailyPage() {
 
   const today = new Date();
   const isCurrentMonth = today.getFullYear() === year && today.getMonth() + 1 === month;
-  const isFutureMonth =
-    year > today.getFullYear() ||
-    (year === today.getFullYear() && month > today.getMonth() + 1);
   const todayDay = isCurrentMonth ? today.getDate() : 0;
 
   // Projected pace: outlier-trimmed average daily spend from the prior complete
@@ -108,13 +99,6 @@ export default function DailyPage() {
   );
   const maxExp = Math.max(1, ...days.map((d) => toNumber(d.expense)));
 
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const from = toISO(year, month, 1);
-  const to = isCurrentMonth
-    ? toISO(today.getFullYear(), today.getMonth() + 1, today.getDate())
-    : isFutureMonth
-      ? toISO(year, month, 1)
-      : toISO(year, month, daysInMonth);
   const yAxisTick = (v: number) => (showAmounts ? fmtShort(v, reportCurrency) : "•••");
 
   return (
@@ -276,11 +260,6 @@ export default function DailyPage() {
             </div>
           );
         })}
-      </div>
-
-      <div className="mt-10">
-        <SectionTitle>By Category</SectionTitle>
-        <CategoriesBreakdown from={from} to={to} currency={reportCurrency} compact />
       </div>
     </div>
   );

@@ -141,7 +141,6 @@ def _credit_summary(
     end: datetime,
     rates: fx.FxRates,
     report_currency: str,
-    excluded_category_ids: set[int],
 ) -> dict:
     cc_sources = db.query(Source).filter_by(user_id=user_id, is_credit_card=True).all()
     if not cc_sources:
@@ -162,13 +161,17 @@ def _credit_summary(
             rates,
         )
 
+    # Count EVERY non-deleted transaction on the card — including credit-card
+    # payments, which are booked as "Untrackable" income transfers (intent.py).
+    # Unlike the other stats endpoints we deliberately do NOT apply
+    # excluded_category_ids here, so this stays consistent with the card's real
+    # balance (sources.current_balance, query._credit_outstanding) instead of
+    # silently dropping payments and diverging from the Accounts list.
     all_conditions = [
         Transaction.user_id == user_id,
         Transaction.source_id.in_(cc_ids),
         Transaction.deleted_at.is_(None),
     ]
-    if excluded_category_ids:
-        all_conditions.append(~Transaction.category_id.in_(excluded_category_ids))
 
     all_rows = db.execute(
         select(Transaction.source_id, Transaction.type, Transaction.amount).where(*all_conditions)
@@ -308,9 +311,7 @@ def overview(
             "net": str(_round_currency(month_income - month_expense, report_currency)),
         },
         "budgets": budget_rows,
-        "credit": _credit_summary(
-            db, user.id, start, end, rates, report_currency, excluded_category_ids
-        ),
+        "credit": _credit_summary(db, user.id, start, end, rates, report_currency),
     }
 
 

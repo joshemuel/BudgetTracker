@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -19,12 +18,17 @@ import { useAmountVisibility } from "@/lib/privacy";
 import { useIsMobile } from "@/lib/mediaQuery";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
 import { useTheme } from "@/lib/theme";
-import { PALETTE, PALETTE_DARK } from "@/pages/Categories";
+import { CategoriesBreakdown, PALETTE, PALETTE_DARK } from "@/pages/Categories";
 
 // How many top categories to draw individually before bundling the rest into
 // an "Other" segment, so each monthly bar stays readable.
 const TOP_CATEGORIES = 8;
 const OTHER_COLOR = "#877e6a";
+
+function toISO(y: number, m: number, d: number): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${y}-${pad(m)}-${pad(d)}`;
+}
 
 // Explicit numeric fields win over the index signature, so totals/arithmetic
 // stay typed as `number` while the dynamic `inc_<id>`/`exp_<id>` category keys
@@ -42,6 +46,8 @@ export default function MonthlyPage() {
   const { showAmounts } = useAmountVisibility();
   const [year, setYear] = useState(new Date().getFullYear());
   const [byCategory, setByCategory] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
   const palette = theme === "dark" ? PALETTE_DARK : PALETTE;
   const { data: me } = useQuery<Me>({
@@ -120,35 +126,56 @@ export default function MonthlyPage() {
     { income: 0, expense: 0 }
   );
 
+  // Date range powering the spending-division pie: a clicked month, else the
+  // whole selected year.
+  const pieFrom = selectedMonth ? toISO(year, selectedMonth, 1) : toISO(year, 1, 1);
+  const pieTo = selectedMonth
+    ? toISO(year, selectedMonth, new Date(year, selectedMonth, 0).getDate())
+    : toISO(year, 12, 31);
+
+  // On mobile, open the year scrolled so the current month sits in view rather
+  // than starting at January. Runs once the bars have laid out (rAF) and again
+  // when the chart width can change (category toggle) or data arrives.
+  useEffect(() => {
+    if (!isMobile || year !== currentYear) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const raf = requestAnimationFrame(() => {
+      const overflow = el.scrollWidth - el.clientWidth;
+      if (overflow <= 0) return;
+      el.scrollLeft = overflow * ((currentMonth - 0.5) / 12);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isMobile, byCategory, year, currentYear, currentMonth, chartData.length]);
+
   return (
     <div>
       <div className="flex items-end justify-between">
-        <SectionTitle>
-          {year} — Month by Month
-        </SectionTitle>
+        <SectionTitle>{year}</SectionTitle>
         <div className="flex items-center gap-4">
-          <div className="grid grid-cols-2 border border-ink text-[10px] smallcaps">
-            <button
-              type="button"
-              onClick={() => setByCategory(false)}
-              aria-pressed={!byCategory}
-              className={`px-2 py-1 border-r border-ink ${
-                !byCategory ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
-              }`}
-            >
-              Totals
-            </button>
-            <button
-              type="button"
-              onClick={() => setByCategory(true)}
-              aria-pressed={byCategory}
-              className={`px-2 py-1 ${
-                byCategory ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
-              }`}
-            >
+          <button
+            type="button"
+            role="switch"
+            aria-checked={byCategory}
+            onClick={() => setByCategory((v) => !v)}
+            className="flex items-center gap-1.5 cursor-pointer select-none"
+            title="Toggle per-category breakdown"
+          >
+            <span className="smallcaps text-[10px] text-ink-mute whitespace-nowrap">
               By category
-            </button>
-          </div>
+            </span>
+            <span
+              className={`relative inline-flex h-3.5 w-7 shrink-0 items-center rounded-full transition-colors ${
+                byCategory ? "bg-accent" : "bg-ink/20"
+              }`}
+            >
+              <span
+                className={`inline-block h-2.5 w-2.5 rounded-full bg-paper transition-transform ${
+                  byCategory ? "translate-x-[16px]" : "translate-x-[2px]"
+                }`}
+              />
+            </span>
+          </button>
         <div className="flex gap-2 smallcaps">
           {[year - 2, year - 1, year, year + 1].map((y) => (
             <button
@@ -193,13 +220,23 @@ export default function MonthlyPage() {
         </div>
       </div>
 
-      <div className="mt-8 overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
+      <div ref={scrollRef} className="mt-8 overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
         <div
           className="h-[240px] sm:h-[360px]"
           style={isMobile ? { minWidth: 680 } : undefined}
         >
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
+          <BarChart
+            data={chartData}
+            margin={{ top: 20, right: 0, left: 0, bottom: 0 }}
+            onClick={(next) => {
+              const idx = (next as { activeTooltipIndex?: number | null })
+                .activeTooltipIndex;
+              if (idx == null || idx < 0 || idx >= chartData.length) return;
+              const m = Number(chartData[idx].month);
+              setSelectedMonth((prev) => (prev === m ? null : m));
+            }}
+          >
             <CartesianGrid stroke="#d9cdb4" vertical={false} />
             <XAxis
               dataKey="name"
@@ -228,10 +265,6 @@ export default function MonthlyPage() {
               />
             {byCategory ? (
               <>
-                <Legend
-                  wrapperStyle={{ fontFamily: "Instrument Sans", fontSize: 11 }}
-                  iconType="square"
-                />
                 {topCats.map((tc, i) => (
                   <Bar
                     key={`inc_${tc.category_id}`}
@@ -298,6 +331,29 @@ export default function MonthlyPage() {
             )}
           </BarChart>
         </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="mt-10">
+        <div className="flex items-center justify-between gap-3">
+          <SectionTitle>
+            Spending Division — {selectedMonth ? `${monthName(selectedMonth)} ${year}` : year}
+          </SectionTitle>
+          {selectedMonth !== null && (
+            <button
+              type="button"
+              onClick={() => setSelectedMonth(null)}
+              className="smallcaps text-[10px] text-ink-mute hover:text-accent border-b border-transparent hover:border-accent shrink-0"
+            >
+              ← whole year
+            </button>
+          )}
+        </div>
+        <p className="smallcaps text-[10px] text-ink-mute mt-1">
+          Tap a bar above to focus a single month.
+        </p>
+        <div className="mt-4">
+          <CategoriesBreakdown from={pieFrom} to={pieTo} currency={reportCurrency} compact />
         </div>
       </div>
 

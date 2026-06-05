@@ -211,7 +211,11 @@ def test_stats_exclude_untrackable_from_overview_monthly_daily_and_categories(
             auth_client.delete(f"/transactions/{tx_id}")
 
 
-def test_overview_credit_summary_excludes_untrackable(auth_client: TestClient, db):
+def test_overview_credit_summary_counts_untrackable_payments(auth_client: TestClient, db):
+    """A credit-card balance must count *every* transaction on the card,
+    including payments — which are booked as "Untrackable" income transfers.
+    The credit summary deliberately ignores the untracked-category exclusion so
+    it stays consistent with the card's real balance (the Accounts list)."""
     _seed_fx_rates(db)
     categories = auth_client.get("/categories").json()
     assert categories
@@ -246,39 +250,44 @@ def test_overview_credit_summary_excludes_untrackable(auth_client: TestClient, d
     before = auth_client.get(f"/stats/overview?year={year}&month={month}&currency=IDR").json()
     tx_ids: list[int] = []
     try:
+        # A real charge (tracked expense) on the card.
         tx_ids.append(
             _create_tx(
                 auth_client,
                 occurred_at=occurred,
                 tx_type="expense",
                 category_id=int(tracked["id"]),
-                amount="400",
+                amount="1000",
                 source_id=source_id,
-                description=f"pytest-credit-tracked-{uuid4().hex[:8]}",
+                description=f"pytest-credit-charge-{uuid4().hex[:8]}",
             )
         )
+        # A bill payment toward the card: income booked as "Untrackable".
         tx_ids.append(
             _create_tx(
                 auth_client,
                 occurred_at=occurred,
-                tx_type="expense",
+                tx_type="income",
                 category_id=int(untracked["id"]),
-                amount="700",
+                amount="400",
                 source_id=source_id,
-                description=f"pytest-credit-untracked-{uuid4().hex[:8]}",
+                description=f"pytest-credit-payment-{uuid4().hex[:8]}",
             )
         )
 
         after = auth_client.get(f"/stats/overview?year={year}&month={month}&currency=IDR").json()
         before_credit = before["credit"]
         after_credit = after["credit"]
+        # Charge counts toward this month's charges.
         assert (
             _to_decimal(after_credit["month_charges"]) - _to_decimal(before_credit["month_charges"])
-            == Decimal("400")
+            == Decimal("1000")
         )
+        # The Untrackable payment is now counted (was silently dropped before).
         assert (
-            _to_decimal(after_credit["outstanding"]) - _to_decimal(before_credit["outstanding"])
-            == Decimal("-400")
+            _to_decimal(after_credit["month_payments"])
+            - _to_decimal(before_credit["month_payments"])
+            == Decimal("400")
         )
     finally:
         for tx_id in tx_ids:
