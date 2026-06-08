@@ -6,7 +6,7 @@ import type { Me } from "@/types";
 import { monthName } from "@/lib/format";
 import { useIsMobile } from "@/lib/mediaQuery";
 import { useAmountVisibility } from "@/lib/privacy";
-import { usePwaInstall } from "@/lib/pwaInstall";
+import { usePwaInstall, type InstallPlatform } from "@/lib/pwaInstall";
 import { useTheme } from "@/lib/theme";
 import { startSyncPolling } from "@/lib/sync";
 import QuickLog from "@/components/QuickLog";
@@ -300,15 +300,55 @@ function Masthead({
   );
 }
 
-function IosInstallHelp({ open, onClose }: { open: boolean; onClose: () => void }) {
+// Shown when the browser doesn't hand us a native install prompt (stock Chrome
+// that didn't fire `beforeinstallprompt`, iOS Safari, in-app browsers, …). The
+// steps are tailored to the detected platform so every user has a way in.
+function InstallHelp({
+  open,
+  platform,
+  onClose,
+}: {
+  open: boolean;
+  platform: InstallPlatform;
+  onClose: () => void;
+}) {
   if (!open) return null;
+  const copy =
+    platform === "ios"
+      ? {
+          title: "Install on iPhone",
+          steps: [
+            "Open this page in Safari.",
+            "Tap the Share button (the square with an up-arrow).",
+            "Choose “Add to Home Screen”, then tap Add.",
+          ],
+        }
+      : platform === "android"
+      ? {
+          title: "Install on Android",
+          steps: [
+            "Open this page in Chrome.",
+            "Tap the ⋮ menu (top-right).",
+            "Tap “Install app” or “Add to Home screen”, then confirm.",
+          ],
+        }
+      : {
+          title: "Install this app",
+          steps: [
+            "Open this page in Chrome or Safari.",
+            "Open the browser menu.",
+            "Choose “Install app” or “Add to Home screen”.",
+          ],
+        };
   return (
     <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center p-4">
       <div className="modal-card w-full max-w-sm p-5">
-        <h3 className="font-semibold">Install on iPhone</h3>
-        <p className="text-sm text-ink-soft mt-2">
-          Open this page in Safari, tap the Share button, then choose Add to Home Screen.
-        </p>
+        <h3 className="font-semibold">{copy.title}</h3>
+        <ol className="text-sm text-ink-soft mt-3 space-y-2 list-decimal pl-5">
+          {copy.steps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
         <div className="mt-4 flex justify-end">
           <button
             onClick={onClose}
@@ -539,9 +579,10 @@ export default function AppShell() {
       <QuickLog open={logOpen} onClose={() => setLogOpen(false)} />
       <WebChat open={chatOpen} onOpenChange={setChatOpen} />
       <BottomNav />
-      <IosInstallHelp
-        open={isMobile && pwaInstall.showIosInstructions}
-        onClose={pwaInstall.closeIosInstructions}
+      <InstallHelp
+        open={isMobile && pwaInstall.showInstructions}
+        platform={pwaInstall.platform}
+        onClose={pwaInstall.closeInstructions}
       />
     </div>
   );
