@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Callable
 
@@ -17,6 +18,7 @@ from app.db.session import SessionLocal
 from app.services import financial, intent, query, telegram
 from app.services.auth import verify_password
 from app.services.currency_mode import default_source_for_currency
+from app.schemas.telegram import LinkTokenOut
 from app.services.parse import (
     correct_inflated_decimal_amounts,
     format_number,
@@ -41,6 +43,15 @@ PENDING_SOURCE_PREFIX = "PENDING_SOURCE_CREATE"
 PENDING_SOURCE_CHOICE_PREFIX = "PENDING_SOURCE_CHOICE"
 PENDING_TX_EDIT_PREFIX = "PENDING_TX_EDIT"
 PENDING_MANAGE_PREFIX = "PENDING_MANAGE"
+TELEGRAM_LINK_PREFIX = "TELEGRAM_LINK"
+BOT_USERNAME_KEY = "TELEGRAM_BOT_USERNAME"
+LINK_TOKEN_TTL_SECONDS = 600
+# Telegram start payloads are limited to 64 chars of [A-Za-z0-9_-].
+LINK_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+LINK_EXPIRED_MSG = (
+    "That link has expired or was already used. "
+    "Get a fresh one from Settings → Connected apps."
+)
 SendFn = Callable[[int | str, str], None]
 
 # Shown when the user asks for something the bot can't do, or attempts a
@@ -97,6 +108,99 @@ def _handle_login(
     user.telegram_chat_id = cid
     db.commit()
     _emit_message(chat_id, f"Logged in as {user.username}. {HELLO}", send_fn)
+
+
+def _link_token_key(token: str) -> str:
+    return f"{TELEGRAM_LINK_PREFIX}:{token}"
+
+
+def _issue_link_token(db: Session, user: User) -> tuple[str, int]:
+    """Create a single-use deep-link token for this user.
+
+    Sweeps expired tokens and replaces any outstanding token for the same user,
+    so at most one row per user ever accumulates.
+    """
+    now = datetime.now(timezone.utc)
+    rows = db.query(AppState).filter(AppState.key.like(f"{TELEGRAM_LINK_PREFIX}:%")).all()
+    for row in rows:
+        try:
+            expired = datetime.fromisoformat(str(row.value.get("expires_at"))) <= now
+        except (TypeError, ValueError):
+            expired = True
+        if expired or row.value.get("user_id") == user.id:
+            db.delete(row)
+    token = secrets.token_urlsafe(24)  # 32 chars, exactly [A-Za-z0-9_-]
+    expires_at = now + timedelta(seconds=LINK_TOKEN_TTL_SECONDS)
+    db.add(
+        AppState(
+            key=_link_token_key(token),
+            value={"user_id": user.id, "expires_at": expires_at.isoformat()},
+        )
+    )
+    db.commit()
+    return token, LINK_TOKEN_TTL_SECONDS
+
+
+def _consume_link_token(db: Session, token: str) -> User | None:
+    """Resolve a deep-link token to its approved user, deleting it on any attempt."""
+    if not LINK_TOKEN_RE.fullmatch(token):
+        return None
+    row = db.query(AppState).filter_by(key=_link_token_key(token)).one_or_none()
+    if row is None:
+        return None
+    value = dict(row.value)
+    db.delete(row)
+    db.commit()
+    try:
+        expires_at = datetime.fromisoformat(str(value.get("expires_at")))
+    except (TypeError, ValueError):
+        return None
+    if expires_at <= datetime.now(timezone.utc):
+        return None
+    user = db.get(User, int(value["user_id"]))
+    if user is None or user.status != "approved":
+        return None
+    return user
+
+
+def _bot_username(db: Session) -> str | None:
+    """Bot username for t.me deep links: env override → AppState cache → getMe."""
+    override = get_settings().telegram_bot_username
+    if override:
+        return override
+    row = db.query(AppState).filter_by(key=BOT_USERNAME_KEY).one_or_none()
+    if row is not None and row.value.get("username"):
+        return str(row.value["username"])
+    me = telegram.get_me()
+    username = (me or {}).get("username")
+    if not username:
+        return None
+    if row is None:
+        db.add(AppState(key=BOT_USERNAME_KEY, value={"username": username}))
+    else:
+        row.value = {"username": username}
+    db.commit()
+    return str(username)
+
+
+def _handle_start_link(db: Session, chat_id: int | str, payload: str) -> None:
+    """Bind this chat to the account named by a `/start <token>` deep link.
+
+    Unlike /login this never needs a password, so it's the only binding path
+    available to Google-OAuth accounts.
+    """
+    user = _consume_link_token(db, payload)
+    if user is None:
+        telegram.send_message(chat_id, LINK_EXPIRED_MSG)
+        return
+    cid = str(chat_id)
+    # Same eviction semantics as /login: one chat ↔ one user.
+    db.query(User).filter(User.telegram_chat_id == cid, User.id != user.id).update(
+        {"telegram_chat_id": None}
+    )
+    user.telegram_chat_id = cid
+    db.commit()
+    telegram.send_message(chat_id, f"Connected as {user.username}. {HELLO}")
 
 
 def _ensure_update_new(db: Session, update_id: int) -> bool:
@@ -1308,6 +1412,17 @@ def dispatch_update(db: Session, update: dict[str, Any]) -> None:
         _handle_login(db, chat_id, text)
         return
 
+    stripped = text.strip()
+    if stripped.startswith("/start"):
+        parts = stripped.split(maxsplit=1)
+        if len(parts) == 2 and parts[1].strip():
+            # Deep-link binding from Settings → Connected apps. Handles bound
+            # AND unbound chats — a fresh token is an explicit re-link.
+            _handle_start_link(db, chat_id, parts[1].strip())
+            return
+        # Plain /start falls through: bound → HELLO via _handle_text,
+        # unbound → LOGIN_PROMPT below.
+
     user = _user_for_chat(db, chat_id)
     if user is None:
         telegram.send_message(chat_id, LOGIN_PROMPT)
@@ -1373,6 +1488,35 @@ def set_webhook(payload: dict[str, str], _admin: User = Depends(get_current_admi
         return {"ok": False, "error": "missing url"}
     secret = get_settings().telegram_webhook_secret or None
     return telegram.set_webhook(url, secret_token=secret)
+
+
+@router.post("/link_token", response_model=LinkTokenOut)
+def link_token(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Issue a short-lived single-use t.me deep link that binds a Telegram chat
+    to this account. Works for all users, including Google-OAuth (no password)."""
+    username = _bot_username(db)
+    if not username:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "Telegram bot is not configured"
+        )
+    token, expires_in = _issue_link_token(db, user)
+    return LinkTokenOut(
+        deep_link=f"https://t.me/{username}?start={token}",
+        bot_username=username,
+        expires_in=expires_in,
+    )
+
+
+@router.post("/unlink", status_code=status.HTTP_204_NO_CONTENT)
+def unlink(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user.telegram_chat_id = None
+    db.commit()
 
 
 @router.post("/web_chat")

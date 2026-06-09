@@ -158,6 +158,7 @@ export default function PreferencesForm({
 
   return (
     <>
+      <div data-tutorial="prefs-defaults">
       <label className="block mb-2">
         <span className="smallcaps text-ink-mute block mb-1">Default Currency</span>
         <select
@@ -185,7 +186,8 @@ export default function PreferencesForm({
           ))}
         </select>
       </label>
-      <div className="mb-3 border-t border-paper-rule pt-3">
+      </div>
+      <div className="mb-3 border-t border-paper-rule pt-3" data-tutorial="tracking-mode">
         <span className="smallcaps text-ink-mute block mb-1">Tracking mode</span>
         <div className="grid grid-cols-2 border border-ink">
           <button

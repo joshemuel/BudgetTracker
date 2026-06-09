@@ -9,7 +9,9 @@ import { useAmountVisibility } from "@/lib/privacy";
 import { usePwaInstall, type InstallPlatform } from "@/lib/pwaInstall";
 import { useTheme } from "@/lib/theme";
 import { startSyncPolling } from "@/lib/sync";
+import { startTutorial } from "@/lib/tutorial";
 import QuickLog from "@/components/QuickLog";
+import Tour from "@/components/tour/Tour";
 import UserPrefsMenu from "@/components/UserPrefsMenu";
 import WebChat from "@/components/WebChat";
 
@@ -199,8 +201,22 @@ function Masthead({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-baseline sm:justify-between smallcaps text-ink-mute border-t border-paper-rule pt-4 sm:pt-5">
         <span className="order-1">Beta Version</span>
         <span className="order-3 sm:order-2 hidden sm:inline">{dateStr}</span>
-        <span className="order-2 sm:order-3 flex flex-wrap items-center gap-x-4 gap-y-2 sm:gap-6 self-start sm:self-auto">
+        <span
+          className="order-2 sm:order-3 flex flex-wrap items-center gap-x-4 gap-y-2 sm:gap-6 self-start sm:self-auto"
+          data-tutorial="masthead-tools"
+        >
           <UserPrefsMenu me={me} />
+          <button
+            onClick={startTutorial}
+            className="w-8 h-8 rounded-sm border border-ink text-ink hover:bg-ink hover:text-paper transition-colors flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            title="Replay the tour"
+            aria-label="Replay the tour"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 9a3 3 0 1 1 4.6 2.5c-1 .6-1.6 1.2-1.6 2.5" />
+              <circle cx="12" cy="17.5" r="0.4" fill="currentColor" />
+            </svg>
+          </button>
           <button
             onClick={toggleTheme}
             className="w-8 h-8 rounded-sm border border-ink text-ink hover:bg-ink hover:text-paper transition-colors flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -254,6 +270,7 @@ function Masthead({
             onClick={onLog}
             className="smallcaps px-3 py-1.5 border border-ink text-ink hover:bg-ink hover:text-paper transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             title="Press N"
+            data-tutorial="new-entry"
           >
             + New entry
           </button>
@@ -578,6 +595,13 @@ export default function AppShell() {
       </div>
       <QuickLog open={logOpen} onClose={() => setLogOpen(false)} />
       <WebChat open={chatOpen} onOpenChange={setChatOpen} />
+      <Tour
+        me={me}
+        openQuickLog={() => setLogOpen(true)}
+        closeQuickLog={() => setLogOpen(false)}
+        openChat={() => setChatOpen(true)}
+        closeChat={() => setChatOpen(false)}
+      />
       <BottomNav />
       <InstallHelp
         open={isMobile && pwaInstall.showInstructions}

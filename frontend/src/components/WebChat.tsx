@@ -314,7 +314,7 @@ export default function WebChat({
   );
 
   const expandedFooter = (
-    <div className="p-3 border-t border-paper-rule bg-paper space-y-2">
+    <div className="p-3 border-t border-paper-rule bg-paper space-y-2" data-tutorial="chat-footer">
       {recordErr && <p className="text-xs text-accent">{recordErr}</p>}
       <div className="flex gap-2">
         <input
