@@ -167,8 +167,10 @@ export default function Tour({
   }, [settled, idx, isMobile]);
 
   // Focus the dialog on each step; wrap Tab between its controls.
+  // preventScroll: focusing a fixed element otherwise nudges the page to
+  // "reveal" it, which scrolled the whole app and pushed the masthead away.
   useEffect(() => {
-    if (active && settled) cardRef.current?.focus();
+    if (active && settled) cardRef.current?.focus({ preventScroll: true });
   }, [active, settled, idx]);
   const onCardKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key !== "Tab" || !cardRef.current) return;
@@ -192,15 +194,27 @@ export default function Tour({
   const vw = window.innerWidth;
   const vh = window.innerHeight;
 
-  // Desktop callout placement: below → above → beside, clamped to the viewport.
-  let cardStyle: React.CSSProperties;
-  if (isMobile) {
+  // Three placements:
+  //  • centered  — no target (welcome/finale fallbacks): flex-centered overlay.
+  //  • mobile    — spotlight present: bottom sheet clear of the nav bar.
+  //  • anchored  — desktop spotlight: beside/above/below, clamped to viewport.
+  const anchored = settled && !!rect;
+  const centered = !anchored;
+  const maxCardH = vh - EDGE * 2;
+
+  let cardStyle: React.CSSProperties = {};
+  if (anchored && isMobile && rect) {
     cardStyle = {
       left: EDGE,
       right: EDGE,
       bottom: `calc(64px + env(safe-area-inset-bottom))`,
+      maxHeight: `calc(100dvh - ${rect.bottom + pad + GAP + EDGE}px)`,
     };
-  } else if (settled && rect) {
+    // If the target sits low (little room above the sheet), the sheet would be
+    // squashed — fall back to anchoring the sheet just under the spotlight.
+    const room = vh - (rect.bottom + pad + GAP) - EDGE;
+    if (room < 180) cardStyle = { left: EDGE, right: EDGE, top: EDGE, maxHeight: maxCardH };
+  } else if (anchored && rect) {
     const fitsBelow = rect.bottom + pad + GAP + cardH <= vh - EDGE;
     const fitsAbove = rect.top - pad - GAP - cardH >= EDGE;
     let top: number;
@@ -208,59 +222,45 @@ export default function Tour({
     if (fitsBelow) top = rect.bottom + pad + GAP;
     else if (fitsAbove) top = rect.top - pad - GAP - cardH;
     else {
-      top = Math.min(Math.max(EDGE, rect.top), vh - cardH - EDGE);
+      top = EDGE;
       if (rect.right + pad + GAP + CARD_W <= vw - EDGE) left = rect.right + pad + GAP;
       else if (rect.left - pad - GAP - CARD_W >= EDGE) left = rect.left - pad - GAP - CARD_W;
     }
+    top = Math.min(Math.max(EDGE, top), Math.max(EDGE, vh - Math.min(cardH, maxCardH) - EDGE));
     left = Math.min(Math.max(EDGE, left), vw - CARD_W - EDGE);
-    cardStyle = { top, left, width: CARD_W };
-  } else {
-    cardStyle = { top: vh / 2 - cardH / 2, left: vw / 2 - CARD_W / 2, width: CARD_W };
+    cardStyle = { top, left, width: CARD_W, maxHeight: maxCardH };
   }
 
-  return createPortal(
-    <div>
-      {settled && rect ? (
-        <>
-          {/* transparent blocker: the hole's box-shadow paints the dim,
-              this layer eats every click outside the tour's own buttons */}
-          <div className="fixed inset-0 z-[80]" />
-          <div
-            className="tour-hole z-[81]"
-            style={{
-              top: rect.top - pad,
-              left: rect.left - pad,
-              width: rect.width + pad * 2,
-              height: rect.height + pad * 2,
-            }}
-          />
-        </>
-      ) : (
-        <div className="tour-full z-[80]" />
+  const card = (
+    <div
+      ref={cardRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Leo's tour, step ${idx + 1} of ${tourSteps.length}`}
+      tabIndex={-1}
+      onKeyDown={onCardKeyDown}
+      className={
+        "modal-card overflow-y-auto p-5 pt-6 " +
+        (centered ? "w-[min(92vw,400px)] " : "fixed z-[90] ") +
+        (reducedMotion ? "" : "anim-in")
+      }
+      style={{
+        // position: fixed inline beats `.modal-card { position: relative }`, which
+        // (declared after the Tailwind import) otherwise wins over the `fixed` class.
+        ...cardStyle,
+        ...(centered ? { maxHeight: maxCardH } : { position: "fixed" }),
+        outline: "none",
+      }}
+    >
+      {/* Leo perches on the card's top-left corner, stamped on a paper seal.
+          Inline on mobile spotlight sheets where there's no room above. */}
+      {!(anchored && isMobile) && (
+        <div className="absolute -top-9 left-4 w-[72px] h-[72px] rounded-full bg-paper border border-ink flex items-center justify-center text-ink">
+          <Lion pose={step.pose ?? "point"} size={56} />
+        </div>
       )}
 
-      {settled && (
-        <div
-          ref={cardRef}
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Leo's tour, step ${idx + 1} of ${tourSteps.length}`}
-          tabIndex={-1}
-          onKeyDown={onCardKeyDown}
-          className={
-            "modal-card fixed z-[90] p-5 pt-6 outline-none focus:outline-none focus-visible:outline-none " +
-            (reducedMotion ? "" : "anim-in")
-          }
-          style={cardStyle}
-        >
-          {/* Leo perches on the card's top-left corner, stamped on a paper seal */}
-          {!isMobile && (
-            <div className="absolute -top-9 left-4 w-[72px] h-[72px] rounded-full bg-paper border border-ink flex items-center justify-center text-ink">
-              <Lion pose={step.pose ?? "point"} size={56} />
-            </div>
-          )}
-
-          <div className={isMobile ? "" : "pl-20"}>
+      <div className={!(anchored && isMobile) ? "pl-24 min-h-[44px]" : ""}>
             <div className="flex items-baseline justify-between gap-3 smallcaps text-ink-mute">
               <span>
                 Leo's tour · {idx + 1} / {tourSteps.length}
@@ -270,8 +270,8 @@ export default function Tour({
               </button>
             </div>
 
-            <div className={isMobile ? "mt-2 flex items-start gap-3" : "mt-2"}>
-              {isMobile && (
+            <div className={anchored && isMobile ? "mt-2 flex items-start gap-3" : "mt-2"}>
+              {anchored && isMobile && (
                 <span className="shrink-0 w-12 h-12 rounded-full bg-paper border border-ink flex items-center justify-center text-ink">
                   <Lion pose={step.pose ?? "point"} size={40} />
                 </span>
@@ -310,7 +310,38 @@ export default function Tour({
             </button>
           </div>
         </div>
+  );
+
+  return createPortal(
+    <div>
+      {anchored && rect ? (
+        <>
+          {/* transparent blocker: the hole's box-shadow paints the dim,
+              this layer eats every click outside the tour's own buttons */}
+          <div className="fixed inset-0 z-[80]" />
+          <div
+            className="tour-hole z-[81]"
+            style={{
+              top: rect.top - pad,
+              left: rect.left - pad,
+              width: rect.width + pad * 2,
+              height: rect.height + pad * 2,
+            }}
+          />
+        </>
+      ) : (
+        <div className="tour-full z-[80]" />
       )}
+
+      {settled &&
+        (centered ? (
+          // True flex centering — never depends on measured height or scroll.
+          <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+            {card}
+          </div>
+        ) : (
+          card
+        ))}
     </div>,
     document.body,
   );

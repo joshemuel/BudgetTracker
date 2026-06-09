@@ -213,8 +213,9 @@ function Masthead({
             aria-label="Replay the tour"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 9a3 3 0 1 1 4.6 2.5c-1 .6-1.6 1.2-1.6 2.5" />
-              <circle cx="12" cy="17.5" r="0.4" fill="currentColor" />
+              <circle cx="12" cy="12" r="9" />
+              <path d="M9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2-2.7 4" />
+              <circle cx="12" cy="17.4" r="0.6" fill="currentColor" stroke="none" />
             </svg>
           </button>
           <button
