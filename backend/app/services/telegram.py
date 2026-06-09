@@ -114,6 +114,25 @@ def delete_webhook() -> dict:
         return r.json()
 
 
+def get_me() -> dict | None:
+    """Bot identity from Telegram getMe; None when token unset or the call fails."""
+    if not get_settings().telegram_token:
+        return None
+    try:
+        with httpx.Client(timeout=10.0) as c:
+            r = c.get(f"{_base()}/getMe")
+            r.raise_for_status()
+            body = r.json()
+            if isinstance(body, dict) and body.get("ok"):
+                return body.get("result")
+            return None
+    except httpx.HTTPError as e:
+        log.exception("telegram get_me failed: %s", e)
+        return None
+    except ValueError:
+        return None
+
+
 def get_updates(offset: int | None = None, timeout: int = 30) -> list[dict]:
     if not get_settings().telegram_token:
         return []

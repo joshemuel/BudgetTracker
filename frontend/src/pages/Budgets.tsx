@@ -237,6 +237,7 @@ export default function BudgetsPage() {
 
       <form
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end"
+        data-tutorial="budget-form"
         onSubmit={(e) => {
           e.preventDefault();
           if (categoryId && limit) save.mutate();

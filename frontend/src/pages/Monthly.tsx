@@ -313,7 +313,11 @@ export default function MonthlyPage() {
         </div>
       </div>
 
-      <div ref={scrollRef} className="mt-8 overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
+      <div
+        ref={scrollRef}
+        className="mt-8 overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0"
+        data-tutorial="monthly-chart"
+      >
         <div
           ref={chartBoxRef}
           className="h-[240px] sm:h-[360px] select-none"

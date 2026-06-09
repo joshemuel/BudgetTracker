@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { AdminUser, Category, CurrencyBalance, Me, Source } from "@/types";
 import { fmtMoney, formatAmountLive, handleAmountChange } from "@/lib/format";
 import { useAmountVisibility } from "@/lib/privacy";
+import { startTutorial } from "@/lib/tutorial";
 import { SectionTitle } from "@/components/Figure";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import TrackAsOtherDialog from "@/components/TrackAsOtherDialog";
@@ -82,7 +83,7 @@ function CurrencyBlock({ sourcesEnabled }: { sourcesEnabled: boolean }) {
   });
 
   return (
-    <section className="mb-12">
+    <section className="mb-12" data-tutorial="currencies-table">
       <SectionTitle>Currencies</SectionTitle>
       <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
         <table className="ledger-table w-full text-[11px] sm:text-[13px]">
@@ -468,6 +469,7 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
       />
       <form
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end"
+        data-tutorial="add-source-form"
         onSubmit={(e) => {
           e.preventDefault();
           if (name.trim()) create.mutate();
@@ -782,6 +784,141 @@ function AdminBlock() {
   );
 }
 
+type LinkTokenOut = { deep_link: string; bot_username: string; expires_in: number };
+
+function ConnectedAppsBlock() {
+  const qc = useQueryClient();
+  const { data: me } = useMe();
+  const connected = !!me?.telegram_chat_id;
+  const [pendingLink, setPendingLink] = useState<LinkTokenOut | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const pollRef = useRef<number | null>(null);
+
+  const issueLink = useMutation({
+    mutationFn: () => api.post<LinkTokenOut>("/telegram/link_token"),
+    onSuccess: (r) => {
+      setPendingLink(r);
+      setCopied(false);
+      // t.me hands off to the native Telegram app on mobile; new tab on desktop.
+      window.open(r.deep_link, "_blank", "noopener");
+    },
+  });
+
+  const disconnect = useMutation({
+    mutationFn: () => api.post("/telegram/unlink"),
+    onSuccess: () => {
+      setConfirmOpen(false);
+      qc.invalidateQueries({ queryKey: ["me"] });
+    },
+  });
+
+  // Window-focus refetch is globally off, so while a link is outstanding poll
+  // ["me"] until the binding lands (the user confirms inside Telegram, not here).
+  useEffect(() => {
+    if (!pendingLink || connected) {
+      if (pollRef.current !== null) window.clearInterval(pollRef.current);
+      pollRef.current = null;
+      if (connected) setPendingLink(null);
+      return;
+    }
+    const refresh = () => qc.invalidateQueries({ queryKey: ["me"] });
+    pollRef.current = window.setInterval(refresh, 3000);
+    window.addEventListener("focus", refresh);
+    const expiry = window.setTimeout(() => setPendingLink(null), pendingLink.expires_in * 1000);
+    return () => {
+      if (pollRef.current !== null) window.clearInterval(pollRef.current);
+      pollRef.current = null;
+      window.removeEventListener("focus", refresh);
+      window.clearTimeout(expiry);
+    };
+  }, [pendingLink, connected, qc]);
+
+  return (
+    <section className="mt-12" data-tutorial="connect-telegram">
+      <SectionTitle>Connected apps</SectionTitle>
+      <p className="text-ink-mute text-sm mb-4">
+        Link other apps to log entries and ask about your finances from anywhere.
+      </p>
+      <table className="ledger-table w-full text-[11px] sm:text-[13px]">
+        <thead>
+          <tr>
+            <th>App</th>
+            <th>Status</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td className="font-[450]">Telegram</td>
+            <td className={`smallcaps ${connected ? "text-gain" : "text-ink-mute"}`}>
+              {connected ? "Connected" : "Not connected"}
+            </td>
+            <td className="text-right whitespace-nowrap">
+              {connected ? (
+                <button
+                  onClick={() => setConfirmOpen(true)}
+                  className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
+                >
+                  disconnect
+                </button>
+              ) : (
+                <button
+                  onClick={() => issueLink.mutate()}
+                  disabled={issueLink.isPending}
+                  className="smallcaps text-ink-mute hover:text-gain inline-block p-2 -m-2 disabled:opacity-50"
+                >
+                  {issueLink.isPending ? "opening…" : "connect"}
+                </button>
+              )}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      {issueLink.isError && (
+        <p className="text-accent text-sm mt-3">
+          {(issueLink.error as Error).message || "Couldn't reach Telegram. Try again later."}
+        </p>
+      )}
+      {pendingLink && !connected && (
+        <div className="mt-3 text-sm text-ink-soft">
+          <p>
+            Telegram should have opened — tap <span className="font-[550]">Start</span> in the bot
+            chat to finish connecting. Didn't open?{" "}
+            <a
+              href={pendingLink.deep_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-accent break-all"
+            >
+              Open this link
+            </a>{" "}
+            <button
+              onClick={() => {
+                navigator.clipboard?.writeText(pendingLink.deep_link).then(() => setCopied(true));
+              }}
+              className="smallcaps text-ink-mute hover:text-ink"
+            >
+              {copied ? "copied" : "copy"}
+            </button>
+          </p>
+          <p className="text-ink-mute mt-1">The link expires in 10 minutes.</p>
+        </div>
+      )}
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Disconnect Telegram?"
+        message="The bot will stop responding to that chat until you connect again."
+        confirmLabel="Disconnect"
+        busy={disconnect.isPending}
+        error={disconnect.isError ? (disconnect.error as Error).message : null}
+        onConfirm={() => disconnect.mutate()}
+        onClose={() => setConfirmOpen(false)}
+      />
+    </section>
+  );
+}
+
 function useMe() {
   return useQuery<Me>({
     queryKey: ["me"],
@@ -817,7 +954,16 @@ export function AccountSettingsPage() {
     <div className="prefs-compact">
       <section className="mb-12">
         <PreferencesForm me={me} />
+        <div className="mt-2">
+          <button
+            className="smallcaps text-ink-mute hover:text-accent"
+            onClick={startTutorial}
+          >
+            View tutorial →
+          </button>
+        </div>
       </section>
+      <ConnectedAppsBlock />
       {me?.is_admin && <AdminBlock />}
     </div>
   );

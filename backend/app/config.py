@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     # Shared secret echoed by Telegram in X-Telegram-Bot-Api-Secret-Token. When
     # set, inbound webhook updates that don't carry it are rejected.
     telegram_webhook_secret: str = Field(default="", alias="TELEGRAM_WEBHOOK_SECRET")
+    # Normally discovered via getMe and cached in AppState (key TELEGRAM_BOT_USERNAME);
+    # set this to override, e.g. after swapping bots while the cached row is stale.
+    telegram_bot_username: str = Field(default="", alias="TELEGRAM_BOT_USERNAME")
 
     # Google OAuth (Authorization Code flow). Empty disables Google sign-in.
     google_client_id: str = Field(default="", alias="GOOGLE_CLIENT_ID")

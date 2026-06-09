@@ -340,7 +340,7 @@ export default function SubscriptionsPage() {
         </section>
       )}
 
-      <section>
+      <section data-tutorial="subs-books">
         <div className="flex justify-between items-end mb-2">
           <p className="smallcaps text-ink-mute">On the books</p>
           {!adding && (

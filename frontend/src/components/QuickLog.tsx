@@ -287,7 +287,10 @@ export default function QuickLog({ open, onClose }: Props) {
         }`}
         aria-hidden={!open}
       >
-        <div className="modal-card w-full max-w-xl max-h-[100dvh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+        <div
+          className="modal-card w-full max-w-xl max-h-[100dvh] sm:max-h-[90vh] overflow-hidden flex flex-col"
+          data-tutorial="quicklog-card"
+        >
           <div className="p-4 sm:p-6 sm:pb-4 border-b border-paper-rule">
             <div className="flex items-baseline justify-between smallcaps text-ink-mute">
               <span>New entry</span>

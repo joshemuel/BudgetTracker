@@ -248,7 +248,11 @@ export default function OverviewPage() {
         </section>
       )}
 
-      <section ref={radarRef} className="col-span-12 lg:col-span-8 lg:order-1 lg:self-start">
+      <section
+        ref={radarRef}
+        className="col-span-12 lg:col-span-8 lg:order-1 lg:self-start"
+        data-tutorial="radar"
+      >
         <SpendRadar currency={ov.currency} year={ov.year} month={ov.month} />
       </section>
 
@@ -332,6 +336,7 @@ export default function OverviewPage() {
       <aside
         className="col-span-12 lg:col-span-4 lg:order-2 mt-6 lg:mt-0 text-sm flex flex-col gap-6 lg:overflow-hidden"
         style={!isMobile && !creditOpen && radarH ? { height: radarH } : undefined}
+        data-tutorial="credit-panel"
       >
         <div className="border-t-2 border-ink pt-4 shrink-0">
           <p className="smallcaps text-ink-mute">Credit Card</p>
