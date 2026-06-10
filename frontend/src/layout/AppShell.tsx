@@ -13,7 +13,7 @@ import { startTutorial } from "@/lib/tutorial";
 import QuickLog from "@/components/QuickLog";
 import Tour from "@/components/tour/Tour";
 import UserPrefsMenu from "@/components/UserPrefsMenu";
-import WebChat from "@/components/WebChat";
+import WebChat, { type ChatMode } from "@/components/WebChat";
 
 // Single source of truth for navigation. Desktop renders these as a collapsible
 // left sidebar (top-level) plus a sub-tab strip (group.sub); mobile renders the
@@ -535,7 +535,7 @@ export default function AppShell() {
     retry: false,
   });
   const [logOpen, setLogOpen] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMode, setChatMode] = useState<ChatMode>("closed");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -588,7 +588,9 @@ export default function AppShell() {
             sidebar stretches all the way to the bottom edge, with the footer
             tucked into the content column rather than stranded beside it. */}
         <div className="sm:flex sm:flex-1">
-          <Sidebar onOpenChat={() => setChatOpen(true)} />
+          {/* The sidebar tab opens the full-screen conversation; the docked
+              bar (inside WebChat) handles its own compact-panel toggle. */}
+          <Sidebar onOpenChat={() => setChatMode("full")} />
           <div className={`min-w-0 flex-1 ${pad} sm:pt-4`}>
             <SubTabNav />
             <GroupSubNav />
@@ -599,13 +601,13 @@ export default function AppShell() {
         </div>
       </div>
       <QuickLog open={logOpen} onClose={() => setLogOpen(false)} />
-      <WebChat open={chatOpen} onOpenChange={setChatOpen} />
+      <WebChat mode={chatMode} onModeChange={setChatMode} />
       <Tour
         me={me}
         openQuickLog={() => setLogOpen(true)}
         closeQuickLog={() => setLogOpen(false)}
-        openChat={() => setChatOpen(true)}
-        closeChat={() => setChatOpen(false)}
+        openChat={() => setChatMode("docked")}
+        closeChat={() => setChatMode("closed")}
       />
       <BottomNav />
       <InstallHelp

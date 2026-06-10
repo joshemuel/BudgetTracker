@@ -257,7 +257,9 @@ select:focus-visible {
 
 /* === Leo's tour: spotlight scrim === */
 /* One fixed div sits over the target; its oversized box-shadow paints the dim
-   everywhere else, so animating the div's box morphs the hole between steps.
+   everywhere else. No position transition: the hole is repositioned every
+   animation frame while the page scrolls, and a transition makes it visibly
+   trail its target. (Steps remount the hole anyway, so nothing morphs.)
    Scrim colors mirror .modal-backdrop exactly. */
 .tour-hole {
   position: fixed;
@@ -265,11 +267,6 @@ select:focus-visible {
   box-shadow: 0 0 0 200vmax rgba(25, 23, 15, 0.52);
   outline: 1.5px solid var(--color-accent);
   outline-offset: 2px;
-  transition:
-    top 0.35s cubic-bezier(0.2, 0.6, 0.2, 1),
-    left 0.35s cubic-bezier(0.2, 0.6, 0.2, 1),
-    width 0.35s cubic-bezier(0.2, 0.6, 0.2, 1),
-    height 0.35s cubic-bezier(0.2, 0.6, 0.2, 1);
 }
 :root[data-theme="dark"] .tour-hole {
   box-shadow: 0 0 0 200vmax rgba(0, 0, 0, 0.64);
@@ -292,12 +289,6 @@ select:focus-visible {
 :root[data-theme="dark"] .tour-scrim-strip {
   background: rgba(0, 0, 0, 0.64);
 }
-@media (prefers-reduced-motion: reduce) {
-  .tour-hole {
-    transition: none;
-  }
-}
-
 .safe-chat-right {
   right: max(0.75rem, env(safe-area-inset-right));
   bottom: env(safe-area-inset-bottom);

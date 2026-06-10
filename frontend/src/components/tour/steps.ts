@@ -43,10 +43,21 @@ export type TourStep = {
   gateHint?: string;
   /** Window event name that advances to the next step when dispatched. */
   advanceOn?: string;
+  /** Include the step only when this returns true (e.g. desktop-only). */
+  when?: (isMobile: boolean) => boolean;
+  /** Desktop card placement override: beside the spotlight, vertically
+   *  centered on it, instead of the below/above auto-flow. Falls back to
+   *  auto when the requested side doesn't fit the viewport. */
+  desktopPlacement?: "left" | "right";
+  /** Mobile: hug the spotlight (adjacent, roomier side) instead of the
+   *  centered default — for targets whose surroundings must stay visible. */
+  mobilePlacement?: "nearTarget";
   /** Prep on entering the step (open a modal, …). */
   before?: (ctx: TourControls) => void;
-  /** Cleanup on leaving the step in either direction, and on skip/finish. */
-  after?: (ctx: TourControls) => void;
+  /** Cleanup on leaving the step: dir is +1 advancing, -1 going back,
+   *  0 on skip/finish. Lets consecutive steps share state (an open chat)
+   *  without a close/reopen flicker between them. */
+  after?: (ctx: TourControls, dir?: 1 | -1 | 0) => void;
 };
 
 export const PRACTICE_ENTRY_TEXT = "Bought coffee for 50k";
@@ -68,6 +79,7 @@ export const tourSteps: TourStep[] = [
     body:
       "Everything in the house lives behind one of these four tabs. Let's " +
       "take the quick pass — one room at a time.",
+    desktopPlacement: "right",
   },
   {
     id: "nav-overview",
@@ -79,6 +91,7 @@ export const tourSteps: TourStep[] = [
       "my written summary, and By Category tracks each budget's pace. The " +
       "credit panel keeps the statement math: carried over + paid − charges " +
       "= outstanding.",
+    desktopPlacement: "right",
   },
   {
     id: "nav-activity",
@@ -89,6 +102,7 @@ export const tourSteps: TourStep[] = [
       "Activity stacks a year of bars — click any month and I'll cut it into " +
       "a category pie. The Daily tab adds the heatmap and projects where the " +
       "month will land at this pace.",
+    desktopPlacement: "right",
   },
   {
     id: "nav-ledger",
@@ -98,6 +112,7 @@ export const tourSteps: TourStep[] = [
     body:
       "The ledger itself. Every entry you log lands here — search it, filter " +
       "it, fix it. We'll come back in a minute to practice.",
+    desktopPlacement: "right",
   },
   {
     id: "nav-manage",
@@ -108,6 +123,7 @@ export const tourSteps: TourStep[] = [
       "Budgets, subscriptions, wallets, categories, and your account — " +
       "everything you set once and tune occasionally. Let's set up your " +
       "books next.",
+    desktopPlacement: "right",
   },
   {
     id: "tracking-mode",
@@ -158,9 +174,19 @@ export const tourSteps: TourStep[] = [
       ctx.isMobile
         ? "Prefer plain words to forms? This button opens our chat — I'm one " +
           "tap away from any page."
-        : "Prefer plain words to forms? The Chat tab opens our conversation — " +
-          "and the docked bar in the bottom-right corner is me too, always " +
-          "listening.",
+        : "Prefer plain words to forms? The Chat tab opens our conversation " +
+          "across the whole screen — ask anything, log anything.",
+    desktopPlacement: "right",
+  },
+  {
+    id: "chat-dock",
+    target: "chat-dock",
+    title: "Always *listening*",
+    body:
+      "This docked bar is me too, on every page. Type straight into it and " +
+      "hit enter, or click it open for the compact panel — same conversation, " +
+      "smaller window.",
+    when: (isMobile) => !isMobile,
   },
   {
     id: "chat-log",
@@ -175,13 +201,35 @@ export const tourSteps: TourStep[] = [
     gated: true,
     gateHint: "Send the message to continue",
     advanceOn: CHAT_LOGGED_EVENT,
+    desktopPlacement: "left",
+    mobilePlacement: "nearTarget",
     before: (ctx) => {
       ctx.openChat();
       window.dispatchEvent(
         new CustomEvent(CHAT_PREFILL_EVENT, { detail: PRACTICE_ENTRY_TEXT }),
       );
     },
-    after: (ctx) => ctx.closeChat(),
+    // Keep the chat open while advancing into chat-reply — close only on
+    // Back or skip/finish.
+    after: (ctx, dir) => {
+      if (dir !== 1) ctx.closeChat();
+    },
+  },
+  {
+    id: "chat-reply",
+    target: "chat-reply",
+    title: "Signed and *filed*",
+    body:
+      "That reply is my receipt — the coffee is on the books, category and " +
+      "all. If I ever misread you, say so in the next message and I'll " +
+      "correct the entry.",
+    pose: "cheer",
+    desktopPlacement: "left",
+    before: (ctx) => ctx.openChat(),
+    // Going Back returns to the send exercise — leave the chat open for it.
+    after: (ctx, dir) => {
+      if (dir !== -1) ctx.closeChat();
+    },
   },
   {
     id: "tx-edit",

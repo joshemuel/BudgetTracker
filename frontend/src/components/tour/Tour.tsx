@@ -61,6 +61,9 @@ export default function Tour({
   controlsRef.current = controls;
   const seqRef = useRef(0);
 
+  // Device-dependent step list (e.g. the docked-bar step is desktop-only).
+  const steps = useMemo(() => tourSteps.filter((s) => !s.when || s.when(isMobile)), [isMobile]);
+
   // Auto-start once per user. The timeout survives StrictMode's double-mount
   // (first invocation's timer is cleared by its cleanup) and lets .anim-in settle.
   useEffect(() => {
@@ -85,7 +88,8 @@ export default function Tour({
   // Step setup: prep → navigate → find target → scroll → wait still → reveal.
   useEffect(() => {
     if (!active) return;
-    const step = tourSteps[idx];
+    const step = steps[idx];
+    if (!step) return;
     const seq = ++seqRef.current;
     setTarget(null);
     setSettled(false);
@@ -111,46 +115,46 @@ export default function Tour({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, idx]);
+  }, [active, idx, steps]);
 
   const finish = useCallback(() => {
-    tourSteps[idx]?.after?.(controlsRef.current);
+    steps[idx]?.after?.(controlsRef.current, 0);
     markTutorialDone(me.id);
     setActive(false);
-  }, [idx, me.id]);
+  }, [idx, me.id, steps]);
 
   const go = useCallback(
     (delta: number) => {
       const next = idx + delta;
       if (next < 0) return;
-      tourSteps[idx]?.after?.(controlsRef.current);
-      if (next >= tourSteps.length) {
+      steps[idx]?.after?.(controlsRef.current, delta > 0 ? 1 : -1);
+      if (next >= steps.length) {
         markTutorialDone(me.id);
         setActive(false);
         return;
       }
       setIdx(next);
     },
-    [idx, me.id],
+    [idx, me.id, steps],
   );
 
   // Gated steps advance themselves when the page reports the user's action
   // (entry logged / edited / deleted) via a window CustomEvent.
   useEffect(() => {
     if (!active) return;
-    const ev = tourSteps[idx].advanceOn;
+    const ev = steps[idx]?.advanceOn;
     if (!ev) return;
     const onDone = () => go(1);
     window.addEventListener(ev, onDone);
     return () => window.removeEventListener(ev, onDone);
-  }, [active, idx, go]);
+  }, [active, idx, go, steps]);
 
   // Capture-phase keyboard control; stopPropagation keeps Escape/N away from
   // QuickLog, WebChat, and the AppShell shortcut while the tour drives.
   // Interactive steps only claim Escape — typing must reach the page.
   useEffect(() => {
     if (!active) return;
-    const interactive = !!tourSteps[idx].interactive;
+    const interactive = !!steps[idx]?.interactive;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -173,9 +177,9 @@ export default function Tour({
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [active, idx, finish, go]);
+  }, [active, idx, finish, go, steps]);
 
-  const rect = useAnchorRect(target, active ? tourSteps[idx]?.target : undefined);
+  const rect = useAnchorRect(target, active ? steps[idx]?.target : undefined);
 
   // Measure the card so placement can flip above/below/beside accurately.
   const cardRef = useRef<HTMLDivElement | null>(null);
@@ -189,9 +193,9 @@ export default function Tour({
   // "reveal" it, which scrolled the whole app and pushed the masthead away.
   // Interactive steps leave focus to the page (chat input, edit form).
   useEffect(() => {
-    if (active && settled && !tourSteps[idx].interactive)
+    if (active && settled && !steps[idx]?.interactive)
       cardRef.current?.focus({ preventScroll: true });
-  }, [active, settled, idx]);
+  }, [active, settled, idx, steps]);
   const onCardKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key !== "Tab" || !cardRef.current) return;
     const items = cardRef.current.querySelectorAll<HTMLElement>("button");
@@ -209,7 +213,8 @@ export default function Tour({
 
   if (!active) return null;
 
-  const step = tourSteps[idx];
+  const step = steps[idx];
+  if (!step) return null;
   const interactive = !!step.interactive;
   const pad = step.padding ?? 8;
   const vw = window.innerWidth;
@@ -218,52 +223,13 @@ export default function Tour({
 
   // Three placements:
   //  • centered  — no target (welcome/finale fallbacks): flex-centered overlay.
-  //  • mobile    — spotlight present: bottom sheet clear of the nav bar.
+  //  • mobile    — spotlight present: vertically centered, dodging the hole.
   //  • anchored  — desktop spotlight: beside/above/below, clamped to viewport.
   const anchored = settled && !!rect;
   const centered = !anchored;
   // Leo's seal pokes OVERHANG px above the card wherever it's perched
   // (everywhere except mobile spotlight sheets) — reserve headroom for it.
   const showBadge = !(anchored && isMobile);
-
-  let cardStyle: React.CSSProperties = {};
-  // The card itself never scrolls (that would clip the seal) — the inner
-  // content wrapper does. Centered default: viewport minus the wrapper's
-  // pt-12 (seal headroom) and pb-4.
-  let innerMaxH: React.CSSProperties["maxHeight"] = vh - 48 - 16;
-  if (anchored && isMobile && rect) {
-    cardStyle = {
-      left: EDGE,
-      right: EDGE,
-      bottom: `calc(64px + env(safe-area-inset-bottom))`,
-    };
-    innerMaxH = `calc(100dvh - ${rect.bottom + pad + GAP + EDGE}px)`;
-    // If the target sits low (little room above the sheet), the sheet would be
-    // squashed — fall back to anchoring the sheet just under the spotlight.
-    const room = vh - (rect.bottom + pad + GAP) - EDGE;
-    if (room < 180) {
-      cardStyle = { left: EDGE, right: EDGE, top: EDGE };
-      innerMaxH = vh - EDGE * 2;
-    }
-  } else if (anchored && rect) {
-    const minTop = EDGE + OVERHANG;
-    const maxH = vh - minTop - EDGE;
-    const fitsBelow = rect.bottom + pad + GAP + cardH <= vh - EDGE;
-    const fitsAbove = rect.top - pad - GAP - cardH >= minTop;
-    let top: number;
-    let left = rect.left + rect.width / 2 - CARD_W / 2;
-    if (fitsBelow) top = rect.bottom + pad + GAP;
-    else if (fitsAbove) top = rect.top - pad - GAP - cardH;
-    else {
-      top = minTop;
-      if (rect.right + pad + GAP + CARD_W <= vw - EDGE) left = rect.right + pad + GAP;
-      else if (rect.left - pad - GAP - CARD_W >= EDGE) left = rect.left - pad - GAP - CARD_W;
-    }
-    top = Math.min(Math.max(minTop, top), Math.max(minTop, vh - Math.min(cardH, maxH) - EDGE));
-    left = Math.min(Math.max(EDGE, left), vw - CARD_W - EDGE);
-    cardStyle = { top, left, width: CARD_W };
-    innerMaxH = maxH;
-  }
 
   const hole = rect
     ? {
@@ -274,12 +240,69 @@ export default function Tour({
       }
     : null;
 
+  let cardStyle: React.CSSProperties = {};
+  // The card itself never scrolls (that would clip the seal) — the inner
+  // content wrapper does. Centered default: viewport minus the wrapper's
+  // pt-12 (seal headroom) and pb-4.
+  let innerMaxH: React.CSSProperties["maxHeight"] = vh - 48 - 16;
+  if (anchored && isMobile && rect && hole) {
+    // Mobile: center the card in the band between the top edge and the
+    // bottom tab bar; only when that would cover the spotlight (or the step
+    // asks to hug it) shift just clear of the hole, on the roomier side.
+    const NAV_H = 64; // BottomNav incl. safe-area approximation
+    const bandTop = EDGE;
+    const bandBottom = vh - NAV_H - EDGE;
+    const holeTop = hole.top - GAP;
+    const holeBottom = hole.top + hole.height + GAP;
+    const roomAbove = holeTop - bandTop;
+    const roomBelow = bandBottom - holeBottom;
+    let top = bandTop + Math.max(0, (bandBottom - bandTop - cardH) / 2);
+    const covers = top < holeBottom && top + cardH > holeTop;
+    if (step.mobilePlacement === "nearTarget" || covers) {
+      const below = roomBelow >= cardH || roomBelow >= roomAbove;
+      top = below ? holeBottom : holeTop - cardH;
+    }
+    top = Math.min(Math.max(bandTop, top), Math.max(bandTop, bandBottom - cardH));
+    cardStyle = { left: EDGE, right: EDGE, top };
+    innerMaxH = bandBottom - top;
+  } else if (anchored && rect) {
+    const minTop = EDGE + OVERHANG;
+    const maxH = vh - minTop - EDGE;
+    const fitsRight = rect.right + pad + GAP + CARD_W <= vw - EDGE;
+    const fitsLeft = rect.left - pad - GAP - CARD_W >= EDGE;
+    let top: number | undefined;
+    let left = rect.left + rect.width / 2 - CARD_W / 2;
+    // Requested side placement (sidebar steps → right, chat steps → left):
+    // beside the spotlight, vertically centered on it.
+    if (step.desktopPlacement === "right" && fitsRight) {
+      left = rect.right + pad + GAP;
+      top = rect.top + rect.height / 2 - cardH / 2;
+    } else if (step.desktopPlacement === "left" && fitsLeft) {
+      left = rect.left - pad - GAP - CARD_W;
+      top = rect.top + rect.height / 2 - cardH / 2;
+    } else {
+      const fitsBelow = rect.bottom + pad + GAP + cardH <= vh - EDGE;
+      const fitsAbove = rect.top - pad - GAP - cardH >= minTop;
+      if (fitsBelow) top = rect.bottom + pad + GAP;
+      else if (fitsAbove) top = rect.top - pad - GAP - cardH;
+      else {
+        top = minTop;
+        if (fitsRight) left = rect.right + pad + GAP;
+        else if (fitsLeft) left = rect.left - pad - GAP - CARD_W;
+      }
+    }
+    top = Math.min(Math.max(minTop, top), Math.max(minTop, vh - Math.min(cardH, maxH) - EDGE));
+    left = Math.min(Math.max(EDGE, left), vw - CARD_W - EDGE);
+    cardStyle = { top, left, width: CARD_W };
+    innerMaxH = maxH;
+  }
+
   const card = (
     <div
       ref={cardRef}
       role="dialog"
       aria-modal="true"
-      aria-label={`Leo's tour, step ${idx + 1} of ${tourSteps.length}`}
+      aria-label={`Leo's tour, step ${idx + 1} of ${steps.length}`}
       tabIndex={-1}
       onKeyDown={onCardKeyDown}
       className={
@@ -315,7 +338,7 @@ export default function Tour({
         <div className={showBadge ? "pl-24 min-h-[44px]" : ""}>
           <div className="flex items-baseline justify-between gap-3 smallcaps text-ink-mute">
             <span>
-              Leo's tour · {idx + 1} / {tourSteps.length}
+              Leo's tour · {idx + 1} / {steps.length}
             </span>
             <button onClick={finish} className="hover:text-accent transition-colors">
               skip
@@ -340,7 +363,7 @@ export default function Tour({
         <div className="mt-4 h-[3px] bg-paper-deep">
           <div
             className="h-full bg-accent transition-[width] duration-300"
-            style={{ width: `${((idx + 1) / tourSteps.length) * 100}%` }}
+            style={{ width: `${((idx + 1) / steps.length) * 100}%` }}
           />
         </div>
 
@@ -361,7 +384,7 @@ export default function Tour({
               onClick={() => go(1)}
               className="smallcaps px-5 py-2 bg-ink text-paper hover:bg-accent transition-colors"
             >
-              {idx === tourSteps.length - 1 ? "Finish" : "Next →"}
+              {idx === steps.length - 1 ? "Finish" : "Next →"}
             </button>
           )}
         </div>

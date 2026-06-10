@@ -110,16 +110,22 @@ function MicIcon() {
   );
 }
 
+/** closed — desktop collapsed bar / mobile FAB. docked — compact bottom-right
+ *  panel (mobile: the modal). full — whole-screen conversation, opened from
+ *  the sidebar Chat tab (mobile: the same modal). */
+export type ChatMode = "closed" | "docked" | "full";
+
 export default function WebChat({
-  open,
-  onOpenChange,
+  mode,
+  onModeChange,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  mode: ChatMode;
+  onModeChange: (mode: ChatMode) => void;
 }) {
   const isMobile = useIsMobile();
   const qc = useQueryClient();
-  const setOpen = onOpenChange;
+  const open = mode !== "closed";
+  const setOpen = (next: boolean) => onModeChange(next ? "docked" : "closed");
   const [text, setText] = useState("");
   const [items, setItems] = useState<ChatItem[]>([
     { id: uid(), role: "leo", text: INITIAL_MESSAGE },
@@ -327,6 +333,12 @@ export default function WebChat({
     return "Record";
   }, [recording, busy]);
 
+  // The tour's chat-reply step spotlights my latest answer.
+  const lastLeoId = items.reduce<string | null>(
+    (acc, it) => (it.role === "leo" ? it.id : acc),
+    null,
+  );
+
   const messageLog = (
     <div
       ref={scrollRef}
@@ -335,6 +347,7 @@ export default function WebChat({
       {items.map((it) => (
         <div
           key={it.id}
+          data-tutorial={it.id === lastLeoId ? "chat-reply" : undefined}
           className={
             "max-w-[90%] px-3 py-2 rounded-sm border text-sm whitespace-pre-wrap " +
             (it.role === "user"
@@ -465,10 +478,49 @@ export default function WebChat({
     );
   }
 
-  // Desktop
+  // Desktop. Two surfaces: the sidebar Chat tab opens the full-screen room,
+  // the docked bar in the corner expands into the compact panel.
+  if (mode === "full") {
+    return (
+      <div className="modal-backdrop fixed inset-0 z-[70] flex items-stretch justify-center">
+        <div
+          className="modal-card w-full mx-4 my-4 flex flex-col"
+          style={{ maxHeight: "calc(100dvh - 2rem)" }}
+        >
+          <div className="flex items-center justify-between px-3 py-2 border-b border-paper-rule">
+            <span className="smallcaps text-ink-mute">Chat with Leo</span>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={resetSession}
+                className="smallcaps text-ink-mute hover:text-accent transition-colors"
+              >
+                new
+              </button>
+              <button
+                type="button"
+                onClick={() => onModeChange("closed")}
+                className="w-8 h-8 flex items-center justify-center text-ink-mute hover:text-accent transition-colors"
+                title="Close"
+                aria-label="Close chat"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+          </div>
+          {messageLog}
+          {expandedFooter}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed bottom-0 right-3 z-[70] w-[min(92vw,360px)] pointer-events-none safe-chat-right">
-      <div className="pointer-events-auto border border-paper-rule border-b-0 rounded-t-md bg-paper overflow-hidden chat-docked flex flex-col">
+      <div
+        className="pointer-events-auto border border-paper-rule border-b-0 rounded-t-md bg-paper overflow-hidden chat-docked flex flex-col"
+        data-tutorial="chat-dock"
+      >
         {!open ? (
           <form
             className="h-11 flex items-center gap-2 px-3"
