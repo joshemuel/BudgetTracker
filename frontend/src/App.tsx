@@ -9,6 +9,7 @@ import Categories from "@/pages/Categories";
 import Budgets from "@/pages/Budgets";
 import Subscriptions from "@/pages/Subscriptions";
 import Transactions from "@/pages/Transactions";
+import Chat from "@/pages/Chat";
 import Settings, {
   CategoriesSettingsPage,
   AccountSettingsPage,
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="categories" element={<Categories />} />
         <Route path="subscriptions" element={<Subscriptions />} />
         <Route path="transactions" element={<Transactions />} />
+        <Route path="chat" element={<Chat />} />
         <Route path="settings" element={<Settings />} />
         <Route path="settings/categories" element={<CategoriesSettingsPage />} />
         <Route path="settings/account" element={<AccountSettingsPage />} />

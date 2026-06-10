@@ -31,6 +31,18 @@ function toISO(y: number, m: number, d: number): string {
   return `${y}-${pad(m)}-${pad(d)}`;
 }
 
+// Round a value up to a "nice" axis maximum (1/2/2.5/5/10 × 10ⁿ). On mobile the
+// chart scrolls horizontally, so the real YAxis scrolls out of view; we pin a
+// duplicate axis over the left edge. Both share this fixed domain so their ticks
+// land at identical heights and the pinned copy reads true for every month.
+function niceCeil(v: number): number {
+  if (!isFinite(v) || v <= 0) return 1;
+  const pow = Math.pow(10, Math.floor(Math.log10(v)));
+  const norm = v / pow;
+  const step = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10;
+  return step * pow;
+}
+
 // Explicit numeric fields win over the index signature, so totals/arithmetic
 // stay typed as `number` while the dynamic `inc_<id>`/`exp_<id>` category keys
 // can still be assigned.
@@ -149,6 +161,15 @@ export default function MonthlyPage() {
       }
       return row;
     }) ?? [];
+
+  // Fixed Y domain shared by the chart and the pinned mobile axis. Each bar
+  // (or stack, in category mode) tops out at that month's income or expense, so
+  // the tallest of those across the year sets the ceiling.
+  const rawYMax = chartData.reduce(
+    (mx, r) => Math.max(mx, Number(r.Income), Number(r.Expense)),
+    0,
+  );
+  const yDomainMax = niceCeil(rawYMax);
 
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -313,9 +334,12 @@ export default function MonthlyPage() {
         </div>
       </div>
 
+      {/* relative wrapper hosts the horizontal scroller plus, on mobile, a
+          pinned axis overlaid on its left edge. */}
+      <div className="mt-8 relative">
       <div
         ref={scrollRef}
-        className="mt-8 overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0"
+        className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0"
         data-tutorial="monthly-chart"
       >
         <div
@@ -353,6 +377,8 @@ export default function MonthlyPage() {
               interval={0}
               tick={{ fontFamily: "Instrument Sans", fontSize: 11 }}
               tickLine={false}
+              // Fixed height on mobile so the plot area matches the pinned axis.
+              height={isMobile ? 28 : undefined}
             />
             <YAxis
               stroke="#4a4437"
@@ -360,6 +386,8 @@ export default function MonthlyPage() {
               tickFormatter={(v) => (showAmounts ? fmtShort(v, reportCurrency) : "•••")}
               tickLine={false}
               width={72}
+              // Mobile: lock the domain so the pinned overlay axis reads true.
+              domain={isMobile ? [0, yDomainMax] : undefined}
             />
               {/* Desktop hover shows the month's income/expense totals in both
                   plain and by-category modes (the stacked segments alone don't
@@ -439,6 +467,37 @@ export default function MonthlyPage() {
           </BarChart>
         </ResponsiveContainer>
         </div>
+      </div>
+        {/* Pinned axis: the same chart laid out at full width but clipped to the
+            72px left gutter and made opaque, so bars scrolling under it are
+            masked while the axis stays put. Identical height, margins, XAxis
+            spacer and domain as the real chart → its ticks line up exactly. */}
+        {isMobile && (
+          <div className="absolute top-0 left-0 h-[240px] w-[72px] overflow-hidden bg-paper pointer-events-none">
+            <div style={{ width: 680, height: "100%" }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
+                  <XAxis
+                    dataKey="name"
+                    height={28}
+                    tick={false}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    stroke="#4a4437"
+                    tick={{ fontFamily: "JetBrains Mono", fontSize: 11 }}
+                    tickFormatter={(v) => (showAmounts ? fmtShort(v, reportCurrency) : "•••")}
+                    tickLine={false}
+                    width={72}
+                    domain={[0, yDomainMax]}
+                  />
+                  <Bar dataKey="Income" fill="transparent" isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
       </div>
       <p className="smallcaps text-[10px] text-ink-mute mt-2">
         Tap a bar to see that month's spending breakdown{isMobile ? " · hold for in vs out" : ""}.

@@ -175,7 +175,8 @@ export const tourSteps: TourStep[] = [
         ? "Prefer plain words to forms? This button opens our chat — I'm one " +
           "tap away from any page."
         : "Prefer plain words to forms? The Chat tab opens our conversation " +
-          "across the whole screen — ask anything, log anything.",
+          "on its own full page — just like Overview or the ledger, only it's " +
+          "me.",
     desktopPlacement: "right",
   },
   {
@@ -183,9 +184,9 @@ export const tourSteps: TourStep[] = [
     target: "chat-dock",
     title: "Always *listening*",
     body:
-      "This docked bar is me too, on every page. Type straight into it and " +
-      "hit enter, or click it open for the compact panel — same conversation, " +
-      "smaller window.",
+      "And this docked bar is me too, on every page. Type straight into it " +
+      "and hit enter, or click it open for the compact panel — same " +
+      "conversation as the full page, smaller window.",
     when: (isMobile) => !isMobile,
   },
   {

@@ -13,7 +13,8 @@ import { startTutorial } from "@/lib/tutorial";
 import QuickLog from "@/components/QuickLog";
 import Tour from "@/components/tour/Tour";
 import UserPrefsMenu from "@/components/UserPrefsMenu";
-import WebChat, { type ChatMode } from "@/components/WebChat";
+import WebChat from "@/components/WebChat";
+import { ChatProvider } from "@/components/chat/ChatProvider";
 
 // Single source of truth for navigation. Desktop renders these as a collapsible
 // left sidebar (top-level) plus a sub-tab strip (group.sub); mobile renders the
@@ -404,9 +405,10 @@ function useSidebarCollapsed(): [boolean, () => void] {
 
 // Desktop left sidebar — the four top-level groups. Collapses to an icon rail.
 // Mobile uses BottomNav + GroupSubNav instead (this is hidden under sm).
-function Sidebar({ onOpenChat }: { onOpenChat: () => void }) {
+function Sidebar() {
   const { pathname } = useLocation();
   const [collapsed, toggle] = useSidebarCollapsed();
+  const chatActive = pathname === "/chat";
   return (
     <aside
       className={
@@ -458,14 +460,20 @@ function Sidebar({ onOpenChat }: { onOpenChat: () => void }) {
               );
             })}
             <li>
-              <button
-                type="button"
-                onClick={onOpenChat}
+              {/* A real route, like the other tabs — opens the full-page
+                  conversation. The docked corner bar is the pop-up variant. */}
+              <Link
+                to="/chat"
+                aria-current={chatActive ? "page" : undefined}
                 title={collapsed ? "Chat" : undefined}
                 data-tutorial="chat-launcher"
                 className={
-                  "w-full flex items-center gap-3 rounded-sm border-l-2 border-transparent py-2 transition-colors text-rail-ink/65 hover:text-rail-ink hover:bg-rail-ink/5 " +
-                  (collapsed ? "justify-center px-0" : "px-2.5")
+                  "w-full flex items-center gap-3 rounded-sm border-l-2 py-2 transition-colors " +
+                  (collapsed ? "justify-center px-0" : "px-2.5") +
+                  " " +
+                  (chatActive
+                    ? "border-accent text-rail-ink bg-rail-ink/10"
+                    : "border-transparent text-rail-ink/65 hover:text-rail-ink hover:bg-rail-ink/5")
                 }
               >
                 <span className="shrink-0">
@@ -485,7 +493,7 @@ function Sidebar({ onOpenChat }: { onOpenChat: () => void }) {
                 {!collapsed && (
                   <span className="smallcaps nav-tabs whitespace-nowrap">Chat</span>
                 )}
-              </button>
+              </Link>
             </li>
           </ul>
         </nav>
@@ -528,6 +536,7 @@ function SubTabNav() {
 export default function AppShell() {
   const qc = useQueryClient();
   const isMobile = useIsMobile();
+  const { pathname } = useLocation();
   const pwaInstall = usePwaInstall();
   const { data: me, isLoading, isError } = useQuery<Me>({
     queryKey: ["me"],
@@ -535,7 +544,9 @@ export default function AppShell() {
     retry: false,
   });
   const [logOpen, setLogOpen] = useState(false);
-  const [chatMode, setChatMode] = useState<ChatMode>("closed");
+  // The docked corner chat's open/closed state. The full-page conversation is
+  // a route (/chat), so it isn't tracked here.
+  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -578,43 +589,45 @@ export default function AppShell() {
   // Full-width shell: the masthead and footer span the display with their own
   // padding, while the sidebar runs flush against the left edge between them.
   const pad = "px-3 sm:px-4 md:px-6 lg:px-8 xl:px-10";
+  // The docked corner bar is redundant on the full-page chat — hide it there.
+  const onChatPage = pathname === "/chat";
   return (
-    <div className="pb-24 sm:pb-0">
-      <div className="sm:flex sm:min-h-screen sm:flex-col">
-        <div className={pad}>
-          <Masthead me={me} onLog={() => setLogOpen(true)} install={installCta} />
-        </div>
-        {/* The row fills the remaining viewport height (sm:flex-1) so the dark
-            sidebar stretches all the way to the bottom edge, with the footer
-            tucked into the content column rather than stranded beside it. */}
-        <div className="sm:flex sm:flex-1">
-          {/* The sidebar tab opens the full-screen conversation; the docked
-              bar (inside WebChat) handles its own compact-panel toggle. */}
-          <Sidebar onOpenChat={() => setChatMode("full")} />
-          <div className={`min-w-0 flex-1 ${pad} sm:pt-4`}>
-            <SubTabNav />
-            <GroupSubNav />
-            <main className="py-7 sm:py-10 md:py-12 lg:py-14">
-              <Outlet />
-            </main>
+    <ChatProvider>
+      <div className="pb-24 sm:pb-0">
+        <div className="sm:flex sm:min-h-screen sm:flex-col">
+          <div className={pad}>
+            <Masthead me={me} onLog={() => setLogOpen(true)} install={installCta} />
+          </div>
+          {/* The row fills the remaining viewport height (sm:flex-1) so the dark
+              sidebar stretches all the way to the bottom edge, with the footer
+              tucked into the content column rather than stranded beside it. */}
+          <div className="sm:flex sm:flex-1">
+            <Sidebar />
+            <div className={`min-w-0 flex-1 ${pad} sm:pt-4`}>
+              <SubTabNav />
+              <GroupSubNav />
+              <main className="py-7 sm:py-10 md:py-12 lg:py-14">
+                <Outlet />
+              </main>
+            </div>
           </div>
         </div>
+        <QuickLog open={logOpen} onClose={() => setLogOpen(false)} />
+        {!onChatPage && <WebChat open={chatOpen} onOpenChange={setChatOpen} />}
+        <Tour
+          me={me}
+          openQuickLog={() => setLogOpen(true)}
+          closeQuickLog={() => setLogOpen(false)}
+          openChat={() => setChatOpen(true)}
+          closeChat={() => setChatOpen(false)}
+        />
+        <BottomNav />
+        <InstallHelp
+          open={isMobile && pwaInstall.showInstructions}
+          platform={pwaInstall.platform}
+          onClose={pwaInstall.closeInstructions}
+        />
       </div>
-      <QuickLog open={logOpen} onClose={() => setLogOpen(false)} />
-      <WebChat mode={chatMode} onModeChange={setChatMode} />
-      <Tour
-        me={me}
-        openQuickLog={() => setLogOpen(true)}
-        closeQuickLog={() => setLogOpen(false)}
-        openChat={() => setChatMode("docked")}
-        closeChat={() => setChatMode("closed")}
-      />
-      <BottomNav />
-      <InstallHelp
-        open={isMobile && pwaInstall.showInstructions}
-        platform={pwaInstall.platform}
-        onClose={pwaInstall.closeInstructions}
-      />
-    </div>
+    </ChatProvider>
   );
 }
