@@ -246,7 +246,7 @@ export function CategoriesBreakdown({
                     className="inline-block w-2.5 h-2.5 rounded-[2px] shrink-0"
                     style={{ background: palette[i % palette.length] }}
                   />
-                  <span className="font-[450] flex-1 truncate">{r.category_name}</span>
+                  <span className="font-[550] flex-1 truncate">{r.category_name}</span>
                   <span className="num text-accent text-right whitespace-nowrap">
                     {masked(fmtAmount(r.expense))}
                   </span>
@@ -258,7 +258,7 @@ export function CategoriesBreakdown({
                 </li>
               );
             })}
-            <li className="flex items-center gap-2.5 pt-2 mt-1 border-t border-ink font-[500]">
+            <li className="flex items-center gap-2.5 pt-2 mt-1 border-t border-ink font-semibold">
               <span className="smallcaps flex-1">Total</span>
               <span className="num text-right whitespace-nowrap">
                 {masked(fmtAmount(total))}
@@ -282,7 +282,7 @@ export function CategoriesBreakdown({
                   const share = total ? toNumber(r.expense) / total : 0;
                   return (
                     <tr key={r.category_id}>
-                      <td className="font-[450] flex items-center gap-2">
+                      <td className="font-[550] flex items-center gap-2">
                         <span
                           className="inline-block w-2 h-2"
                           style={{ background: palette[i % palette.length] }}
@@ -301,7 +301,7 @@ export function CategoriesBreakdown({
                     </tr>
                   );
                 })}
-                <tr className="font-[500]">
+                <tr className="font-semibold">
                   <td className="smallcaps">Total</td>
                   <td className="text-right num">{masked(fmtAmount(total))}</td>
                   <td></td>

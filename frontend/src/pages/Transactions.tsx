@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Category, Me, Source, Transaction, TransactionList, TxType } from "@/types";
@@ -47,7 +47,6 @@ export default function TransactionsPage() {
   const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const isMobile = useIsMobile();
-  const tableScrollRef = useRef<HTMLDivElement>(null);
 
   const { data: cats } = useQuery<Category[]>({
     queryKey: ["categories"],
@@ -230,7 +229,7 @@ export default function TransactionsPage() {
                     <span className="num text-ink-soft text-[11px] block">
                       {fmtDateTime(t.occurred_at)}
                     </span>
-                    <span className="font-[450] block truncate">
+                    <span className="font-[550] block truncate">
                       {t.description || <span className="text-ink-mute italic">—</span>}
                     </span>
                     <span className="smallcaps text-ink-mute block mt-0.5">{t.category_name}</span>
@@ -318,11 +317,7 @@ export default function TransactionsPage() {
           )}
         </ul>
       ) : (
-        <div
-          ref={tableScrollRef}
-          className="tx-scroll overflow-y-auto"
-          style={{ maxHeight: "calc(100vh - 30rem)" }}
-        >
+        <div className="tx-scroll">
           <table className="ledger-table w-full text-[13px]">
             <thead>
               <tr>
@@ -339,7 +334,7 @@ export default function TransactionsPage() {
               {txs.map((t, i) => (
                 <tr key={t.id} data-tutorial={i === 0 ? "tx-row" : undefined}>
                   <td className="num text-ink-soft text-sm">{fmtDateTime(t.occurred_at)}</td>
-                  <td className="font-[450]">
+                  <td className="font-[550]">
                     {t.description || <span className="text-ink-mute italic">—</span>}
                     {t.transfer_group_id && (
                       <span className="ml-2 smallcaps text-ink-mute">transfer</span>
@@ -413,8 +408,7 @@ export default function TransactionsPage() {
                 e.preventDefault();
                 if (canPrev) {
                   setPage((p) => p - 1);
-                  if (tableScrollRef.current) tableScrollRef.current.scrollTop = 0;
-                  else window.scrollTo({ top: 0, behavior: "instant" });
+                  window.scrollTo({ top: 0, behavior: "instant" });
                 }
               }}
               disabled={!canPrev}
@@ -428,8 +422,7 @@ export default function TransactionsPage() {
                 e.preventDefault();
                 if (canNext) {
                   setPage((p) => p + 1);
-                  if (tableScrollRef.current) tableScrollRef.current.scrollTop = 0;
-                  else window.scrollTo({ top: 0, behavior: "instant" });
+                  window.scrollTo({ top: 0, behavior: "instant" });
                 }
               }}
               disabled={!canNext}

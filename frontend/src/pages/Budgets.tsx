@@ -152,7 +152,7 @@ export default function BudgetsPage() {
           <tbody>
             {(budgets ?? []).map((b) => (
               <tr key={b.id}>
-                <td className="font-[450]">{b.category_name}</td>
+                <td className="font-[550]">{b.category_name}</td>
                 <td className="text-right num">
                   {maskedText(maskMoney(b.monthly_limit, b.currency, showAmounts), showAmounts)}
                 </td>

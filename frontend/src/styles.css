@@ -7,12 +7,14 @@
   --color-paper-deep: #eadfcb;
   --color-paper-rule: #d9cdb4;
   --color-ink: #19170f;
-  --color-ink-soft: #4a4437;
-  --color-ink-mute: #877e6a;
+  --color-ink-soft: #3f3a2e;
+  --color-ink-mute: #746b57;
   --color-accent: #a02a1a;     /* rust-red, for expenses / accents */
   --color-gain: #3f5d2e;        /* deep olive, for income / positive */
   --color-warn: #b4721f;        /* amber, for warnings / behind */
   --color-highlight: #f1e6cc;   /* soft highlight strip */
+  --color-tab-activity: #dde3c9; /* booktab wash for Activity (from gain olive) */
+  --color-tab-manage: #f0d9c4;   /* booktab wash for Manage (from accent terracotta) */
   --color-rail: #1c1910;        /* dark left-sidebar panel */
   --color-rail-ink: #f4ecdb;    /* sidebar text / icons */
 
@@ -31,12 +33,14 @@
   --color-paper-deep: #242019;
   --color-paper-rule: #4a4130;
   --color-ink: #f4ecdb;
-  --color-ink-soft: #d2c9b2;
-  --color-ink-mute: #a59a80;
+  --color-ink-soft: #d8d0bc;
+  --color-ink-mute: #b0a68c;
   --color-accent: #f08a66;
   --color-gain: #abcb80;
   --color-warn: #e6ad5f;
   --color-highlight: #2c2618;
+  --color-tab-activity: #333a26;
+  --color-tab-manage: #46291f;
   --color-rail: #100d08;        /* deeper than the espresso page so the panel still reads */
   --color-rail-ink: #f4ecdb;
 }
@@ -53,14 +57,21 @@ html, body, #root {
   background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  /* 470 (Instrument Sans is a 400–700 variable font): body reads a touch
+     heavier without crossing into medium; emphasis sits at 550+. No
+     -webkit-font-smoothing: antialiased — it thins glyphs on macOS. */
+  font-weight: 470;
   font-feature-settings: "ss01", "cv11";
-  -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* Never let a stray wide element open a horizontal scrollbar on phones. */
+/* Never let a stray wide element open a horizontal scrollbar on phones.
+   `clip` (not `hidden`): hidden turns body into a scroll container, which
+   silently breaks viewport position:sticky (Transactions thead). The hidden
+   line stays as a fallback for engines without clip support. */
 html, body {
   overflow-x: hidden;
+  overflow-x: clip;
   max-width: 100%;
 }
 
@@ -118,7 +129,7 @@ body::after {
   text-transform: uppercase;
   letter-spacing: 0.18em;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
 }
 .num {
   font-family: var(--font-mono);
@@ -197,7 +208,7 @@ select:focus-visible {
   text-transform: uppercase;
   letter-spacing: 0.14em;
   font-size: 10.5px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--color-ink-mute);
   border-bottom: 1px solid var(--color-ink);
 }
@@ -205,9 +216,9 @@ select:focus-visible {
   background: rgba(160, 42, 26, 0.04);
 }
 
-/* Transactions: the body scrolls inside a bounded box so the desktop page
-   length stays put; the header sticks to the top. border-collapse drops a
-   sticky cell's border, so paint the header hairline as an inset shadow. */
+/* Transactions: the table runs the full page height and the header sticks to
+   the viewport top while it's on screen. border-collapse drops a sticky
+   cell's border, so paint the header hairline as an inset shadow. */
 .tx-scroll thead th {
   position: sticky;
   top: 0;
@@ -402,14 +413,21 @@ select:focus-visible {
   }
 }
 
-/* Desktop horizontal sub-tab strip only (Activity → Monthly/Daily, Manage →
-   Budgets/…): the default .smallcaps 10–11px reads too small here, so scale it
-   up fluidly with the viewport width. Scoped to `.sub-tabs` so the vertical
-   left-rail labels (which also carry `nav-tabs`) keep their original size.
-   Higher specificity than .smallcaps wins over the 768–1366px block above. */
+/* Desktop nav hierarchy: the left-rail primary tabs outrank the horizontal
+   sub-tab strip (Activity → Monthly/Daily, Manage → Budgets/…). Sub-tabs cap
+   at 13px so they always sit below the 14px rail labels. Double-class
+   specificity wins over both base .smallcaps and the 768–1366px block above. */
 @media (min-width: 641px) {
   .sub-tabs.smallcaps {
-    font-size: clamp(13px, 1.2vw, 18px);
-    letter-spacing: 0.1em;
+    font-size: clamp(11px, 1vw, 13px);
+    letter-spacing: 0.12em;
+  }
+
+  /* Rail width is fixed, so a fixed size (not a clamp) keeps the
+     whitespace-nowrap labels from overflowing. */
+  .rail-tabs.smallcaps {
+    font-size: 14px;
+    letter-spacing: 0.12em;
+    font-weight: 600;
   }
 }

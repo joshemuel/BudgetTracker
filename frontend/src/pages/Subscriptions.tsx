@@ -317,7 +317,7 @@ export default function SubscriptionsPage() {
             {pending!.map((c) => (
               <li key={c.id} className="py-3 flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <p className="font-[450]">{c.subscription_name}</p>
+                  <p className="font-[550]">{c.subscription_name}</p>
                   <p className="text-ink-soft text-sm">Due {c.due_date}</p>
                 </div>
                 <div className="flex gap-3">
@@ -377,7 +377,7 @@ export default function SubscriptionsPage() {
                     className="w-full text-left flex items-start gap-3 py-3 min-h-[44px]"
                   >
                     <span className="flex-1 min-w-0">
-                      <span className="font-[450] block truncate">{s.name}</span>
+                      <span className="font-[550] block truncate">{s.name}</span>
                       <span className="num text-ink-soft text-[11px] block mt-0.5">
                         next {s.next_billing_date}
                       </span>
@@ -470,7 +470,7 @@ export default function SubscriptionsPage() {
             <tbody>
               {(subs ?? []).map((s) => (
                 <tr key={s.id} className={s.active ? "" : "opacity-50"}>
-                  <td className="font-[450]">{s.name}</td>
+                  <td className="font-[550]">{s.name}</td>
                   <td className="text-ink-soft">
                     {sourcesEnabled ? (
                       showAmounts ? s.source_name : <span className="masked-amount">••••••</span>

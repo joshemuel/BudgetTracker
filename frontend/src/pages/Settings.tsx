@@ -4,7 +4,6 @@ import { api } from "@/api";
 import type { AdminUser, Category, CurrencyBalance, Me, Source } from "@/types";
 import { fmtMoney, formatAmountLive, handleAmountChange } from "@/lib/format";
 import { useAmountVisibility } from "@/lib/privacy";
-import { startTutorial } from "@/lib/tutorial";
 import { SectionTitle } from "@/components/Figure";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import TrackAsOtherDialog from "@/components/TrackAsOtherDialog";
@@ -98,7 +97,7 @@ function CurrencyBlock({ sourcesEnabled }: { sourcesEnabled: boolean }) {
           <tbody>
             {(currencies ?? []).map((c) => (
               <tr key={c.currency}>
-                <td className="font-[450]">{c.currency}</td>
+                <td className="font-[550]">{c.currency}</td>
                 <td className="text-right num">
                   {showAmounts ? fmtMoney(c.current_balance, c.currency) : "••••••"}
                 </td>
@@ -297,7 +296,7 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
           <tbody>
             {data?.map((s) => (
               <tr key={s.id}>
-                <td className="font-[450]">
+                <td className="font-[550]">
                   {s.name}
                   {s.is_credit_card && (
                     <span className="ml-2 smallcaps text-accent">credit</span>
@@ -593,7 +592,7 @@ function CategoriesBlock() {
           <tbody>
             {data?.map((c) => (
               <tr key={c.id}>
-                <td className="font-[450]">{c.name}</td>
+                <td className="font-[550]">{c.name}</td>
                 <td className="text-right whitespace-nowrap">
                   <button
                     onClick={() => {
@@ -744,7 +743,7 @@ function AdminBlock() {
           <tbody>
             {(users ?? []).map((u) => (
               <tr key={u.id}>
-                <td className="font-[450]">
+                <td className="font-[550]">
                   {u.username}
                   {u.is_admin && <span className="smallcaps text-ink-mute"> · admin</span>}
                 </td>
@@ -850,7 +849,7 @@ function ConnectedAppsBlock() {
         </thead>
         <tbody>
           <tr>
-            <td className="font-[450]">Telegram</td>
+            <td className="font-[550]">Telegram</td>
             <td className={`smallcaps ${connected ? "text-gain" : "text-ink-mute"}`}>
               {connected ? "Connected" : "Not connected"}
             </td>
@@ -954,14 +953,6 @@ export function AccountSettingsPage() {
     <div className="prefs-compact">
       <section className="mb-12">
         <PreferencesForm me={me} />
-        <div className="mt-2">
-          <button
-            className="smallcaps text-ink-mute hover:text-accent"
-            onClick={startTutorial}
-          >
-            View tutorial →
-          </button>
-        </div>
       </section>
       <ConnectedAppsBlock />
       {me?.is_admin && <AdminBlock />}

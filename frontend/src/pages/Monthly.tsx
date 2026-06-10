@@ -471,10 +471,13 @@ export default function MonthlyPage() {
         {/* Pinned axis: the same chart laid out at full width but clipped to the
             72px left gutter and made opaque, so bars scrolling under it are
             masked while the axis stays put. Identical height, margins, XAxis
-            spacer and domain as the real chart → its ticks line up exactly. */}
+            spacer and domain as the real chart → its ticks line up exactly.
+            The scroller's -mx-2 lets bars slide 8px past the wrapper's left
+            edge, so the mask starts at -left-2 (marginLeft puts the axis chart
+            back at wrapper x=0). */}
         {isMobile && (
-          <div className="absolute top-0 left-0 h-[240px] w-[72px] overflow-hidden bg-paper pointer-events-none">
-            <div style={{ width: 680, height: "100%" }}>
+          <div className="absolute top-0 -left-2 h-[240px] w-[80px] overflow-hidden bg-paper pointer-events-none">
+            <div style={{ width: 680, height: "100%", marginLeft: 8 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
                   <XAxis
@@ -516,7 +519,7 @@ export default function MonthlyPage() {
           <tbody>
             {data?.months.map((m) => (
               <tr key={m.month} className={isFuture(m.month) ? "opacity-50" : ""}>
-                <td className="font-[450]">{monthName(m.month)}</td>
+                <td className="font-[550]">{monthName(m.month)}</td>
                 <td className="text-right num text-gain">{masked(fmtAmount(m.income))}</td>
                 <td className="text-right num text-accent">{masked(fmtAmount(m.expense))}</td>
                 <td

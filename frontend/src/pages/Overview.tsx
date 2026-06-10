@@ -272,7 +272,7 @@ export default function OverviewPage() {
             {ov.budgets.map((b) => (
               <li key={b.category_id} className="py-3">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="font-[450]">{b.category_name}</span>
+                  <span className="font-[550]">{b.category_name}</span>
                   <span className={`smallcaps shrink-0 ${STATUS_STYLE[b.status]}`}>
                     {STATUS_LABEL[b.status]}
                   </span>
@@ -308,7 +308,7 @@ export default function OverviewPage() {
               <tbody>
                 {ov.budgets.map((b) => (
                   <tr key={b.category_id}>
-                    <td className="font-[450]">{b.category_name}</td>
+                    <td className="font-[550]">{b.category_name}</td>
                     <td className="text-right num">{fmtAmount(b.spent)}</td>
                     <td className="text-right num text-ink-mute">{fmtAmount(b.limit)}</td>
                     <td
@@ -381,7 +381,7 @@ export default function OverviewPage() {
                   .sort((a, b) => toNumber(b.current_balance) - toNumber(a.current_balance))
                   .map((c) => (
                   <li key={c.currency} className="py-2 flex justify-between items-baseline">
-                    <span className="font-[450]">{c.currency}</span>
+                    <span className="font-[550]">{c.currency}</span>
                     <span className={`num ${toNumber(c.current_balance) < 0 ? "text-accent" : ""}`}>
                       {showAmounts
                         ? `${new Intl.NumberFormat("de-DE", {
@@ -397,7 +397,7 @@ export default function OverviewPage() {
               .sort((a, b) => toNumber(b.current_balance) - toNumber(a.current_balance))
               .map((s) => (
                 <li key={s.id} className="py-2 flex justify-between items-baseline">
-                  <span className="font-[450]">
+                  <span className="font-[550]">
                     {showAmounts ? (
                       <>
                         {s.name}

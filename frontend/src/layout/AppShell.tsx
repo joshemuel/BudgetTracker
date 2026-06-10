@@ -144,22 +144,34 @@ function BottomNav() {
   );
 }
 
+// Booktab pastel per section. Literal class names (not concatenation) so
+// Tailwind's scanner emits them.
+const tabWashByGroup: Partial<Record<NavGroup["key"], string>> = {
+  activity: "bg-tab-activity",
+  manage: "bg-tab-manage",
+};
+
 function GroupSubNav() {
   const { pathname } = useLocation();
   const group = navGroups.find((g) => g.routes.includes(pathname));
   if (!group?.sub) return null;
+  const wash = tabWashByGroup[group.key] ?? "bg-highlight";
   return (
     <nav className="sm:hidden pt-3 pb-1 overflow-x-auto -mx-3 px-3">
-      <div className="inline-flex border border-ink smallcaps nav-tabs">
-        {group.sub.map((s, i) => (
+      {/* Book-index folder tabs: all tabs sit on a baseline rule; the active
+          one is taller, pastel-filled, and opens into the page (-mb-px over
+          the rule with no bottom border). */}
+      <div className="flex items-end min-w-max border-b border-ink smallcaps nav-tabs">
+        {group.sub.map((s) => (
           <NavLink
             key={s.to}
             to={s.to}
             end={s.end}
             className={({ isActive }) =>
-              "px-3 py-1.5 transition-colors " +
-              (i > 0 ? "border-l border-ink " : "") +
-              (isActive ? "bg-ink text-paper" : "text-ink-soft active:text-ink")
+              "relative shrink-0 whitespace-nowrap rounded-t border -mb-px mr-1 transition-colors " +
+              (isActive
+                ? `z-10 ${wash} border-ink border-b-0 text-ink px-3 pt-1.5 pb-[7px]`
+                : "bg-paper-deep/60 border-paper-rule text-ink-soft px-3 py-1 active:text-ink")
             }
           >
             {s.label}
@@ -279,7 +291,7 @@ function Masthead({
             + New entry
           </button>
           {me && (
-            <span className="text-ink-soft normal-case tracking-normal font-[450] hidden sm:inline">
+            <span className="text-ink-soft normal-case tracking-normal font-[550] hidden sm:inline">
               {me.username}
             </span>
           )}
@@ -413,7 +425,7 @@ function Sidebar() {
     <aside
       className={
         "hidden sm:block shrink-0 bg-rail text-rail-ink border-r border-rail-ink/10 transition-[width] " +
-        (collapsed ? "w-14" : "w-44")
+        (collapsed ? "w-14" : "w-52")
       }
     >
       <div className="sticky top-0 flex flex-col px-2.5 py-4">
@@ -453,7 +465,7 @@ function Sidebar() {
                       <NavIcon name={g.key} />
                     </span>
                     {!collapsed && (
-                      <span className="smallcaps nav-tabs whitespace-nowrap">{g.label}</span>
+                      <span className="smallcaps nav-tabs rail-tabs whitespace-nowrap">{g.label}</span>
                     )}
                   </Link>
                 </li>
@@ -491,7 +503,7 @@ function Sidebar() {
                   </svg>
                 </span>
                 {!collapsed && (
-                  <span className="smallcaps nav-tabs whitespace-nowrap">Chat</span>
+                  <span className="smallcaps nav-tabs rail-tabs whitespace-nowrap">Chat</span>
                 )}
               </Link>
             </li>
