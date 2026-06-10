@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import { useIsMobile } from "@/lib/mediaQuery";
+import { CHAT_LOGGED_EVENT, CHAT_PREFILL_EVENT } from "@/lib/tutorial";
 
 type Role = "user" | "leo";
 type ChatItem = { id: string; role: Role; text: string };
@@ -34,6 +35,8 @@ const INITIAL_MESSAGE =
 type WebChatResponse = {
   ok: boolean;
   messages?: string[];
+  /** True when the message booked one or more ledger entries. */
+  logged?: boolean;
   error?: string;
 };
 
@@ -115,6 +118,7 @@ export default function WebChat({
   onOpenChange: (open: boolean) => void;
 }) {
   const isMobile = useIsMobile();
+  const qc = useQueryClient();
   const setOpen = onOpenChange;
   const [text, setText] = useState("");
   const [items, setItems] = useState<ChatItem[]>([
@@ -157,6 +161,35 @@ export default function WebChat({
     }
   }, [open, isMobile]);
 
+  // Leo's tour drafts a practice message into the input.
+  useEffect(() => {
+    const onPrefill = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (typeof detail === "string") setText(detail);
+    };
+    window.addEventListener(CHAT_PREFILL_EVENT, onPrefill);
+    return () => window.removeEventListener(CHAT_PREFILL_EVENT, onPrefill);
+  }, []);
+
+  // After a chat message books entries: refresh everything the new rows touch
+  // (same set QuickLog invalidates), THEN tell the tour — its next step lands
+  // on /transactions and must find the fresh row.
+  const notifyLogged = (res: WebChatResponse) => {
+    if (!res.ok || !res.logged) return;
+    for (const key of [
+      "transactions",
+      "overview",
+      "sources",
+      "currencies",
+      "monthly",
+      "daily",
+      "category-stats",
+    ]) {
+      qc.invalidateQueries({ queryKey: [key] });
+    }
+    window.dispatchEvent(new CustomEvent(CHAT_LOGGED_EVENT));
+  };
+
   const postText = useMutation({
     mutationFn: async (message: string) => {
       // The acting user is derived from the session cookie server-side.
@@ -165,6 +198,7 @@ export default function WebChat({
       });
     },
     onSuccess: (res) => {
+      notifyLogged(res);
       if (!res.ok) {
         setItems((prev) => [
           ...prev,
@@ -195,6 +229,7 @@ export default function WebChat({
       });
     },
     onSuccess: (res) => {
+      notifyLogged(res);
       if (!res.ok) {
         setItems((prev) => [
           ...prev,
@@ -382,6 +417,7 @@ export default function WebChat({
           <button
             type="button"
             onClick={() => setOpen(true)}
+            data-tutorial="chat-launcher"
             className="chat-fab fixed z-[70] w-[52px] h-[52px] rounded-full bg-ink text-paper flex items-center justify-center hover:bg-ink-soft transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             style={{
               right: "max(1rem, env(safe-area-inset-right))",

@@ -15,6 +15,7 @@ import { SectionTitle } from "@/components/Figure";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useAmountVisibility } from "@/lib/privacy";
 import { useIsMobile } from "@/lib/mediaQuery";
+import { TX_DELETED_EVENT, TX_EDITED_EVENT } from "@/lib/tutorial";
 
 type CurrencyCode = "IDR" | "SGD" | "JPY" | "AUD" | "TWD" | "USD";
 const CURRENCIES: CurrencyCode[] = ["IDR", "SGD", "JPY", "AUD", "TWD", "USD"];
@@ -98,6 +99,8 @@ export default function TransactionsPage() {
       qc.invalidateQueries({ queryKey: ["sources"] });
       qc.invalidateQueries({ queryKey: ["currencies"] });
       setPendingDelete(null);
+      // Leo's tour listens for this to advance its delete exercise.
+      window.dispatchEvent(new CustomEvent(TX_DELETED_EVENT));
     },
   });
 
@@ -113,6 +116,8 @@ export default function TransactionsPage() {
       qc.invalidateQueries({ queryKey: ["daily"] });
       qc.invalidateQueries({ queryKey: ["category-stats"] });
       setEditing(null);
+      // Leo's tour listens for this to advance its edit exercise.
+      window.dispatchEvent(new CustomEvent(TX_EDITED_EVENT));
     },
   });
 
@@ -211,10 +216,10 @@ export default function TransactionsPage() {
 
       {isMobile ? (
         <ul className="border-t border-paper-rule divide-y divide-paper-rule">
-          {txs.map((t) => {
+          {txs.map((t, i) => {
             const expanded = expandedId === t.id;
             return (
-              <li key={t.id}>
+              <li key={t.id} data-tutorial={i === 0 ? "tx-row" : undefined}>
                 <button
                   type="button"
                   onClick={() => setExpandedId(expanded ? null : t.id)}
@@ -331,8 +336,8 @@ export default function TransactionsPage() {
               </tr>
             </thead>
             <tbody>
-              {txs.map((t) => (
-                <tr key={t.id}>
+              {txs.map((t, i) => (
+                <tr key={t.id} data-tutorial={i === 0 ? "tx-row" : undefined}>
                   <td className="num text-ink-soft text-sm">{fmtDateTime(t.occurred_at)}</td>
                   <td className="font-[450]">
                     {t.description || <span className="text-ink-mute italic">—</span>}

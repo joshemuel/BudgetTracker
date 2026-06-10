@@ -282,6 +282,16 @@ select:focus-visible {
 :root[data-theme="dark"] .tour-full {
   background: rgba(0, 0, 0, 0.64);
 }
+/* Interactive steps: four strips tile the screen around the spotlight hole so
+   clicks pass through the hole itself. Sits *below* the app's own modals
+   (z-50/70) so the edit dialog and chat stay usable and undimmed. */
+.tour-scrim-strip {
+  position: fixed;
+  background: rgba(25, 23, 15, 0.52);
+}
+:root[data-theme="dark"] .tour-scrim-strip {
+  background: rgba(0, 0, 0, 0.64);
+}
 @media (prefers-reduced-motion: reduce) {
   .tour-hole {
     transition: none;

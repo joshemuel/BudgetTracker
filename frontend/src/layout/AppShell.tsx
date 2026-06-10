@@ -114,6 +114,7 @@ function BottomNav() {
     <nav
       className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-paper border-t border-ink"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      data-tutorial="nav-panel"
     >
       <ul className="grid grid-cols-4">
         {navGroups.map((g) => {
@@ -123,6 +124,7 @@ function BottomNav() {
               <Link
                 to={g.to}
                 aria-current={active ? "page" : undefined}
+                data-tutorial={`nav-${g.key}`}
                 className={
                   "flex flex-col items-center justify-center gap-1 min-h-[56px] py-2 transition-colors " +
                   (active ? "text-accent" : "text-ink-soft active:text-ink")
@@ -425,7 +427,7 @@ function Sidebar({ onOpenChat }: { onOpenChat: () => void }) {
             {collapsed ? <path d="M9 6l6 6-6 6" /> : <path d="M15 6l-6 6 6 6" />}
           </svg>
         </button>
-        <nav>
+        <nav data-tutorial="nav-panel">
           <ul className="flex flex-col gap-1">
             {navGroups.map((g) => {
               const active = g.routes.includes(pathname);
@@ -435,6 +437,7 @@ function Sidebar({ onOpenChat }: { onOpenChat: () => void }) {
                     to={g.to}
                     aria-current={active ? "page" : undefined}
                     title={collapsed ? g.label : undefined}
+                    data-tutorial={`nav-${g.key}`}
                     className={
                       "flex items-center gap-3 rounded-sm border-l-2 py-2 transition-colors " +
                       (collapsed ? "justify-center px-0" : "px-2.5") +
@@ -459,6 +462,7 @@ function Sidebar({ onOpenChat }: { onOpenChat: () => void }) {
                 type="button"
                 onClick={onOpenChat}
                 title={collapsed ? "Chat" : undefined}
+                data-tutorial="chat-launcher"
                 className={
                   "w-full flex items-center gap-3 rounded-sm border-l-2 border-transparent py-2 transition-colors text-rail-ink/65 hover:text-rail-ink hover:bg-rail-ink/5 " +
                   (collapsed ? "justify-center px-0" : "px-2.5")

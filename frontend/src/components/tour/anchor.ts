@@ -53,9 +53,13 @@ export function rectStable(el: HTMLElement, timeoutMs = 1500): Promise<void> {
   });
 }
 
-/** Live viewport rect for the spotlight: ResizeObserver + window resize/scroll
- * (capture catches inner scroll boxes), coalesced through one rAF. */
-export function useAnchorRect(el: HTMLElement | null): DOMRect | null {
+/** Live viewport rect for the spotlight, polled through rAF while a step is
+ * active. Each frame re-resolves the data-tutorial selector when the held
+ * node went stale: a query refetch can replace or reorder the tagged element
+ * (e.g. tx-row moves down when a newer entry lands), and following the live
+ * selector keeps the spotlight on the intended target. setRect only fires on
+ * an actual move, so render churn stays at zero while everything holds still. */
+export function useAnchorRect(el: HTMLElement | null, name?: string): DOMRect | null {
   const [rect, setRect] = useState<DOMRect | null>(null);
   useEffect(() => {
     if (!el) {
@@ -63,24 +67,33 @@ export function useAnchorRect(el: HTMLElement | null): DOMRect | null {
       return;
     }
     let raf = 0;
+    let current: HTMLElement = el;
+    let last: DOMRect | null = null;
     const measure = () => {
-      raf = 0;
-      setRect(el.getBoundingClientRect());
+      if (name && (!current.isConnected || current.getAttribute("data-tutorial") !== name)) {
+        for (const cand of document.querySelectorAll<HTMLElement>(`[data-tutorial="${name}"]`)) {
+          const r = cand.getBoundingClientRect();
+          if (r.width > 0 && r.height > 0) {
+            current = cand;
+            break;
+          }
+        }
+      }
+      const r = current.getBoundingClientRect();
+      const moved =
+        last === null ||
+        Math.abs(r.top - last.top) > 0.5 ||
+        Math.abs(r.left - last.left) > 0.5 ||
+        Math.abs(r.width - last.width) > 0.5 ||
+        Math.abs(r.height - last.height) > 0.5;
+      if (moved) {
+        last = r;
+        setRect(r);
+      }
+      raf = requestAnimationFrame(measure);
     };
-    const schedule = () => {
-      if (!raf) raf = requestAnimationFrame(measure);
-    };
-    measure();
-    const ro = new ResizeObserver(schedule);
-    ro.observe(el);
-    window.addEventListener("resize", schedule, { passive: true });
-    window.addEventListener("scroll", schedule, { passive: true, capture: true });
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", schedule);
-      window.removeEventListener("scroll", schedule, { capture: true });
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, [el]);
+    raf = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(raf);
+  }, [el, name]);
   return rect;
 }

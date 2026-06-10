@@ -1188,7 +1188,9 @@ def _handle_text(
     chat_id: int | str,
     text: str,
     send_fn: SendFn | None = None,
-) -> None:
+) -> bool | None:
+    """Returns truthy only when the message booked ledger entries (the web
+    chat surfaces this so Leo's tour can advance its logging exercise)."""
     t = text.strip()
     if t == "/start" or t == "/help":
         _emit_message(chat_id, HELLO, send_fn)
@@ -1332,6 +1334,7 @@ def _handle_text(
     outcome = financial.log_items(db, user, items)
     keyboard = _tx_keyboard(outcome.summaries) if send_fn is None else None
     _emit_message(chat_id, outcome.as_message(), send_fn, reply_markup=keyboard)
+    return True
 
 
 def _handle_media_b64(
@@ -1341,7 +1344,8 @@ def _handle_media_b64(
     b64: str,
     mime: str,
     send_fn: SendFn | None = None,
-) -> None:
+) -> bool | None:
+    """Same truthy-on-logged contract as _handle_text."""
     cats, srcs = _names(db, user.id)
     today = now_local().strftime("%m/%d/%Y")
     try:
@@ -1371,8 +1375,10 @@ def _handle_media_b64(
         outcome = financial.log_items(db, user, result["items"])
         keyboard = _tx_keyboard(outcome.summaries) if send_fn is None else None
         _emit_message(chat_id, outcome.as_message(), send_fn, reply_markup=keyboard)
+        return True
     else:
         _emit_message(chat_id, "Didn't catch anything financial in there.", send_fn)
+    return None
 
 
 def _handle_media(db: Session, user: User, chat_id: int | str, file_id: str, mime: str) -> None:
@@ -1533,13 +1539,15 @@ async def web_chat(
 
     text = str(payload.get("text") or "").strip()
     if text:
-        _handle_text(db, user, f"web:{user.id}", text, send_fn=_capture)
-        return {"ok": True, "messages": messages}
+        logged = bool(_handle_text(db, user, f"web:{user.id}", text, send_fn=_capture))
+        return {"ok": True, "messages": messages, "logged": logged}
 
     audio_b64 = payload.get("audio_b64")
     mime = str(payload.get("audio_mime") or "audio/webm").strip() or "audio/webm"
     if isinstance(audio_b64, str) and audio_b64.strip():
-        _handle_media_b64(db, user, f"web:{user.id}", audio_b64.strip(), mime, send_fn=_capture)
-        return {"ok": True, "messages": messages}
+        logged = bool(
+            _handle_media_b64(db, user, f"web:{user.id}", audio_b64.strip(), mime, send_fn=_capture)
+        )
+        return {"ok": True, "messages": messages, "logged": logged}
 
     return {"ok": False, "error": "missing text or audio"}
