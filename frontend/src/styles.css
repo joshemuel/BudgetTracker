@@ -1,48 +1,88 @@
 @import "tailwindcss";
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-/* === Ledger: a warm, editorial palette === */
+/* =========================================================================
+   BudgetTracker — modern pastel design system
+   Soft, rounded, snappy dashboard. Clean near-white base, white cards, soft
+   shadows. Five book-tab section hues (overview/activity/ledger/manage/chat),
+   each a soft surface "wash" + a saturated "edge" accent. Rust stays for
+   expenses/destructive. Light + dark in lockstep, every pair ≥4.5:1 on text.
+   ========================================================================= */
 @theme {
-  --color-paper: #f5efe3;
-  --color-paper-deep: #eadfcb;
-  --color-paper-rule: #d9cdb4;
-  --color-ink: #19170f;
-  --color-ink-soft: #3f3a2e;
-  --color-ink-mute: #746b57;
-  --color-accent: #a02a1a;     /* rust-red, for expenses / accents */
-  --color-gain: #3f5d2e;        /* deep olive, for income / positive */
-  --color-warn: #b4721f;        /* amber, for warnings / behind */
-  --color-highlight: #f1e6cc;   /* soft highlight strip */
-  --color-tab-activity: #dde3c9; /* booktab wash for Activity (from gain olive) */
-  --color-tab-manage: #f0d9c4;   /* booktab wash for Manage (from accent terracotta) */
-  --color-rail: #1c1910;        /* dark left-sidebar panel */
-  --color-rail-ink: #f4ecdb;    /* sidebar text / icons */
+  /* surfaces & ink */
+  --color-paper: #f5f6fb;        /* app background (cool near-white) */
+  --color-paper-deep: #eceef6;   /* recessed wells / track fills */
+  --color-paper-rule: #e2e5ef;   /* hairline borders & dividers */
+  --color-surface: #ffffff;      /* cards / sheets sit above paper */
+  --color-surface-2: #f8f9fd;    /* nested surface */
+  --color-ink: #1b2130;          /* primary text (deep slate, not black) */
+  --color-ink-soft: #424a5c;     /* secondary text */
+  --color-ink-mute: #6a7385;     /* tertiary text / labels (≥4.5:1 on white) */
 
-  --font-display: "Fraunces", "Playfair Display", ui-serif, Georgia, serif;
-  --font-sans: "Instrument Sans", "Helvetica Neue", system-ui, sans-serif;
+  /* semantic accents */
+  --color-accent: #c43d24;       /* rust — expenses, destructive, focus */
+  --color-gain: #2e7d4f;         /* income / positive */
+  --color-warn: #b7791f;         /* warnings / behind pace */
+  --color-highlight: #fbf3d6;    /* soft highlight strip */
+
+  /* book-tab section hues — wash (soft surface) + edge (saturated accent) */
+  --color-tab-overview: #dde9f8;
+  --color-tab-overview-edge: #2f6fae;
+  --color-tab-activity: #dcecd6;
+  --color-tab-activity-edge: #3f8f57;
+  --color-tab-ledger: #f1ecca;
+  --color-tab-ledger-edge: #997818;
+  --color-tab-manage: #f7dade;
+  --color-tab-manage-edge: #bd4f5e;
+  --color-tab-chat: #e9d8f5;
+  --color-tab-chat-edge: #7d51b3;
+
+  /* sidebar rail — now a clean elevated surface, not a dark slab */
+  --color-rail: #ffffff;
+  --color-rail-ink: #1b2130;
+
+  --font-display: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
-  --radius-card: 2px;
+  --radius-card: 18px;
+
+  --shadow-card: 0 1px 2px rgba(20, 28, 46, 0.05), 0 8px 24px -12px rgba(20, 28, 46, 0.14);
+  --shadow-pop: 0 18px 48px -16px rgba(20, 28, 46, 0.32);
 }
 
-/* === Night mode: warm espresso background, paper text. Same editorial feel,
-   inverted — lifted off pure black with stronger hairlines and legible muted
-   text so it reads cleanly at a glance. === */
+/* === Night mode: deep slate, lifted cards, brightened pastel edges === */
 :root[data-theme="dark"] {
-  --color-paper: #1b1813;
-  --color-paper-deep: #242019;
-  --color-paper-rule: #4a4130;
-  --color-ink: #f4ecdb;
-  --color-ink-soft: #d8d0bc;
-  --color-ink-mute: #b0a68c;
-  --color-accent: #f08a66;
-  --color-gain: #abcb80;
+  --color-paper: #11141b;
+  --color-paper-deep: #181c25;
+  --color-paper-rule: #2c313d;
+  --color-surface: #1a1f29;
+  --color-surface-2: #20262f;
+  --color-ink: #eef1f7;
+  --color-ink-soft: #cbd2de;
+  --color-ink-mute: #9aa3b2;
+
+  --color-accent: #f0876a;
+  --color-gain: #7fd6a0;
   --color-warn: #e6ad5f;
-  --color-highlight: #2c2618;
-  --color-tab-activity: #333a26;
-  --color-tab-manage: #46291f;
-  --color-rail: #100d08;        /* deeper than the espresso page so the panel still reads */
-  --color-rail-ink: #f4ecdb;
+  --color-highlight: #2a2616;
+
+  --color-tab-overview: #1b2b3b;
+  --color-tab-overview-edge: #82b7df;
+  --color-tab-activity: #1d2f21;
+  --color-tab-activity-edge: #84c993;
+  --color-tab-ledger: #322c16;
+  --color-tab-ledger-edge: #dcbf6e;
+  --color-tab-manage: #37222b;
+  --color-tab-manage-edge: #e896a2;
+  --color-tab-chat: #2a2138;
+  --color-tab-chat-edge: #c1a1e2;
+
+  --color-rail: #161a22;
+  --color-rail-ink: #eef1f7;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px -14px rgba(0, 0, 0, 0.7);
+  --shadow-pop: 0 22px 56px -18px rgba(0, 0, 0, 0.78);
 }
 
 :root {
@@ -52,30 +92,41 @@
   color-scheme: dark;
 }
 
+/* === Per-section identity ===
+   AppShell stamps data-section on the shell wrapper; --section-wash / -edge
+   then cascade so nav, dividers, charts and page accents inherit the active
+   group's hue with no per-page wiring. Defaults to overview. */
+:root,
+[data-section] {
+  --section-wash: var(--color-tab-overview);
+  --section-edge: var(--color-tab-overview-edge);
+}
+[data-section="overview"] { --section-wash: var(--color-tab-overview); --section-edge: var(--color-tab-overview-edge); }
+[data-section="activity"] { --section-wash: var(--color-tab-activity); --section-edge: var(--color-tab-activity-edge); }
+[data-section="ledger"]   { --section-wash: var(--color-tab-ledger);   --section-edge: var(--color-tab-ledger-edge); }
+[data-section="manage"]   { --section-wash: var(--color-tab-manage);   --section-edge: var(--color-tab-manage-edge); }
+[data-section="chat"]     { --section-wash: var(--color-tab-chat);     --section-edge: var(--color-tab-chat-edge); }
+
 html, body, #root {
   min-height: 100%;
   background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
-  /* 470 (Instrument Sans is a 400–700 variable font): body reads a touch
-     heavier without crossing into medium; emphasis sits at 550+. No
-     -webkit-font-smoothing: antialiased — it thins glyphs on macOS. */
-  font-weight: 470;
-  font-feature-settings: "ss01", "cv11";
+  font-weight: 450;
+  -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 /* Never let a stray wide element open a horizontal scrollbar on phones.
    `clip` (not `hidden`): hidden turns body into a scroll container, which
-   silently breaks viewport position:sticky (Transactions thead). The hidden
-   line stays as a fallback for engines without clip support. */
+   silently breaks viewport position:sticky (Transactions thead). */
 html, body {
   overflow-x: hidden;
   overflow-x: clip;
   max-width: 100%;
 }
 
-/* === Paper texture: subtle noise + ruled edges === */
+/* === Ambient backdrop: a single faint cool glow, no paper noise === */
 body::before {
   content: "";
   position: fixed;
@@ -83,51 +134,33 @@ body::before {
   pointer-events: none;
   z-index: 0;
   background-image:
-    radial-gradient(ellipse at 10% 0%, rgba(255, 240, 200, 0.25) 0%, transparent 55%),
-    radial-gradient(ellipse at 90% 100%, rgba(160, 42, 26, 0.06) 0%, transparent 45%);
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(47, 111, 174, 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 50% at 100% 0%, rgba(189, 79, 94, 0.04) 0%, transparent 55%);
 }
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.35;
-  mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0.10  0 0 0 0 0.09  0 0 0 0 0.06  0 0 0 0.055 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-}
-
 :root[data-theme="dark"] body::before {
   background-image:
-    radial-gradient(ellipse at 10% 0%, rgba(226, 115, 85, 0.10) 0%, transparent 55%),
-    radial-gradient(ellipse at 90% 100%, rgba(239, 231, 211, 0.04) 0%, transparent 45%);
-}
-:root[data-theme="dark"] body::after {
-  opacity: 0.22;
-  mix-blend-mode: screen;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0.65  0 0 0 0 0.60  0 0 0 0 0.48  0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(130, 183, 223, 0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 50% at 100% 0%, rgba(232, 150, 162, 0.05) 0%, transparent 55%);
 }
 
 #root { position: relative; z-index: 1; isolation: isolate; }
 
-
 /* === Typography primitives === */
 .display {
   font-family: var(--font-display);
-  font-weight: 500;
-  font-variation-settings: "opsz" 144, "SOFT" 25, "WONK" 0;
-  letter-spacing: 0;
-  line-height: 1.02;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.04;
 }
 .display-italic {
   font-family: var(--font-display);
   font-style: italic;
-  font-variation-settings: "opsz" 144, "SOFT" 100;
+  font-weight: 600;
 }
 .smallcaps {
   font-family: var(--font-sans);
   text-transform: uppercase;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.14em;
   font-size: 11px;
   font-weight: 600;
 }
@@ -135,6 +168,14 @@ body::after {
   font-family: var(--font-mono);
   font-feature-settings: "tnum", "zero";
   font-variant-numeric: tabular-nums slashed-zero;
+}
+
+/* === Reusable surface === */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-paper-rule);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
 }
 
 /* Hairline */
@@ -150,18 +191,17 @@ hr {
 *:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+  border-radius: 4px;
 }
 
-/* Native selects render their option popup with OS colors and ignore the
-   transparent backgrounds we use, so dark mode left options invisible. Pin the
-   control + popup to the theme tokens. The inset focus offset keeps the accent
-   ring on the control instead of bleeding across neighbours / the open list. */
+/* Native selects: pin control + popup to theme tokens (OS popups ignore
+   transparent backgrounds, which left dark-mode options invisible). */
 select {
   color: var(--color-ink);
 }
 select option,
 select optgroup {
-  background-color: var(--color-paper);
+  background-color: var(--color-surface);
   color: var(--color-ink);
 }
 select:focus-visible {
@@ -171,15 +211,15 @@ select:focus-visible {
 /* Scrollbar treatment */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--color-paper-rule); border-radius: 0; }
+::-webkit-scrollbar-thumb { background: var(--color-paper-rule); border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-ink-mute); }
 
-/* Entrance animation */
+/* === Entrance animations (snappy) === */
 @keyframes ledger-in {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.anim-in { animation: ledger-in 0.6s cubic-bezier(0.2, 0.6, 0.2, 1) both; }
+.anim-in { animation: ledger-in 0.32s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
 
 @keyframes rule-draw {
   from { transform: scaleX(0); }
@@ -187,17 +227,21 @@ select:focus-visible {
 }
 .anim-rule {
   transform-origin: left;
-  animation: rule-draw 0.9s cubic-bezier(0.2, 0.6, 0.2, 1) both;
+  animation: rule-draw 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 
-/* Table styles */
+@media (prefers-reduced-motion: reduce) {
+  .anim-in, .anim-rule { animation: none; }
+}
+
+/* === Tables === */
 .ledger-table {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
 }
 .ledger-table th, .ledger-table td {
-  padding: 10px 12px;
+  padding: 11px 14px;
   text-align: left;
   border-bottom: 1px solid var(--color-paper-rule);
   font-variant-numeric: tabular-nums;
@@ -206,28 +250,31 @@ select:focus-visible {
 .ledger-table th {
   font-family: var(--font-sans);
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   font-size: 10.5px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-ink-mute);
-  border-bottom: 1px solid var(--color-ink);
+  border-bottom: 1.5px solid var(--color-paper-rule);
+}
+.ledger-table tbody tr {
+  transition: background-color 0.12s ease;
 }
 .ledger-table tbody tr:hover {
-  background: rgba(160, 42, 26, 0.04);
+  background: color-mix(in srgb, var(--section-edge) 8%, transparent);
 }
 
-/* Transactions: the table runs the full page height and the header sticks to
-   the viewport top while it's on screen. border-collapse drops a sticky
-   cell's border, so paint the header hairline as an inset shadow. */
+/* Transactions: full-page table with a header that sticks to the viewport
+   top. border-collapse drops a sticky cell's border, so paint it as an inset
+   shadow instead. */
 .tx-scroll thead th {
   position: sticky;
   top: 0;
   z-index: 1;
   background: var(--color-paper);
-  box-shadow: inset 0 -1px 0 var(--color-ink);
+  box-shadow: inset 0 -1.5px 0 var(--color-paper-rule);
 }
 
-/* Decorative cross */
+/* Decorative cross (kept for any residual use) */
 .deco-cross {
   position: absolute;
   width: 10px;
@@ -244,61 +291,51 @@ select:focus-visible {
 .deco-cross::before { top: 4px; height: 1px; }
 .deco-cross::after { left: 4px; width: 1px; }
 
-/* Source edit modal */
+/* === Modals === */
 .modal-backdrop {
-  background: rgba(25, 23, 15, 0.52);
-  backdrop-filter: blur(2px);
+  background: rgba(15, 19, 30, 0.5);
+  backdrop-filter: blur(4px);
 }
 
 .modal-card {
   position: relative;
-  background: color-mix(in srgb, var(--color-paper) 96%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-ink) 20%, transparent);
-  border-radius: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-paper-rule);
+  border-radius: 20px;
   max-height: calc(100dvh - 2rem);
   overflow-y: auto;
-  box-shadow:
-    0 20px 44px rgba(0, 0, 0, 0.28),
-    inset 0 1px 0 color-mix(in srgb, var(--color-ink) 6%, transparent);
+  box-shadow: var(--shadow-pop);
 }
 
 :root[data-theme="dark"] .modal-backdrop {
-  background: rgba(0, 0, 0, 0.64);
+  background: rgba(0, 0, 0, 0.62);
 }
 
 /* === Leo's tour: spotlight scrim === */
-/* One fixed div sits over the target; its oversized box-shadow paints the dim
-   everywhere else. No position transition: the hole is repositioned every
-   animation frame while the page scrolls, and a transition makes it visibly
-   trail its target. (Steps remount the hole anyway, so nothing morphs.)
-   Scrim colors mirror .modal-backdrop exactly. */
 .tour-hole {
   position: fixed;
-  border-radius: 4px;
-  box-shadow: 0 0 0 200vmax rgba(25, 23, 15, 0.52);
-  outline: 1.5px solid var(--color-accent);
-  outline-offset: 2px;
+  border-radius: 16px;
+  box-shadow: 0 0 0 200vmax rgba(15, 19, 30, 0.5);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
 }
 :root[data-theme="dark"] .tour-hole {
-  box-shadow: 0 0 0 200vmax rgba(0, 0, 0, 0.64);
+  box-shadow: 0 0 0 200vmax rgba(0, 0, 0, 0.62);
 }
 .tour-full {
   position: fixed;
   inset: 0;
-  background: rgba(25, 23, 15, 0.52);
+  background: rgba(15, 19, 30, 0.5);
 }
 :root[data-theme="dark"] .tour-full {
-  background: rgba(0, 0, 0, 0.64);
+  background: rgba(0, 0, 0, 0.62);
 }
-/* Interactive steps: four strips tile the screen around the spotlight hole so
-   clicks pass through the hole itself. Sits *below* the app's own modals
-   (z-50/70) so the edit dialog and chat stay usable and undimmed. */
 .tour-scrim-strip {
   position: fixed;
-  background: rgba(25, 23, 15, 0.52);
+  background: rgba(15, 19, 30, 0.5);
 }
 :root[data-theme="dark"] .tour-scrim-strip {
-  background: rgba(0, 0, 0, 0.64);
+  background: rgba(0, 0, 0, 0.62);
 }
 .safe-chat-right {
   right: max(0.75rem, env(safe-area-inset-right));
@@ -306,13 +343,11 @@ select:focus-visible {
 }
 
 .chat-docked {
-  box-shadow:
-    0 14px 28px rgba(25, 23, 15, 0.22),
-    0 1px 0 rgba(255, 255, 255, 0.45) inset;
+  box-shadow: var(--shadow-pop);
 }
 
 .chat-fab {
-  box-shadow: 0 10px 30px -8px rgba(25, 23, 15, 0.45);
+  box-shadow: 0 12px 30px -8px color-mix(in srgb, var(--section-edge) 55%, transparent);
 }
 
 .chat-log {
@@ -337,29 +372,20 @@ select:focus-visible {
     font-size: 10px;
   }
 
-  /* Fluid base size so rem/em-based text scales with the phone's width
-     instead of snapping at a single breakpoint. */
+  /* Fluid base size so rem/em text scales with the phone's width. */
   html, body {
     font-size: clamp(11px, 3.2vw, 13px);
   }
 
-  /* Form controls at >=16px stop iOS Safari from zooming the page on focus,
-     and read as native fields rather than shrunken desktop inputs. */
+  /* >=16px controls stop iOS Safari auto-zoom on focus. */
   input, select, textarea {
     font-size: 16px;
   }
 
-  /* Selects inside ledger tables (Settings) shouldn't tower over the ~10px
-     cells around them. Native selects open a picker, so the iOS-zoom guard
-     above isn't needed here. */
   .ledger-table select {
     font-size: 10px;
   }
 
-  /* Mobile Manage → Account preferences: shrink the form so it doesn't dominate
-     the page. Native selects open a picker, so the iOS-zoom guard isn't needed
-     here. Scoped to the Account tab only — the shared header gear dropdown keeps
-     its 16px controls. */
   .prefs-compact select {
     font-size: 12px;
     padding-top: 2px;
@@ -370,13 +396,13 @@ select:focus-visible {
   }
 
   .display {
-    letter-spacing: 0;
-    line-height: 1;
+    letter-spacing: -0.015em;
+    line-height: 1.02;
   }
 
   .ledger-table th,
   .ledger-table td {
-    padding: 8px 6px;
+    padding: 9px 8px;
     font-size: 10px;
   }
 
@@ -386,12 +412,11 @@ select:focus-visible {
   }
 
   .modal-card {
-    border-radius: 6px;
+    border-radius: 18px;
     max-height: calc(100dvh - 1rem);
   }
 
-  /* Keep the chat launcher and docked panel clear of the fixed bottom tab bar
-     (≈56px tall + the iOS home-indicator safe area). */
+  /* Keep the chat launcher + docked panel clear of the fixed bottom tab bar. */
   .chat-fab {
     bottom: calc(72px + env(safe-area-inset-bottom)) !important;
   }
@@ -409,25 +434,22 @@ select:focus-visible {
 
   .ledger-table th,
   .ledger-table td {
-    padding: 8px 9px;
+    padding: 9px 10px;
   }
 }
 
-/* Desktop nav hierarchy: the left-rail primary tabs outrank the horizontal
-   sub-tab strip (Activity → Monthly/Daily, Manage → Budgets/…). Sub-tabs cap
-   at 13px so they always sit below the 14px rail labels. Double-class
-   specificity wins over both base .smallcaps and the 768–1366px block above. */
+/* Desktop nav hierarchy: left-rail primary tabs outrank the horizontal
+   sub-tab strip. Sub-tabs cap at 13px so they sit below the 14px rail labels. */
 @media (min-width: 641px) {
   .sub-tabs.smallcaps {
     font-size: clamp(11px, 1vw, 13px);
-    letter-spacing: 0.12em;
+    letter-spacing: 0.1em;
   }
 
-  /* Rail width is fixed, so a fixed size (not a clamp) keeps the
-     whitespace-nowrap labels from overflowing. */
   .rail-tabs.smallcaps {
-    font-size: 14px;
-    letter-spacing: 0.12em;
+    font-size: 13.5px;
+    letter-spacing: 0.04em;
     font-weight: 600;
+    text-transform: none;
   }
 }

@@ -56,6 +56,22 @@ const navGroups: NavGroup[] = [
   },
 ];
 
+// Section key for the active route — drives the data-section hue on the shell.
+function sectionFor(pathname: string): string {
+  if (pathname === "/chat") return "chat";
+  return navGroups.find((g) => g.routes.includes(pathname))?.key ?? "overview";
+}
+
+// Per-section active styling. Literal class names (not concatenation) so
+// Tailwind's scanner emits the wash + edge utilities.
+const sectionActiveFill: Record<string, string> = {
+  overview: "bg-tab-overview text-tab-overview-edge",
+  activity: "bg-tab-activity text-tab-activity-edge",
+  ledger: "bg-tab-ledger text-tab-ledger-edge",
+  manage: "bg-tab-manage text-tab-manage-edge",
+  chat: "bg-tab-chat text-tab-chat-edge",
+};
+
 function NavIcon({ name }: { name: NavGroup["key"] }) {
   const stroke = {
     fill: "none",
@@ -113,11 +129,11 @@ function BottomNav() {
   const { pathname } = useLocation();
   return (
     <nav
-      className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-paper border-t border-ink"
+      className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-surface/95 backdrop-blur-md border-t border-paper-rule"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       data-tutorial="nav-panel"
     >
-      <ul className="grid grid-cols-4">
+      <ul className="grid grid-cols-4 px-1.5 pt-1.5">
         {navGroups.map((g) => {
           const active = g.routes.includes(pathname);
           return (
@@ -127,8 +143,8 @@ function BottomNav() {
                 aria-current={active ? "page" : undefined}
                 data-tutorial={`nav-${g.key}`}
                 className={
-                  "flex flex-col items-center justify-center gap-1 min-h-[56px] py-2 transition-colors " +
-                  (active ? "text-accent" : "text-ink-soft active:text-ink")
+                  "flex flex-col items-center justify-center gap-1 min-h-[52px] mx-0.5 rounded-2xl transition-all duration-150 active:scale-95 " +
+                  (active ? sectionActiveFill[g.key] : "text-ink-mute active:text-ink")
                 }
               >
                 <NavIcon name={g.key} />
@@ -144,34 +160,26 @@ function BottomNav() {
   );
 }
 
-// Booktab pastel per section. Literal class names (not concatenation) so
-// Tailwind's scanner emits them.
-const tabWashByGroup: Partial<Record<NavGroup["key"], string>> = {
-  activity: "bg-tab-activity",
-  manage: "bg-tab-manage",
-};
-
 function GroupSubNav() {
   const { pathname } = useLocation();
   const group = navGroups.find((g) => g.routes.includes(pathname));
   if (!group?.sub) return null;
-  const wash = tabWashByGroup[group.key] ?? "bg-highlight";
+  const activeFill = sectionActiveFill[group.key];
   return (
     <nav className="sm:hidden pt-3 pb-1 overflow-x-auto -mx-3 px-3">
-      {/* Book-index folder tabs: all tabs sit on a baseline rule; the active
-          one is taller, pastel-filled, and opens into the page (-mb-px over
-          the rule with no bottom border). */}
-      <div className="flex items-end min-w-max border-b border-ink smallcaps nav-tabs">
+      {/* Segmented pills resting in a soft track; the active pill fills with the
+          section's pastel wash and edge-coloured label. */}
+      <div className="inline-flex min-w-max gap-1 rounded-full bg-paper-deep p-1 smallcaps nav-tabs">
         {group.sub.map((s) => (
           <NavLink
             key={s.to}
             to={s.to}
             end={s.end}
             className={({ isActive }) =>
-              "relative shrink-0 whitespace-nowrap rounded-t border -mb-px mr-1 transition-colors " +
+              "shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 transition-all duration-150 active:scale-95 " +
               (isActive
-                ? `z-10 ${wash} border-ink border-b-0 text-ink px-3 pt-1.5 pb-[7px]`
-                : "bg-paper-deep/60 border-paper-rule text-ink-soft px-3 py-1 active:text-ink")
+                ? `${activeFill} shadow-sm`
+                : "text-ink-mute active:text-ink")
             }
           >
             {s.label}
@@ -223,7 +231,7 @@ function Masthead({
           <UserPrefsMenu me={me} />
           <button
             onClick={startTutorial}
-            className="w-8 h-8 rounded-sm border border-ink text-ink hover:bg-ink hover:text-paper transition-colors flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="w-9 h-9 rounded-full border border-paper-rule bg-surface text-ink-soft hover:text-ink hover:bg-paper-deep transition-all duration-150 active:scale-95 flex items-center justify-center"
             title="Replay the tour"
             aria-label="Replay the tour"
           >
@@ -235,7 +243,7 @@ function Masthead({
           </button>
           <button
             onClick={toggleTheme}
-            className="w-8 h-8 rounded-sm border border-ink text-ink hover:bg-ink hover:text-paper transition-colors flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="w-9 h-9 rounded-full border border-paper-rule bg-surface text-ink-soft hover:text-ink hover:bg-paper-deep transition-all duration-150 active:scale-95 flex items-center justify-center"
             title={theme === "dark" ? "Switch to day mode" : "Switch to night mode"}
             aria-label={theme === "dark" ? "Switch to day mode" : "Switch to night mode"}
             aria-pressed={theme === "dark"}
@@ -256,7 +264,7 @@ function Masthead({
           </button>
           <button
             onClick={toggleAmounts}
-            className="w-8 h-8 rounded-sm border border-ink text-ink hover:bg-ink hover:text-paper transition-colors flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="w-9 h-9 rounded-full border border-paper-rule bg-surface text-ink-soft hover:text-ink hover:bg-paper-deep transition-all duration-150 active:scale-95 flex items-center justify-center"
             title={showAmounts ? "Hide numbers" : "Show numbers"}
             aria-label={showAmounts ? "Hide numbers" : "Show numbers"}
           >
@@ -277,14 +285,15 @@ function Masthead({
           {install && (
             <button
               onClick={install.onInstall}
-              className="smallcaps px-3 py-1.5 border border-ink text-ink hover:bg-ink hover:text-paper transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="smallcaps px-4 py-2 rounded-full border border-paper-rule bg-surface text-ink-soft hover:text-ink hover:bg-paper-deep transition-all duration-150 active:scale-95"
             >
               Install
             </button>
           )}
           <button
             onClick={onLog}
-            className="smallcaps px-3 py-1.5 border border-ink text-ink hover:bg-ink hover:text-paper transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="smallcaps px-4 py-2 rounded-full text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95"
+            style={{ backgroundColor: "var(--section-edge)" }}
             title="Press N"
             data-tutorial="new-entry"
           >
@@ -305,28 +314,33 @@ function Masthead({
       </div>
 
       <div className="mt-4 sm:mt-6 anim-in flex items-center gap-3 sm:gap-4">
-        <svg
-          viewBox="0 0 32 32"
+        <span
           aria-hidden="true"
-          className="w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 text-ink shrink-0"
-          fill="none"
+          className="grid place-items-center w-10 h-10 sm:w-12 sm:h-12 rounded-2xl shrink-0 shadow-sm"
+          style={{ backgroundColor: "var(--section-wash)" }}
         >
-          <rect x="2.5" y="2.5" width="27" height="27" stroke="currentColor" strokeWidth="1.4" />
-          <line x1="6" y1="12" x2="26" y2="12" stroke="currentColor" strokeWidth="0.9" opacity="0.55" />
-          <line x1="6" y1="20" x2="26" y2="20" stroke="currentColor" strokeWidth="0.9" opacity="0.55" />
-          <path d="M7 24 L13 17 L18.5 21.5 L25 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="25" cy="8" r="1.6" fill="currentColor" />
-        </svg>
-        <h1 className="text-[20px] sm:text-[28px] md:text-[36px] lg:text-[44px] font-semibold tracking-tight leading-[0.95] text-ink">
+          <svg
+            viewBox="0 0 32 32"
+            className="w-6 h-6 sm:w-7 sm:h-7"
+            style={{ color: "var(--section-edge)" }}
+            fill="none"
+          >
+            <path d="M6 25 L13 16 L18.5 20.5 L26 7" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx="26" cy="7" r="2" fill="currentColor" />
+          </svg>
+        </span>
+        <h1 className="display text-[22px] sm:text-[30px] md:text-[38px] lg:text-[46px] text-ink">
           Budget Tracker
         </h1>
       </div>
 
-      <div className="mt-6 sm:mt-8 sm:-mx-4 md:-mx-6 lg:-mx-8 xl:-mx-10 relative h-[6px]">
-        <div className="anim-rule absolute inset-x-0 top-0 h-[3px] bg-ink" />
+      <div className="mt-5 sm:mt-7 sm:-mx-4 md:-mx-6 lg:-mx-8 xl:-mx-10">
         <div
-          className="anim-rule absolute inset-x-0 top-[5px] h-[1px] bg-ink"
-          style={{ animationDelay: "0.1s" }}
+          className="anim-rule h-[3px] rounded-full"
+          style={{
+            background:
+              "linear-gradient(90deg, var(--section-edge) 0%, var(--section-wash) 42%, transparent 100%)",
+          }}
         />
       </div>
     </header>
@@ -385,7 +399,7 @@ function InstallHelp({
         <div className="mt-4 flex justify-end">
           <button
             onClick={onClose}
-            className="smallcaps px-3 py-1 border border-ink/30 rounded"
+            className="smallcaps px-4 py-2 rounded-full border border-paper-rule bg-surface text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95"
           >
             Close
           </button>
@@ -424,7 +438,7 @@ function Sidebar() {
   return (
     <aside
       className={
-        "hidden sm:block shrink-0 bg-rail text-rail-ink border-r border-rail-ink/10 transition-[width] " +
+        "hidden sm:block shrink-0 bg-rail text-rail-ink border-r border-paper-rule transition-[width] " +
         (collapsed ? "w-14" : "w-52")
       }
     >
@@ -453,12 +467,12 @@ function Sidebar() {
                     title={collapsed ? g.label : undefined}
                     data-tutorial={`nav-${g.key}`}
                     className={
-                      "flex items-center gap-3 rounded-sm border-l-2 py-2 transition-colors " +
+                      "flex items-center gap-3 rounded-xl py-2 transition-all duration-150 " +
                       (collapsed ? "justify-center px-0" : "px-2.5") +
                       " " +
                       (active
-                        ? "border-accent text-rail-ink bg-rail-ink/10"
-                        : "border-transparent text-rail-ink/65 hover:text-rail-ink hover:bg-rail-ink/5")
+                        ? `${sectionActiveFill[g.key]} font-semibold`
+                        : "text-rail-ink/60 hover:text-rail-ink hover:bg-paper-deep")
                     }
                   >
                     <span className="shrink-0">
@@ -480,12 +494,12 @@ function Sidebar() {
                 title={collapsed ? "Chat" : undefined}
                 data-tutorial="chat-launcher"
                 className={
-                  "w-full flex items-center gap-3 rounded-sm border-l-2 py-2 transition-colors " +
+                  "w-full flex items-center gap-3 rounded-xl py-2 transition-all duration-150 " +
                   (collapsed ? "justify-center px-0" : "px-2.5") +
                   " " +
                   (chatActive
-                    ? "border-accent text-rail-ink bg-rail-ink/10"
-                    : "border-transparent text-rail-ink/65 hover:text-rail-ink hover:bg-rail-ink/5")
+                    ? `${sectionActiveFill.chat} font-semibold`
+                    : "text-rail-ink/60 hover:text-rail-ink hover:bg-paper-deep")
                 }
               >
                 <span className="shrink-0">
@@ -521,19 +535,18 @@ function SubTabNav() {
   const { pathname } = useLocation();
   const group = navGroups.find((g) => g.routes.includes(pathname));
   if (!group?.sub) return null;
+  const activeFill = sectionActiveFill[group.key];
   return (
-    <nav className="hidden sm:block pb-3 mb-2 border-b border-paper-rule">
-      <ul className="flex flex-wrap gap-x-6 lg:gap-x-8 gap-y-2 smallcaps nav-tabs sub-tabs">
+    <nav className="hidden sm:block pb-4 mb-2">
+      <ul className="inline-flex flex-wrap gap-1 rounded-full bg-paper-deep p-1 smallcaps nav-tabs sub-tabs">
         {group.sub.map((s) => (
           <li key={s.to}>
             <NavLink
               to={s.to}
               end={s.end}
               className={({ isActive }) =>
-                "block pb-1.5 md:pb-2 border-b-2 whitespace-nowrap transition-colors " +
-                (isActive
-                  ? "text-accent border-accent"
-                  : "text-ink-soft hover:text-ink border-transparent")
+                "block rounded-full px-4 py-1.5 whitespace-nowrap transition-all duration-150 " +
+                (isActive ? `${activeFill} shadow-sm` : "text-ink-mute hover:text-ink")
               }
             >
               {s.label}
@@ -605,7 +618,7 @@ export default function AppShell() {
   const onChatPage = pathname === "/chat";
   return (
     <ChatProvider>
-      <div className="pb-24 sm:pb-0">
+      <div className="pb-24 sm:pb-0" data-section={sectionFor(pathname)}>
         <div className="sm:flex sm:min-h-screen sm:flex-col">
           <div className={pad}>
             <Masthead me={me} onLog={() => setLogOpen(true)} install={installCta} />

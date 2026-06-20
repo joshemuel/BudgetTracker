@@ -17,32 +17,34 @@ import { useIsMobile } from "@/lib/mediaQuery";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
 import { useTheme } from "@/lib/theme";
 
+// Book-tab chart family: the five section edges (blue/green/rose/gold/purple)
+// lead, then five extension hues — all readable on the light ground.
 export const PALETTE = [
-  "#a02a1a",
-  "#3f5d2e",
-  "#b4721f",
-  "#19170f",
-  "#4a4437",
-  "#877e6a",
-  "#c26a1f",
-  "#6b4e2e",
-  "#7d2a2a",
-  "#2a5d4e",
+  "#2f6fae",
+  "#3f8f57",
+  "#bd4f5e",
+  "#997818",
+  "#7d51b3",
+  "#c43d24",
+  "#2a8c8c",
+  "#b3622a",
+  "#5a6b8c",
+  "#9a5b86",
 ];
 
-// Night-mode palette: the near-black/dark inks above disappear on a dark
-// ground, so brighten them while keeping each hue distinct.
+// Night-mode palette: brightened book-tab edges so each hue stays distinct
+// and legible on the dark ground.
 export const PALETTE_DARK = [
-  "#e2674f",
-  "#7fa64f",
-  "#d99a3f",
-  "#cdbf9e",
-  "#9a8f76",
-  "#b6ab90",
-  "#e08a3f",
-  "#bb8a55",
-  "#cf6a5e",
-  "#5fa48c",
+  "#82b7df",
+  "#84c993",
+  "#e896a2",
+  "#dcbf6e",
+  "#c1a1e2",
+  "#f0876a",
+  "#5fc7c0",
+  "#e0a06a",
+  "#9fb0d0",
+  "#cf9ec0",
 ];
 
 // Pick black or near-white text so an in-slice % label stays legible on any
