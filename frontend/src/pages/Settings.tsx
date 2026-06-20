@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { AdminUser, Category, CurrencyBalance, Me, Source } from "@/types";
+import type { AdminUser, Category, CurrencyBalance, Me, SheetsStatus, Source } from "@/types";
 import { fmtMoney, formatAmountLive, handleAmountChange } from "@/lib/format";
 import { useAmountVisibility } from "@/lib/privacy";
 import { SectionTitle } from "@/components/Figure";
@@ -918,6 +918,149 @@ function ConnectedAppsBlock() {
   );
 }
 
+function GoogleSheetsBlock() {
+  const qc = useQueryClient();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [justConnected, setJustConnected] = useState(false);
+
+  const { data: status } = useQuery<SheetsStatus>({
+    queryKey: ["sheets-status"],
+    queryFn: () => api.get<SheetsStatus>("/sheets/status"),
+  });
+  const connected = !!status?.connected;
+
+  // Returning from the Google OAuth redirect lands here with ?sheets=connected.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("sheets") === "connected") {
+      setJustConnected(true);
+      qc.invalidateQueries({ queryKey: ["sheets-status"] });
+      params.delete("sheets");
+      const qs = params.toString();
+      window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    }
+  }, [qc]);
+
+  const syncNow = useMutation({
+    mutationFn: () => api.post<SheetsStatus>("/sheets/sync"),
+    onSuccess: (r) => qc.setQueryData(["sheets-status"], r),
+  });
+  const toggleAuto = useMutation({
+    mutationFn: (auto_sync: boolean) => api.patch<SheetsStatus>("/sheets", { auto_sync }),
+    onSuccess: (r) => qc.setQueryData(["sheets-status"], r),
+  });
+  const disconnect = useMutation({
+    mutationFn: () => api.post("/sheets/disconnect"),
+    onSuccess: () => {
+      setConfirmOpen(false);
+      setJustConnected(false);
+      qc.invalidateQueries({ queryKey: ["sheets-status"] });
+    },
+  });
+
+  const lastSynced = status?.last_synced_at ? new Date(status.last_synced_at).toLocaleString() : null;
+
+  return (
+    <section className="mt-12" data-tutorial="connect-sheets">
+      <SectionTitle>Google Sheets</SectionTitle>
+      <p className="text-ink-mute text-sm mb-4">
+        Connect a Google account to mirror your ledger into a private spreadsheet. Once connected it
+        stays in sync automatically (refreshed hourly); you can also sync on demand.
+      </p>
+      <table className="ledger-table w-full text-[11px] sm:text-[13px]">
+        <thead>
+          <tr>
+            <th>Account</th>
+            <th>Status</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td className="font-[550]">{connected ? status?.google_email || "Google" : "Google Sheets"}</td>
+            <td className={`smallcaps ${connected ? "text-gain" : "text-ink-mute"}`}>
+              {connected ? "Connected" : "Not connected"}
+            </td>
+            <td className="text-right whitespace-nowrap">
+              {connected ? (
+                <button
+                  onClick={() => setConfirmOpen(true)}
+                  className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
+                >
+                  disconnect
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    window.location.href = "/api/sheets/connect";
+                  }}
+                  className="smallcaps text-ink-mute hover:text-gain inline-block p-2 -m-2"
+                >
+                  connect
+                </button>
+              )}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {connected && (
+        <div className="mt-4 text-sm text-ink-soft space-y-3">
+          {justConnected && (
+            <p className="text-gain">Connected — your spreadsheet has been created and filled.</p>
+          )}
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={!!status?.auto_sync}
+              disabled={toggleAuto.isPending}
+              onChange={(e) => toggleAuto.mutate(e.target.checked)}
+            />
+            <span>Automatic sync (hourly)</span>
+          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            {status?.spreadsheet_url && (
+              <a
+                href={status.spreadsheet_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 hover:text-accent"
+              >
+                Open in Google Sheets
+              </a>
+            )}
+            <button
+              onClick={() => syncNow.mutate()}
+              disabled={syncNow.isPending}
+              className="smallcaps text-ink-mute hover:text-gain disabled:opacity-50"
+            >
+              {syncNow.isPending ? "syncing…" : "sync now"}
+            </button>
+            {lastSynced && <span className="text-ink-mute">Last synced {lastSynced}</span>}
+          </div>
+          {syncNow.isError && (
+            <p className="text-accent">{(syncNow.error as Error).message || "Sync failed."}</p>
+          )}
+          {status?.last_sync_error && !syncNow.isError && (
+            <p className="text-accent">Last sync error: {status.last_sync_error}</p>
+          )}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Disconnect Google Sheets?"
+        message="Automatic syncing will stop and we'll revoke access. Your existing spreadsheet stays in your Drive."
+        confirmLabel="Disconnect"
+        busy={disconnect.isPending}
+        error={disconnect.isError ? (disconnect.error as Error).message : null}
+        onConfirm={() => disconnect.mutate()}
+        onClose={() => setConfirmOpen(false)}
+      />
+    </section>
+  );
+}
+
 function useMe() {
   return useQuery<Me>({
     queryKey: ["me"],
@@ -955,6 +1098,7 @@ export function AccountSettingsPage() {
         <PreferencesForm me={me} />
       </section>
       <ConnectedAppsBlock />
+      <GoogleSheetsBlock />
       {me?.is_admin && <AdminBlock />}
     </div>
   );

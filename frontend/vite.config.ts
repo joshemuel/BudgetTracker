@@ -17,6 +17,7 @@ const proxiedPaths = [
   "/api/subscriptions",
   "/api/stats",
   "/api/telegram",
+  "/api/sheets",
   "/api/healthz",
 ];
 

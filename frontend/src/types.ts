@@ -151,3 +151,12 @@ export type SubscriptionMonthlyTotal = {
   total: string;
   currency: CurrencyCode;
 };
+
+export type SheetsStatus = {
+  connected: boolean;
+  google_email: string | null;
+  auto_sync: boolean;
+  spreadsheet_url: string | null;
+  last_synced_at: string | null;
+  last_sync_error: string | null;
+};

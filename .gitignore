@@ -29,3 +29,9 @@ frontend/tsconfig.tsbuildinfo
 
 # graphify local output
 graphify-out/
+
+# Large local media (not for the repo)
+video/
+
+# Android TWA Gradle cache (build/ is already ignored above)
+android-twa/.gradle/

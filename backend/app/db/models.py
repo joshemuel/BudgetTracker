@@ -214,3 +214,30 @@ class AppState(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class GoogleCredential(Base):
+    """Per-user Google Sheets connection (one-to-one with User).
+
+    Holds the encrypted OAuth refresh token plus the id/url of the spreadsheet
+    we created for this user. Presence of a row = the user opted in. The hourly
+    scheduler job rewrites the workbook for every row where auto_sync is true.
+    """
+
+    __tablename__ = "google_credentials"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    google_email: Mapped[str | None] = mapped_column(String(255))
+    # Fernet ciphertext of the Google OAuth refresh token (never returned to clients).
+    refresh_token_enc: Mapped[str] = mapped_column(Text, nullable=False)
+    scopes: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    auto_sync: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    spreadsheet_id: Mapped[str | None] = mapped_column(String(128))
+    spreadsheet_url: Mapped[str | None] = mapped_column(String(512))
+    connected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_sync_error: Mapped[str | None] = mapped_column(Text)

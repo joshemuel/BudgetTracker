@@ -38,6 +38,15 @@ class Settings(BaseSettings):
     # relative redirect ("/"), correct for the single-origin nginx prod setup.
     frontend_base_url: str = Field(default="", alias="FRONTEND_BASE_URL")
 
+    # Google Sheets auto-sync. Empty redirect URI disables the feature (the
+    # "Connect Google Sheets" action 503s and status reports connected=false).
+    # This redirect URI is registered as a SECOND authorized URI on the same
+    # OAuth client as login, and resolves to the backend /sheets/callback route.
+    google_sheets_redirect_uri: str = Field(default="", alias="GOOGLE_SHEETS_REDIRECT_URI")
+    # Fernet key for encrypting stored Google refresh tokens at rest. When empty,
+    # a key is derived from app_secret so self-hosting needs no extra config.
+    google_token_enc_key: str = Field(default="", alias="GOOGLE_TOKEN_ENC_KEY")
+
     llm_api_key: str = Field(
         default="",
         validation_alias=AliasChoices("OPENROUTER_API_KEY", "LLM_API_KEY"),

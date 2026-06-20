@@ -10,6 +10,7 @@ from app.api import (
     budgets,
     categories,
     currencies,
+    sheets,
     sources,
     stats,
     subscriptions,
@@ -52,6 +53,7 @@ app.include_router(transactions.router)
 app.include_router(stats.router)
 app.include_router(subscriptions.router)
 app.include_router(telegram.router)
+app.include_router(sheets.router)
 
 
 @app.get("/healthz")

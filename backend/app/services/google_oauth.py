@@ -7,18 +7,25 @@ signed with APP_SECRET (itsdangerous), mirrored in an httponly cookie.
 """
 
 import base64
+import hashlib
 import json
 import secrets
 import time
 from urllib.parse import urlencode
 
 import httpx
+from cryptography.fernet import Fernet
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from app.config import get_settings
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke"
+# Least-privilege Sheets scope: drive.file lets us create + manage only files we
+# created (the budget spreadsheet). It is NON-sensitive, so it needs no Google
+# verification review, unlike the broad spreadsheets scope.
+SHEETS_SCOPE = "openid email https://www.googleapis.com/auth/drive.file"
 _VALID_ISS = {"accounts.google.com", "https://accounts.google.com"}
 STATE_MAX_AGE = 600  # seconds
 
@@ -57,7 +64,27 @@ def authorize_url(state: str) -> str:
     return f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
 
 
-def exchange_code(code: str) -> dict:
+def sheets_authorize_url(state: str) -> str:
+    """Authorize URL for the Sheets connection (separate from the login grant).
+
+    Uses access_type=offline + prompt=consent so Google always returns a refresh
+    token, and the drive.file scope so we can create/write the user's workbook.
+    """
+    s = get_settings()
+    params = {
+        "client_id": s.google_client_id,
+        "redirect_uri": s.google_sheets_redirect_uri,
+        "response_type": "code",
+        "scope": SHEETS_SCOPE,
+        "state": state,
+        "access_type": "offline",
+        "prompt": "consent",
+        "include_granted_scopes": "true",
+    }
+    return f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
+
+
+def exchange_code(code: str, redirect_uri: str | None = None) -> dict:
     s = get_settings()
     with httpx.Client(timeout=15.0) as c:
         r = c.post(
@@ -66,13 +93,62 @@ def exchange_code(code: str) -> dict:
                 "code": code,
                 "client_id": s.google_client_id,
                 "client_secret": s.google_client_secret,
-                "redirect_uri": s.google_redirect_uri,
+                "redirect_uri": redirect_uri or s.google_redirect_uri,
                 "grant_type": "authorization_code",
             },
         )
     if r.status_code != 200:
         raise OAuthError("token exchange failed")
     return r.json()
+
+
+def refresh_access_token(refresh_token: str) -> str:
+    """Exchange a stored refresh token for a fresh access token (used at sync time)."""
+    s = get_settings()
+    with httpx.Client(timeout=15.0) as c:
+        r = c.post(
+            GOOGLE_TOKEN_URL,
+            data={
+                "refresh_token": refresh_token,
+                "client_id": s.google_client_id,
+                "client_secret": s.google_client_secret,
+                "grant_type": "refresh_token",
+            },
+        )
+    if r.status_code != 200:
+        raise OAuthError("access-token refresh failed")
+    token = r.json().get("access_token")
+    if not token:
+        raise OAuthError("no access_token in refresh response")
+    return token
+
+
+def revoke_token(token: str) -> None:
+    """Best-effort revoke of a refresh/access token at Google. Never raises."""
+    try:
+        with httpx.Client(timeout=10.0) as c:
+            c.post(GOOGLE_REVOKE_URL, data={"token": token})
+    except httpx.HTTPError:
+        pass
+
+
+def _fernet() -> Fernet:
+    """Fernet from GOOGLE_TOKEN_ENC_KEY, else derived deterministically from
+    app_secret so self-hosting works with no extra configuration."""
+    s = get_settings()
+    key = s.google_token_enc_key.strip()
+    if not key:
+        digest = hashlib.sha256(s.app_secret.encode()).digest()
+        key = base64.urlsafe_b64encode(digest).decode()
+    return Fernet(key.encode())
+
+
+def encrypt_token(plaintext: str) -> str:
+    return _fernet().encrypt(plaintext.encode()).decode()
+
+
+def decrypt_token(ciphertext: str) -> str:
+    return _fernet().decrypt(ciphertext.encode()).decode()
 
 
 def _b64url_decode(seg: str) -> bytes:
