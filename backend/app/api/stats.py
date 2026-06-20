@@ -235,14 +235,18 @@ def _credit_summary(
     }
 
 
-@router.get("/overview")
-def overview(
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+def compute_overview(
+    db: Session,
+    user: User,
     year: int | None = None,
     month: int | None = None,
-    currency: str | None = Query(default=None),
-):
+    currency: str | None = None,
+) -> dict:
+    """Dashboard snapshot for one month (totals / budgets / credit).
+
+    Shared by the `/stats/overview` route and the Google Sheets export so both
+    render the exact same numbers.
+    """
     today = datetime.now(timezone.utc)
     y = year or today.year
     m = month or today.month
@@ -328,6 +332,17 @@ def overview(
         "budgets": budget_rows,
         "credit": _credit_summary(db, user.id, start, end, rates, report_currency),
     }
+
+
+@router.get("/overview")
+def overview(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    year: int | None = None,
+    month: int | None = None,
+    currency: str | None = Query(default=None),
+):
+    return compute_overview(db, user, year=year, month=month, currency=currency)
 
 
 @router.get("/monthly")
