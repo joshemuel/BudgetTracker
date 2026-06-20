@@ -276,7 +276,7 @@ export default function QuickLog({ open, onClose }: Props) {
   return (
     <>
       <div
-        className={`fixed inset-0 bg-ink/40 z-40 transition-opacity duration-300 ${
+        className={`modal-backdrop fixed inset-0 z-40 transition-opacity duration-300 ${
           open ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
         onClick={onClose}
@@ -294,7 +294,7 @@ export default function QuickLog({ open, onClose }: Props) {
           <div className="p-4 sm:p-6 sm:pb-4 border-b border-paper-rule">
             <div className="flex items-baseline justify-between smallcaps text-ink-mute">
               <span>New entry</span>
-              <button onClick={onClose} className="hover:text-accent">
+              <button onClick={onClose} className="hover:text-accent transition-colors">
                 close · esc
               </button>
             </div>
@@ -316,12 +316,12 @@ export default function QuickLog({ open, onClose }: Props) {
           >
             <div>
               <span className="smallcaps text-ink-mute block mb-2">Kind</span>
-              <div className="grid grid-cols-3 border border-ink">
+              <div className="grid grid-cols-3 gap-1 rounded-full bg-paper-deep p-1">
                 <button
                   type="button"
                   onClick={() => setKind("expense")}
-                  className={`min-h-[44px] py-2 smallcaps border-r border-ink ${
-                    kind === "expense" ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
+                  className={`min-h-[44px] py-2 rounded-full smallcaps transition-all duration-150 active:scale-95 ${
+                    kind === "expense" ? "bg-accent text-white shadow-sm" : "text-ink-soft hover:text-ink"
                   }`}
                 >
                   − Expense
@@ -329,8 +329,8 @@ export default function QuickLog({ open, onClose }: Props) {
                 <button
                   type="button"
                   onClick={() => setKind("income")}
-                  className={`min-h-[44px] py-2 smallcaps border-r border-ink ${
-                    kind === "income" ? "bg-gain text-paper" : "text-ink-soft hover:text-ink"
+                  className={`min-h-[44px] py-2 rounded-full smallcaps transition-all duration-150 active:scale-95 ${
+                    kind === "income" ? "bg-gain text-white shadow-sm" : "text-ink-soft hover:text-ink"
                   }`}
                 >
                   + Income
@@ -339,8 +339,8 @@ export default function QuickLog({ open, onClose }: Props) {
                   type="button"
                   onClick={() => setKind("transfer")}
                   disabled={!sourcesEnabled}
-                  className={`min-h-[44px] py-2 smallcaps disabled:opacity-40 ${
-                    kind === "transfer" ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
+                  className={`min-h-[44px] py-2 rounded-full smallcaps transition-all duration-150 active:scale-95 disabled:opacity-40 disabled:active:scale-100 ${
+                    kind === "transfer" ? "bg-ink text-paper shadow-sm" : "text-ink-soft hover:text-ink"
                   }`}
                 >
                   Transfer
@@ -350,7 +350,7 @@ export default function QuickLog({ open, onClose }: Props) {
 
             <label className="block">
               <span className="smallcaps text-ink-mute">Amount · {amountCurrency}</span>
-              <div className="mt-1 flex items-center gap-3 border-b-2 border-ink focus-within:border-accent">
+              <div className="mt-1.5 flex items-center gap-3 rounded-xl border border-paper-rule bg-surface-2 px-3 py-1 focus-within:border-accent transition-colors">
                 <span className="smallcaps text-ink-mute min-w-10">{amountSymbol}</span>
                 <input
                   value={amountInput}
@@ -360,7 +360,7 @@ export default function QuickLog({ open, onClose }: Props) {
                   placeholder="0"
                   autoFocus
                   inputMode="decimal"
-                  className="w-full bg-transparent py-2 num text-3xl focus:outline-none"
+                  className="w-full bg-transparent py-2 num text-3xl text-ink focus:outline-none"
                 />
               </div>
             </label>
@@ -374,7 +374,7 @@ export default function QuickLog({ open, onClose }: Props) {
                     onChange={(e) =>
                       setCategoryId(e.target.value ? Number(e.target.value) : "")
                     }
-                    className="mt-1 w-full bg-transparent border-b border-ink py-1 focus:outline-none focus:border-accent"
+                    className="mt-1.5 w-full rounded-xl border border-paper-rule bg-surface px-3 py-2 text-ink focus:outline-none focus:border-accent transition-colors"
                   >
                     <option value="">—</option>
                     {cats?.map((c) => (
@@ -442,7 +442,7 @@ export default function QuickLog({ open, onClose }: Props) {
                         displayAmount(normalizeByCurrency(amountInput, nextCurrency), nextCurrency)
                       );
                     }}
-                    className="mt-1 w-full bg-transparent border-b border-ink py-1 focus:outline-none focus:border-accent"
+                    className="mt-1.5 w-full rounded-xl border border-paper-rule bg-surface px-3 py-2 text-ink focus:outline-none focus:border-accent transition-colors"
                   >
                     <option value="">—</option>
                     {srcs
@@ -459,7 +459,7 @@ export default function QuickLog({ open, onClose }: Props) {
                   <select
                     value={toSourceId}
                     onChange={(e) => setToSourceId(e.target.value ? Number(e.target.value) : "")}
-                    className="mt-1 w-full bg-transparent border-b border-ink py-1 focus:outline-none focus:border-accent"
+                    className="mt-1.5 w-full rounded-xl border border-paper-rule bg-surface px-3 py-2 text-ink focus:outline-none focus:border-accent transition-colors"
                   >
                     <option value="">—</option>
                     {srcs
@@ -480,7 +480,7 @@ export default function QuickLog({ open, onClose }: Props) {
                 type="datetime-local"
                 value={occurredAt}
                 onChange={(e) => setOccurredAt(e.target.value)}
-                className="mt-1 w-full bg-transparent border-b border-ink py-1 num focus:outline-none focus:border-accent"
+                className="mt-1.5 w-full rounded-xl border border-paper-rule bg-surface px-3 py-2 num text-ink focus:outline-none focus:border-accent transition-colors"
               />
             </label>
 
@@ -491,7 +491,7 @@ export default function QuickLog({ open, onClose }: Props) {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="coffee at Tanamera, dinner with N…"
-                className="mt-1 w-full bg-transparent border-b border-ink py-1 focus:outline-none focus:border-accent"
+                className="mt-1.5 w-full rounded-xl border border-paper-rule bg-surface px-3 py-2 text-ink placeholder:text-ink-mute focus:outline-none focus:border-accent transition-colors"
               />
             </label>
 
@@ -506,7 +506,7 @@ export default function QuickLog({ open, onClose }: Props) {
             <button
               type="button"
               onClick={onClose}
-              className="smallcaps text-ink-mute hover:text-ink w-full sm:w-auto"
+              className="smallcaps px-5 py-2 rounded-full border border-paper-rule bg-surface text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95 w-full sm:w-auto"
             >
               Cancel
             </button>
@@ -520,7 +520,8 @@ export default function QuickLog({ open, onClose }: Props) {
                 }
               }}
               disabled={isTransfer ? !canSubmitTransfer : !canSubmitSingle}
-              className="smallcaps px-5 py-2 bg-ink text-paper disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent transition-colors w-full sm:w-auto"
+              className="smallcaps px-5 py-2 rounded-full text-white shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 hover:brightness-110 transition-all duration-150 active:scale-95 w-full sm:w-auto"
+              style={{ backgroundColor: "var(--section-edge)" }}
             >
               {isTransfer
                 ? transfer.isPending

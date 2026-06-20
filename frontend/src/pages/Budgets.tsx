@@ -133,15 +133,15 @@ export default function BudgetsPage() {
         <button
           type="button"
           onClick={toggleAmounts}
-          className="smallcaps text-ink-mute hover:text-accent inline-flex items-center gap-1"
+          className="smallcaps text-ink-mute hover:text-accent inline-flex items-center gap-1.5 rounded-full border border-paper-rule bg-surface px-3 py-1.5 hover:bg-paper-deep transition-all duration-150 active:scale-95"
           title={showAmounts ? "Hide values" : "Show values"}
         >
           {eyeButtonIcon(showAmounts)}
           {showAmounts ? "Hide" : "Show"}
         </button>
       </div>
-      <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
-        <table className="ledger-table mb-4 w-full text-[11px] sm:text-[13px]">
+      <div className="card mt-4 mb-4 overflow-hidden">
+        <table className="ledger-table w-full text-[11px] sm:text-[13px]">
           <thead>
             <tr>
               <th>Category</th>
@@ -162,13 +162,13 @@ export default function BudgetsPage() {
                       setEditing(b);
                       setEditLimit(formatAmountLive(String(b.monthly_limit), userDefault));
                     }}
-                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2 mr-1"
+                    className="smallcaps text-ink-mute hover:text-ink inline-block p-2 -m-2 mr-1 transition-colors duration-150"
                   >
                     edit
                   </button>
                   <button
                     onClick={() => del.mutate(b.id)}
-                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
+                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2 transition-colors duration-150"
                   >
                     delete
                   </button>
@@ -200,7 +200,7 @@ export default function BudgetsPage() {
                     inputMode="decimal"
                     value={editLimit}
                     onChange={(e) => handleAmountChange(e.currentTarget, userDefault, setEditLimit)}
-                    className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full num"
+                    className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full num focus-visible:outline-none"
                   />
                 </div>
               </label>
@@ -219,13 +219,14 @@ export default function BudgetsPage() {
                     }
                     patch.mutate({ id: editing.id, body });
                   }}
-                  className="smallcaps px-3 py-1 bg-ink text-paper rounded"
+                  className="smallcaps rounded-full px-4 py-2 text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95"
+                  style={{ backgroundColor: "var(--section-edge)" }}
                 >
                   Save
                 </button>
                 <button
                   onClick={() => setEditing(null)}
-                  className="smallcaps px-3 py-1 border border-ink/30 rounded"
+                  className="smallcaps rounded-full border border-paper-rule bg-surface px-4 py-2 text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95"
                 >
                   Cancel
                 </button>
@@ -236,7 +237,7 @@ export default function BudgetsPage() {
       )}
 
       <form
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end"
+        className="card grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end p-4 sm:p-5"
         data-tutorial="budget-form"
         onSubmit={(e) => {
           e.preventDefault();
@@ -244,11 +245,11 @@ export default function BudgetsPage() {
         }}
       >
         <label>
-          <span className="smallcaps text-ink-mute block">Category</span>
+          <span className="smallcaps text-ink-mute block mb-1">Category</span>
           <select
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : "")}
-            className="bg-transparent border-b border-ink py-1"
+            className="w-full rounded-xl border border-paper-rule bg-surface px-3 py-2 focus-visible:outline-none"
           >
             <option value="">—</option>
             {cats?.map((c) => (
@@ -259,7 +260,7 @@ export default function BudgetsPage() {
           </select>
         </label>
         <label>
-          <span className="smallcaps text-ink-mute block">Monthly limit</span>
+          <span className="smallcaps text-ink-mute block mb-1">Monthly limit</span>
           <div className="flex items-center gap-2">
             <span className="smallcaps text-ink-mute min-w-10">{currencySymbol(userDefault)}</span>
             <input
@@ -267,11 +268,15 @@ export default function BudgetsPage() {
               inputMode="decimal"
               value={limit}
               onChange={(e) => handleAmountChange(e.currentTarget, userDefault, setLimit)}
-              className="bg-transparent border-b border-ink py-1 w-full num"
+              className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full num focus-visible:outline-none"
             />
           </div>
         </label>
-        <button type="submit" className="smallcaps px-3 py-1 bg-ink text-paper w-full sm:w-auto">
+        <button
+          type="submit"
+          className="smallcaps rounded-full px-4 py-2 text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95 w-full sm:w-auto"
+          style={{ backgroundColor: "var(--section-edge)" }}
+        >
           Save
         </button>
       </form>

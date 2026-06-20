@@ -46,8 +46,9 @@ export default function WebChat({
             type="button"
             onClick={() => onOpenChange(true)}
             data-tutorial="chat-launcher"
-            className="chat-fab fixed z-[70] w-[52px] h-[52px] rounded-full bg-ink text-paper flex items-center justify-center hover:bg-ink-soft transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="chat-fab fixed z-[70] w-14 h-14 rounded-full text-white flex items-center justify-center hover:brightness-110 transition-all duration-150 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             style={{
+              backgroundColor: "var(--section-edge)",
               right: "max(1rem, env(safe-area-inset-right))",
               bottom: "max(1rem, env(safe-area-inset-bottom))",
             }}
@@ -97,12 +98,12 @@ export default function WebChat({
   return (
     <div className="fixed bottom-0 right-3 z-[70] w-[min(92vw,360px)] pointer-events-none safe-chat-right">
       <div
-        className="pointer-events-auto border border-paper-rule border-b-0 rounded-t-md bg-paper overflow-hidden chat-docked flex flex-col"
+        className="pointer-events-auto border border-paper-rule border-b-0 rounded-t-2xl bg-surface overflow-hidden chat-docked flex flex-col"
         data-tutorial="chat-dock"
       >
         {!open ? (
           <form
-            className="h-11 flex items-center gap-2 px-3"
+            className="h-12 flex items-center gap-2 pl-4 pr-2"
             onSubmit={(e) => {
               e.preventDefault();
               const msg = draft.trim();
@@ -123,7 +124,8 @@ export default function WebChat({
             />
             <button
               type="submit"
-              className="w-7 h-7 rounded-sm flex items-center justify-center text-ink-mute hover:text-accent transition-colors"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white hover:brightness-110 transition-all duration-150 active:scale-95"
+              style={{ backgroundColor: "var(--section-edge)" }}
               title="Open chat"
               aria-label="Open chat"
             >

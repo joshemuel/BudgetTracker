@@ -19,7 +19,7 @@ export default function ChatPage() {
         </button>
       </div>
       <div
-        className="mt-4 flex flex-col border border-paper-rule rounded-md overflow-hidden bg-paper"
+        className="card mt-4 flex flex-col overflow-hidden"
         style={{ height: "calc(100dvh - 18rem)", minHeight: 380 }}
       >
         <ChatLog />

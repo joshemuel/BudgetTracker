@@ -143,7 +143,7 @@ export default function TransactionsPage() {
     <div>
       <SectionTitle>Transactions</SectionTitle>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 border-b border-paper-rule pb-4">
+      <div className="card p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <label className="block">
           <span className="smallcaps text-ink-mute">Search</span>
           <input
@@ -154,7 +154,7 @@ export default function TransactionsPage() {
               setPage(1);
             }}
             placeholder="description…"
-            className="mt-1 w-full bg-transparent border-b border-ink py-1"
+            className="mt-1.5 w-full rounded-xl border border-paper-rule bg-surface-2 px-3 py-2"
           />
         </label>
         <label className="block">
@@ -165,7 +165,7 @@ export default function TransactionsPage() {
               setCategoryId(e.target.value ? Number(e.target.value) : "");
               setPage(1);
             }}
-            className="mt-1 w-full bg-transparent border-b border-ink py-1"
+            className="mt-1.5 w-full rounded-xl border border-paper-rule bg-surface-2 px-3 py-2"
           >
             <option value="">All</option>
             {cats?.map((c) => (
@@ -184,7 +184,7 @@ export default function TransactionsPage() {
               setSourceId(e.target.value ? Number(e.target.value) : "");
               setPage(1);
             }}
-            className="mt-1 w-full bg-transparent border-b border-ink py-1"
+            className="mt-1.5 w-full rounded-xl border border-paper-rule bg-surface-2 px-3 py-2"
           >
             <option value="">All</option>
             {srcs?.map((s) => (
@@ -202,7 +202,7 @@ export default function TransactionsPage() {
               setLimit(Number(e.target.value));
               setPage(1);
             }}
-            className="mt-1 w-full bg-transparent border-b border-ink py-1"
+            className="mt-1.5 w-full rounded-xl border border-paper-rule bg-surface-2 px-3 py-2"
           >
             {[50, 100, 250, 500].map((n) => (
               <option key={n} value={n}>
@@ -214,7 +214,7 @@ export default function TransactionsPage() {
       </div>
 
       {isMobile ? (
-        <ul className="border-t border-paper-rule divide-y divide-paper-rule">
+        <ul className="card px-4 divide-y divide-paper-rule">
           {txs.map((t, i) => {
             const expanded = expandedId === t.id;
             return (
@@ -295,14 +295,14 @@ export default function TransactionsPage() {
                       <button
                         type="button"
                         onClick={() => startEdit(t)}
-                        className="smallcaps flex-1 min-h-[44px] border border-ink/30 rounded-sm"
+                        className="smallcaps flex-1 min-h-[44px] rounded-full border border-paper-rule bg-surface text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95"
                       >
                         Edit
                       </button>
                       <button
                         type="button"
                         onClick={() => setPendingDelete(t)}
-                        className="smallcaps flex-1 min-h-[44px] border border-accent/40 text-accent rounded-sm"
+                        className="smallcaps flex-1 min-h-[44px] rounded-full border border-accent/40 text-accent hover:bg-accent/10 transition-all duration-150 active:scale-95"
                       >
                         Delete
                       </button>
@@ -317,7 +317,8 @@ export default function TransactionsPage() {
           )}
         </ul>
       ) : (
-        <div className="tx-scroll">
+        <div className="rounded-2xl border border-paper-rule bg-surface shadow-sm overflow-hidden">
+          <div className="tx-scroll">
           <table className="ledger-table w-full text-[13px]">
             <thead>
               <tr>
@@ -393,6 +394,7 @@ export default function TransactionsPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -412,7 +414,7 @@ export default function TransactionsPage() {
                 }
               }}
               disabled={!canPrev}
-              className="smallcaps px-3 py-1 disabled:opacity-40"
+              className="smallcaps px-4 py-1.5 rounded-full border border-paper-rule bg-surface text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95 disabled:opacity-40 disabled:hover:bg-surface disabled:hover:text-ink-soft"
             >
               Prev
             </button>
@@ -426,7 +428,7 @@ export default function TransactionsPage() {
                 }
               }}
               disabled={!canNext}
-              className="smallcaps px-3 py-1 disabled:opacity-40"
+              className="smallcaps px-4 py-1.5 rounded-full border border-paper-rule bg-surface text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95 disabled:opacity-40 disabled:hover:bg-surface disabled:hover:text-ink-soft"
             >
               Next
             </button>
@@ -436,34 +438,34 @@ export default function TransactionsPage() {
       {editing && (
         <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="modal-card w-full max-w-lg p-6">
-            <h3 className="font-semibold mb-4">Edit entry</h3>
+            <h3 className="display text-lg mb-4">Edit entry</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <label className="block">
-                <span className="smallcaps text-ink-mute block mb-1">When</span>
+                <span className="smallcaps text-ink-mute block mb-1.5">When</span>
                 <input
                   type="datetime-local"
                   value={editOccurredAt}
                   onChange={(e) => setEditOccurredAt(e.target.value)}
-                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full num"
+                  className="rounded-xl border border-paper-rule bg-surface-2 px-3 py-2 w-full num"
                 />
               </label>
               <label className="block">
-                <span className="smallcaps text-ink-mute block mb-1">Type</span>
+                <span className="smallcaps text-ink-mute block mb-1.5">Type</span>
                 <select
                   value={editType}
                   onChange={(e) => setEditType(e.target.value as TxType)}
-                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                  className="rounded-xl border border-paper-rule bg-surface-2 px-3 py-2 w-full"
                 >
                   <option value="expense">Expense</option>
                   <option value="income">Income</option>
                 </select>
               </label>
               <label className="block">
-                <span className="smallcaps text-ink-mute block mb-1">Category</span>
+                <span className="smallcaps text-ink-mute block mb-1.5">Category</span>
                 <select
                   value={editCategoryId}
                   onChange={(e) => setEditCategoryId(e.target.value ? Number(e.target.value) : "")}
-                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                  className="rounded-xl border border-paper-rule bg-surface-2 px-3 py-2 w-full"
                 >
                   <option value="">—</option>
                   {cats?.map((c) => (
@@ -475,11 +477,11 @@ export default function TransactionsPage() {
               </label>
               {sourcesEnabled ? (
                 <label className="block">
-                  <span className="smallcaps text-ink-mute block mb-1">Source</span>
+                  <span className="smallcaps text-ink-mute block mb-1.5">Source</span>
                   <select
                     value={editSourceId}
                     onChange={(e) => setEditSourceId(e.target.value ? Number(e.target.value) : "")}
-                    className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                    className="rounded-xl border border-paper-rule bg-surface-2 px-3 py-2 w-full"
                   >
                     <option value="">—</option>
                     {srcs?.map((s) => (
@@ -491,11 +493,11 @@ export default function TransactionsPage() {
                 </label>
               ) : (
                 <label className="block">
-                  <span className="smallcaps text-ink-mute block mb-1">Currency</span>
+                  <span className="smallcaps text-ink-mute block mb-1.5">Currency</span>
                   <select
                     value={editCurrency}
                     onChange={(e) => setEditCurrency(e.target.value as CurrencyCode)}
-                    className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                    className="rounded-xl border border-paper-rule bg-surface-2 px-3 py-2 w-full"
                   >
                     {CURRENCIES.map((currency) => (
                       <option key={currency} value={currency}>
@@ -506,29 +508,29 @@ export default function TransactionsPage() {
                 </label>
               )}
               <label className="block sm:col-span-2">
-                <span className="smallcaps text-ink-mute block mb-1">Amount</span>
+                <span className="smallcaps text-ink-mute block mb-1.5">Amount</span>
                 <input
                   type="text"
                   inputMode="decimal"
                   value={editAmount}
                   onChange={(e) => handleAmountChange(e.currentTarget, editCurrency, setEditAmount)}
-                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full num"
+                  className="rounded-xl border border-paper-rule bg-surface-2 px-3 py-2 w-full num"
                 />
               </label>
               <label className="block sm:col-span-2">
-                <span className="smallcaps text-ink-mute block mb-1">Description</span>
+                <span className="smallcaps text-ink-mute block mb-1.5">Description</span>
                 <input
                   type="text"
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
-                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                  className="rounded-xl border border-paper-rule bg-surface-2 px-3 py-2 w-full"
                 />
               </label>
             </div>
             <div className="flex gap-2 mt-5 justify-end">
               <button
                 onClick={() => setEditing(null)}
-                className="smallcaps px-3 py-1 border border-ink/30 rounded"
+                className="smallcaps px-4 py-2 rounded-full border border-paper-rule bg-surface text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95"
                 disabled={patch.isPending}
               >
                 Cancel
@@ -551,7 +553,8 @@ export default function TransactionsPage() {
                   });
                 }}
                 disabled={!canEdit}
-                className="smallcaps px-3 py-1 bg-ink text-paper rounded disabled:opacity-60"
+                className="smallcaps px-4 py-2 rounded-full text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95 disabled:opacity-60"
+                style={{ backgroundColor: "var(--section-edge)" }}
               >
                 {patch.isPending ? "Saving..." : "Save"}
               </button>

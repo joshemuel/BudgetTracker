@@ -84,7 +84,7 @@ function CurrencyBlock({ sourcesEnabled }: { sourcesEnabled: boolean }) {
   return (
     <section className="mb-12" data-tutorial="currencies-table">
       <SectionTitle>Currencies</SectionTitle>
-      <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
+      <div className="card overflow-hidden">
         <table className="ledger-table w-full text-[11px] sm:text-[13px]">
           <thead>
             <tr>
@@ -112,7 +112,7 @@ function CurrencyBlock({ sourcesEnabled }: { sourcesEnabled: boolean }) {
                         body: { default_source_id: Number(e.target.value) },
                       });
                     }}
-                    className="w-full bg-transparent border-b border-ink py-1 disabled:opacity-45"
+                    className="w-full rounded-xl border border-paper-rule bg-surface px-3 py-2 disabled:opacity-45 focus-visible:outline-none"
                   >
                     {(sources ?? [])
                       .filter((s) => s.active && s.currency === c.currency)
@@ -130,7 +130,7 @@ function CurrencyBlock({ sourcesEnabled }: { sourcesEnabled: boolean }) {
                       setEditing(c);
                       setCurrentFundsInput(normalizeInput(c.current_balance, c.currency));
                     }}
-                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
+                    className="smallcaps text-ink-mute hover:text-ink inline-block p-2 -m-2 transition-colors duration-150"
                   >
                     reset
                   </button>
@@ -168,7 +168,7 @@ function CurrencyBlock({ sourcesEnabled }: { sourcesEnabled: boolean }) {
                   onFocus={() =>
                     setCurrentFundsInput(formatAmountLive(currentFundsInput, editing.currency))
                   }
-                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full num"
+                  className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full num focus-visible:outline-none"
                 />
               </div>
             </label>
@@ -176,7 +176,7 @@ function CurrencyBlock({ sourcesEnabled }: { sourcesEnabled: boolean }) {
               <button
                 type="button"
                 onClick={() => setEditing(null)}
-                className="smallcaps px-3 py-1 border border-ink/30 rounded"
+                className="smallcaps rounded-full border border-paper-rule bg-surface px-4 py-2 text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95 disabled:opacity-60"
                 disabled={patch.isPending}
               >
                 Cancel
@@ -189,7 +189,8 @@ function CurrencyBlock({ sourcesEnabled }: { sourcesEnabled: boolean }) {
                     body: { current_balance: parseDisplayAmount(currentFundsInput) || "0" },
                   })
                 }
-                className="smallcaps px-3 py-1 bg-ink text-paper rounded disabled:opacity-60"
+                className="smallcaps rounded-full px-4 py-2 text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95 disabled:opacity-60"
+                style={{ backgroundColor: "var(--section-edge)" }}
                 disabled={patch.isPending}
               >
                 Save
@@ -284,8 +285,8 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
     <section className={enabled ? "" : "opacity-45 grayscale"}>
       <fieldset disabled={!enabled}>
       <SectionTitle>Sources</SectionTitle>
-      <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
-        <table className="ledger-table mb-4 w-full text-[11px] sm:text-[13px]">
+      <div className="card mb-4 overflow-hidden">
+        <table className="ledger-table w-full text-[11px] sm:text-[13px]">
           <thead>
             <tr>
               <th>Name</th>
@@ -299,7 +300,7 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
                 <td className="font-[550]">
                   {s.name}
                   {s.is_credit_card && (
-                    <span className="ml-2 smallcaps text-accent">credit</span>
+                    <span className="ml-2 inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 smallcaps text-accent">credit</span>
                   )}
                 </td>
                 <td className={`text-right num ${s.is_credit_card ? "text-accent" : ""}`}>
@@ -314,13 +315,13 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
                       setEditCurrency(s.currency);
                       setEditIsCc(s.is_credit_card);
                     }}
-                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2 mr-1"
+                    className="smallcaps text-ink-mute hover:text-ink inline-block p-2 -m-2 mr-1 transition-colors duration-150"
                   >
                     edit
                   </button>
                   <button
                     onClick={() => setPendingDelete(s)}
-                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
+                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2 transition-colors duration-150"
                   >
                     delete
                   </button>
@@ -340,7 +341,7 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
                 <input
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                  className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full focus-visible:outline-none"
                 />
               </label>
               <label className="block">
@@ -356,7 +357,7 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
                     onFocus={() =>
                       setEditCurrentFundsInput(formatAmountLive(editCurrentFundsInput, editCurrency))
                     }
-                    className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full num"
+                    className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full num focus-visible:outline-none"
                   />
                 </div>
               </label>
@@ -369,7 +370,7 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
                     setEditCurrency(next);
                     setEditCurrentFundsInput(normalizeInput(editCurrentFundsInput, next));
                   }}
-                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                  className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full focus-visible:outline-none"
                 >
                   {CURRENCIES.map((c) => (
                     <option key={c} value={c}>
@@ -421,13 +422,14 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
                       patch.mutate({ id: editing.id, body });
                     }
                   }}
-                  className="smallcaps px-3 py-1 bg-ink text-paper rounded"
+                  className="smallcaps rounded-full px-4 py-2 text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95"
+                  style={{ backgroundColor: "var(--section-edge)" }}
                 >
                   Save
                 </button>
                 <button
                   onClick={() => setEditing(null)}
-                  className="smallcaps px-3 py-1 border border-ink/30 rounded"
+                  className="smallcaps rounded-full border border-paper-rule bg-surface px-4 py-2 text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95"
                 >
                   Cancel
                 </button>
@@ -467,7 +469,7 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
         }}
       />
       <form
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end"
+        className="card grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end p-4 sm:p-5"
         data-tutorial="add-source-form"
         onSubmit={(e) => {
           e.preventDefault();
@@ -475,15 +477,15 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
         }}
       >
         <label>
-          <span className="smallcaps text-ink-mute block">Name</span>
+          <span className="smallcaps text-ink-mute block mb-1">Name</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="bg-transparent border-b border-ink py-1"
+            className="w-full rounded-xl border border-paper-rule bg-surface px-3 py-2 focus-visible:outline-none"
           />
         </label>
         <label>
-          <span className="smallcaps text-ink-mute block">Current funds</span>
+          <span className="smallcaps text-ink-mute block mb-1">Current funds</span>
           <div className="flex items-center gap-2">
             <span className="smallcaps text-ink-mute min-w-10">{currencySymbol(currency)}</span>
             <input
@@ -491,12 +493,12 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
               onChange={(e) => handleAmountChange(e.currentTarget, currency, setCurrentFundsInput)}
               onBlur={() => setCurrentFundsInput(normalizeInput(currentFundsInput, currency))}
               onFocus={() => setCurrentFundsInput(formatAmountLive(currentFundsInput, currency))}
-              className="bg-transparent border-b border-ink py-1 w-full sm:w-40 num"
+              className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full sm:w-40 num focus-visible:outline-none"
             />
           </div>
         </label>
         <label>
-          <span className="smallcaps text-ink-mute block">Currency</span>
+          <span className="smallcaps text-ink-mute block mb-1">Currency</span>
           <select
             value={currency}
             onChange={(e) => {
@@ -504,7 +506,7 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
               setCurrency(next);
               setCurrentFundsInput(normalizeInput(currentFundsInput, next));
             }}
-            className="bg-transparent border-b border-ink py-1"
+            className="w-full rounded-xl border border-paper-rule bg-surface px-3 py-2 focus-visible:outline-none"
           >
             {CURRENCIES.map((c) => (
               <option key={c} value={c}>
@@ -517,7 +519,11 @@ function SourcesBlock({ enabled }: { enabled: boolean }) {
           <input type="checkbox" checked={isCc} onChange={(e) => setIsCc(e.target.checked)} />
           <span className="smallcaps text-ink-mute">Credit card</span>
         </label>
-        <button type="submit" className="smallcaps px-3 py-1 bg-ink text-paper w-full sm:w-auto">
+        <button
+          type="submit"
+          className="smallcaps rounded-full px-4 py-2 text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95 w-full sm:w-auto"
+          style={{ backgroundColor: "var(--section-edge)" }}
+        >
           Add source
         </button>
       </form>
@@ -581,7 +587,7 @@ function CategoriesBlock() {
   return (
     <section className="mt-12">
       <SectionTitle>Categories</SectionTitle>
-      <div className="-mx-2 px-2 sm:mx-0 sm:px-0 mb-6">
+      <div className="card mb-6 overflow-hidden">
         <table className="ledger-table w-full text-[11px] sm:text-[13px]">
           <thead>
             <tr>
@@ -599,13 +605,13 @@ function CategoriesBlock() {
                       setEditing(c);
                       setEditName(c.name);
                     }}
-                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2 mr-1"
+                    className="smallcaps text-ink-mute hover:text-ink inline-block p-2 -m-2 mr-1 transition-colors duration-150"
                   >
                     edit
                   </button>
                   <button
                     onClick={() => setPendingDelete(c)}
-                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
+                    className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2 transition-colors duration-150"
                   >
                     delete
                   </button>
@@ -632,7 +638,7 @@ function CategoriesBlock() {
               <input
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full focus-visible:outline-none"
                 autoFocus
               />
             </label>
@@ -648,13 +654,14 @@ function CategoriesBlock() {
                   patch.mutate({ id: editing.id, body: { name: trimmed } });
                 }}
                 disabled={patch.isPending}
-                className="smallcaps px-3 py-1 bg-ink text-paper rounded disabled:opacity-60"
+                className="smallcaps rounded-full px-4 py-2 text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95 disabled:opacity-60"
+                style={{ backgroundColor: "var(--section-edge)" }}
               >
                 {patch.isPending ? "Saving..." : "Save"}
               </button>
               <button
                 onClick={() => setEditing(null)}
-                className="smallcaps px-3 py-1 border border-ink/30 rounded"
+                className="smallcaps rounded-full border border-paper-rule bg-surface px-4 py-2 text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95"
               >
                 Cancel
               </button>
@@ -663,21 +670,25 @@ function CategoriesBlock() {
         </div>
       )}
       <form
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end"
+        className="card grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end p-4 sm:p-5"
         onSubmit={(e) => {
           e.preventDefault();
           if (name.trim()) create.mutate();
         }}
       >
         <label>
-          <span className="smallcaps text-ink-mute block">Custom category</span>
+          <span className="smallcaps text-ink-mute block mb-1">Custom category</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="bg-transparent border-b border-ink py-1"
+            className="w-full rounded-xl border border-paper-rule bg-surface px-3 py-2 focus-visible:outline-none"
           />
         </label>
-        <button type="submit" className="smallcaps px-3 py-1 bg-ink text-paper w-full sm:w-auto">
+        <button
+          type="submit"
+          className="smallcaps rounded-full px-4 py-2 text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95 w-full sm:w-auto"
+          style={{ backgroundColor: "var(--section-edge)" }}
+        >
           Add
         </button>
       </form>
@@ -699,9 +710,9 @@ function CategoriesBlock() {
 }
 
 function statusTone(status: AdminUser["status"]): string {
-  if (status === "pending") return "text-accent";
-  if (status === "rejected") return "text-ink-mute line-through";
-  return "text-ink-soft";
+  if (status === "pending") return "bg-warn/10 text-warn";
+  if (status === "rejected") return "bg-paper-deep text-ink-mute line-through";
+  return "bg-gain/10 text-gain";
 }
 
 function AdminBlock() {
@@ -730,7 +741,7 @@ function AdminBlock() {
           ? `${pending.length} account${pending.length > 1 ? "s" : ""} awaiting your approval.`
           : "Approve or revoke access for people who signed in with Google."}
       </p>
-      <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
+      <div className="card overflow-hidden">
         <table className="ledger-table w-full text-[11px] sm:text-[13px]">
           <thead>
             <tr>
@@ -748,12 +759,16 @@ function AdminBlock() {
                   {u.is_admin && <span className="smallcaps text-ink-mute"> · admin</span>}
                 </td>
                 <td className="text-ink-soft">{u.email ?? "—"}</td>
-                <td className={`smallcaps ${statusTone(u.status)}`}>{u.status}</td>
+                <td>
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 smallcaps ${statusTone(u.status)}`}>
+                    {u.status}
+                  </span>
+                </td>
                 <td className="text-right whitespace-nowrap">
                   {u.status !== "approved" && (
                     <button
                       onClick={() => approve.mutate(u.id)}
-                      className="smallcaps text-ink-mute hover:text-gain inline-block p-2 -m-2 mr-1"
+                      className="smallcaps text-ink-mute hover:text-gain inline-block p-2 -m-2 mr-1 transition-colors duration-150"
                     >
                       approve
                     </button>
@@ -761,7 +776,7 @@ function AdminBlock() {
                   {u.status !== "rejected" && !u.is_admin && (
                     <button
                       onClick={() => reject.mutate(u.id)}
-                      className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
+                      className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2 transition-colors duration-150"
                     >
                       reject
                     </button>
@@ -882,71 +897,86 @@ function ConnectedAppsBlock() {
         Link other apps to log entries, ask about your finances, or mirror your ledger — from
         anywhere.
       </p>
-      <table className="ledger-table w-full text-[11px] sm:text-[13px]">
-        <thead>
-          <tr>
-            <th>App</th>
-            <th>Status</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td className="font-[550]">Telegram</td>
-            <td className={`smallcaps ${tgConnected ? "text-gain" : "text-ink-mute"}`}>
-              {tgConnected ? "Connected" : "Not connected"}
-            </td>
-            <td className="text-right whitespace-nowrap">
-              {tgConnected ? (
-                <button
-                  onClick={() => setTgConfirmOpen(true)}
-                  className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
-                >
-                  disconnect
-                </button>
-              ) : (
-                <button
-                  onClick={() => issueLink.mutate()}
-                  disabled={issueLink.isPending}
-                  className="smallcaps text-ink-mute hover:text-gain inline-block p-2 -m-2 disabled:opacity-50"
-                >
-                  {issueLink.isPending ? "opening…" : "connect"}
-                </button>
-              )}
-            </td>
-          </tr>
-          <tr>
-            <td className="font-[550]">
-              Google Sheets
-              {sheetsConnected && sheets?.google_email && (
-                <span className="text-ink-mute font-normal"> · {sheets.google_email}</span>
-              )}
-            </td>
-            <td className={`smallcaps ${sheetsConnected ? "text-gain" : "text-ink-mute"}`}>
-              {sheetsConnected ? "Connected" : "Not connected"}
-            </td>
-            <td className="text-right whitespace-nowrap">
-              {sheetsConnected ? (
-                <button
-                  onClick={() => setGsConfirmOpen(true)}
-                  className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
-                >
-                  disconnect
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    window.location.href = "/api/sheets/connect";
-                  }}
-                  className="smallcaps text-ink-mute hover:text-gain inline-block p-2 -m-2"
-                >
-                  connect
-                </button>
-              )}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div className="card divide-y divide-paper-rule overflow-hidden">
+        <div className="flex items-center gap-3 px-4 py-3.5 flex-wrap">
+          <span
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white"
+            style={{ backgroundColor: "var(--section-edge)" }}
+            aria-hidden="true"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M21.9 4.6 18.6 20c-.2 1-.9 1.3-1.8.8l-4.9-3.6-2.4 2.3c-.3.3-.5.5-1 .5l.4-5 9.1-8.2c.4-.4-.1-.6-.6-.2L6 13.2l-4.8-1.5c-1-.3-1-1 .2-1.5L20.6 3c.9-.3 1.6.2 1.3 1.6Z" />
+            </svg>
+          </span>
+          <span className="font-[550] flex-1 min-w-0">Telegram</span>
+          <span
+            className={`inline-flex items-center rounded-full px-2.5 py-0.5 smallcaps ${
+              tgConnected ? "bg-gain/10 text-gain" : "bg-paper-deep text-ink-mute"
+            }`}
+          >
+            {tgConnected ? "Connected" : "Not connected"}
+          </span>
+          {tgConnected ? (
+            <button
+              onClick={() => setTgConfirmOpen(true)}
+              className="smallcaps rounded-full border border-paper-rule bg-surface px-4 py-1.5 text-ink-soft hover:bg-paper-deep hover:text-accent transition-all duration-150 active:scale-95"
+            >
+              Disconnect
+            </button>
+          ) : (
+            <button
+              onClick={() => issueLink.mutate()}
+              disabled={issueLink.isPending}
+              className="smallcaps rounded-full px-4 py-1.5 text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95 disabled:opacity-50"
+              style={{ backgroundColor: "var(--section-edge)" }}
+            >
+              {issueLink.isPending ? "Opening…" : "Connect"}
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-3 px-4 py-3.5 flex-wrap">
+          <span
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white"
+            style={{ backgroundColor: "var(--section-edge)" }}
+            aria-hidden="true"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M5 3h9l5 5v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm8 1.5V8h3.5L13 4.5ZM8 12h8v1.6H8V12Zm0 3.2h8v1.6H8v-1.6Zm0-6.4h3.4v1.6H8V8.8Z" />
+            </svg>
+          </span>
+          <span className="font-[550] flex-1 min-w-0">
+            Google Sheets
+            {sheetsConnected && sheets?.google_email && (
+              <span className="text-ink-mute font-normal"> · {sheets.google_email}</span>
+            )}
+          </span>
+          <span
+            className={`inline-flex items-center rounded-full px-2.5 py-0.5 smallcaps ${
+              sheetsConnected ? "bg-gain/10 text-gain" : "bg-paper-deep text-ink-mute"
+            }`}
+          >
+            {sheetsConnected ? "Connected" : "Not connected"}
+          </span>
+          {sheetsConnected ? (
+            <button
+              onClick={() => setGsConfirmOpen(true)}
+              className="smallcaps rounded-full border border-paper-rule bg-surface px-4 py-1.5 text-ink-soft hover:bg-paper-deep hover:text-accent transition-all duration-150 active:scale-95"
+            >
+              Disconnect
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                window.location.href = "/api/sheets/connect";
+              }}
+              className="smallcaps rounded-full px-4 py-1.5 text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95"
+              style={{ backgroundColor: "var(--section-edge)" }}
+            >
+              Connect
+            </button>
+          )}
+        </div>
+      </div>
       {issueLink.isError && (
         <p className="text-accent text-sm mt-3">
           {(issueLink.error as Error).message || "Couldn't reach Telegram. Try again later."}
@@ -978,18 +1008,31 @@ function ConnectedAppsBlock() {
         </div>
       )}
       {sheetsConnected && (
-        <div className="mt-4 text-sm text-ink-soft space-y-3">
+        <div className="card mt-4 p-4 text-sm text-ink-soft space-y-3">
           {justConnected && (
             <p className="text-gain">Connected — your spreadsheet has been created and filled.</p>
           )}
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={!!sheets?.auto_sync}
-              disabled={toggleAuto.isPending}
-              onChange={(e) => toggleAuto.mutate(e.target.checked)}
-            />
+          <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
             <span>Google Sheets: automatic sync (hourly)</span>
+            <span className="relative inline-flex shrink-0">
+              <input
+                type="checkbox"
+                checked={!!sheets?.auto_sync}
+                disabled={toggleAuto.isPending}
+                onChange={(e) => toggleAuto.mutate(e.target.checked)}
+                className="peer sr-only"
+              />
+              <span
+                className={`h-5 w-9 rounded-full transition-colors duration-150 ${
+                  sheets?.auto_sync ? "bg-gain" : "bg-paper-deep"
+                } peer-disabled:opacity-50`}
+              />
+              <span
+                className={`pointer-events-none absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-surface shadow-sm transition-transform duration-150 ${
+                  sheets?.auto_sync ? "translate-x-4" : "translate-x-0"
+                }`}
+              />
+            </span>
           </label>
           <div className="flex flex-wrap items-center gap-3">
             {sheets?.spreadsheet_url && (
@@ -997,7 +1040,7 @@ function ConnectedAppsBlock() {
                 href={sheets.spreadsheet_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline underline-offset-2 hover:text-accent"
+                className="smallcaps rounded-full border border-paper-rule bg-surface px-4 py-1.5 text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95"
               >
                 Open in Google Sheets
               </a>
@@ -1005,9 +1048,9 @@ function ConnectedAppsBlock() {
             <button
               onClick={() => syncNow.mutate()}
               disabled={syncNow.isPending}
-              className="smallcaps text-ink-mute hover:text-gain disabled:opacity-50"
+              className="smallcaps rounded-full border border-paper-rule bg-surface px-4 py-1.5 text-ink-soft hover:bg-paper-deep hover:text-gain transition-all duration-150 active:scale-95 disabled:opacity-50"
             >
-              {syncNow.isPending ? "syncing…" : "sync now"}
+              {syncNow.isPending ? "Syncing…" : "Sync now"}
             </button>
             {lastSynced && <span className="text-ink-mute">Last synced {lastSynced}</span>}
           </div>

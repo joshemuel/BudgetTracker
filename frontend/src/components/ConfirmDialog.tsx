@@ -37,14 +37,16 @@ export default function ConfirmDialog({
   return (
     <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="modal-card w-full max-w-md p-6">
-        <h3 className="font-semibold mb-4">{title}</h3>
-        {message && <p className="text-sm text-ink-soft mb-4">{message}</p>}
-        {error && <p className="text-sm text-accent mb-4">{error}</p>}
-        <div className="flex gap-2 mt-5 justify-end">
+        <h3 className="display text-2xl text-ink mb-3">{title}</h3>
+        {message && <p className="text-sm text-ink-soft leading-relaxed mb-4">{message}</p>}
+        {error && (
+          <p className="text-sm text-accent italic border-l-2 border-accent pl-3 mb-4">{error}</p>
+        )}
+        <div className="flex gap-3 mt-6 justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="smallcaps px-3 py-1 border border-ink/30 rounded"
+            className="smallcaps px-5 py-2 rounded-full border border-paper-rule bg-surface text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95 disabled:opacity-50"
             disabled={busy}
           >
             {cancelLabel}
@@ -52,7 +54,7 @@ export default function ConfirmDialog({
           <button
             type="button"
             onClick={onConfirm}
-            className="smallcaps px-3 py-1 bg-ink text-paper rounded disabled:opacity-60"
+            className="smallcaps px-5 py-2 rounded-full bg-accent text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95 disabled:opacity-60"
             disabled={busy}
           >
             {busy ? "Working..." : confirmLabel}

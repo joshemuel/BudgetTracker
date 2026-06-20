@@ -24,7 +24,6 @@ import CategoryBreakdownModal from "@/components/CategoryBreakdownModal";
 // How many top categories to draw individually before bundling the rest into
 // an "Other" segment, so each monthly bar stays readable.
 const TOP_CATEGORIES = 8;
-const OTHER_COLOR = "#877e6a";
 
 function toISO(y: number, m: number, d: number): string {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -72,7 +71,7 @@ function TotalsTooltip({
   if (!active || !payload || payload.length === 0) return null;
   const row = payload[0].payload;
   return (
-    <div className="bg-paper border border-ink px-3 py-2 text-[12px] shadow-sm">
+    <div className="rounded-2xl border border-paper-rule bg-surface px-3 py-2 text-[12px] shadow-card">
       <p className="smallcaps text-ink-mute mb-1">{monthName(Number(row.month))}</p>
       <p className="num text-gain">
         In · {showAmounts ? fmtMoney(Number(row.Income), currency) : "••••••"}
@@ -99,7 +98,15 @@ export default function MonthlyPage() {
   const movedRef = useRef(false);
   const [pressBox, setPressBox] = useState<{ index: number; x: number; y: number } | null>(null);
   const { theme } = useTheme();
-  const palette = theme === "dark" ? PALETTE_DARK : PALETTE;
+  const dark = theme === "dark";
+  const palette = dark ? PALETTE_DARK : PALETTE;
+  // Chart chrome colours, branched on theme. Bars use the section GREEN edge;
+  // the "Other" bundle is a neutral gray so it never competes with a category.
+  const gridStroke = dark ? "#2c313d" : "#e2e5ef";
+  const axisTick = dark ? "#9aa3b2" : "#6a7385";
+  const incomeColor = dark ? "#7fd6a0" : "#2e7d4f";
+  const expenseColor = dark ? "#f0876a" : "#c43d24";
+  const otherColor = dark ? "#6a7385" : "#9aa3b2";
   const { data: me } = useQuery<Me>({
     queryKey: ["me"],
     queryFn: () => api.get<Me>("/auth/me"),
@@ -272,34 +279,34 @@ export default function MonthlyPage() {
             role="switch"
             aria-checked={byCategory}
             onClick={() => setByCategory((v) => !v)}
-            className="flex items-center gap-1.5 cursor-pointer select-none"
+            className="flex items-center gap-1.5 cursor-pointer select-none active:scale-95 transition-transform duration-150"
             title="Toggle per-category breakdown"
           >
             <span className="smallcaps text-[10px] text-ink-mute whitespace-nowrap">
               By category
             </span>
             <span
-              className={`relative inline-flex h-3.5 w-7 shrink-0 items-center rounded-full transition-colors ${
-                byCategory ? "bg-accent" : "bg-ink/20"
+              className={`relative inline-flex h-3.5 w-7 shrink-0 items-center rounded-full transition-colors duration-150 ${
+                byCategory ? "bg-[var(--section-edge)]" : "bg-paper-deep"
               }`}
             >
               <span
-                className={`inline-block h-2.5 w-2.5 rounded-full bg-paper transition-transform ${
+                className={`inline-block h-2.5 w-2.5 rounded-full bg-surface shadow-sm transition-transform duration-150 ${
                   byCategory ? "translate-x-[16px]" : "translate-x-[2px]"
                 }`}
               />
             </span>
           </button>
-        <div className="flex gap-2 smallcaps">
+        <div className="flex gap-1.5 smallcaps">
           {[year - 2, year - 1, year, year + 1].map((y) => (
             <button
               key={y}
               onClick={() => setYear(y)}
               className={
-                "px-2 py-1 border-b-2 " +
+                "rounded-full px-3 py-1 transition-all duration-150 active:scale-95 " +
                 (y === year
-                  ? "border-accent text-accent"
-                  : "border-transparent hover:text-ink text-ink-mute")
+                  ? "bg-[var(--section-edge)] text-white"
+                  : "bg-surface-2 text-ink-mute hover:text-ink")
               }
             >
               {y}
@@ -309,7 +316,7 @@ export default function MonthlyPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 border-t border-ink pt-4">
+      <div className="card grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 p-5 sm:p-6 mt-2">
         <div>
           <p className="smallcaps text-ink-mute">YTD In</p>
           <p className="num text-[2.5rem] leading-[0.95] sm:text-2xl sm:leading-none mt-1 break-words text-gain">
@@ -336,7 +343,7 @@ export default function MonthlyPage() {
 
       {/* relative wrapper hosts the horizontal scroller plus, on mobile, a
           pinned axis overlaid on its left edge. */}
-      <div className="mt-8 relative">
+      <div className="card mt-6 relative p-3 sm:p-5 overflow-hidden">
       <div
         ref={scrollRef}
         className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0"
@@ -370,19 +377,19 @@ export default function MonthlyPage() {
             }}
             className="cursor-pointer"
           >
-            <CartesianGrid stroke="#d9cdb4" vertical={false} />
+            <CartesianGrid stroke={gridStroke} vertical={false} />
             <XAxis
               dataKey="name"
-              stroke="#4a4437"
+              stroke={gridStroke}
               interval={0}
-              tick={{ fontFamily: "Instrument Sans", fontSize: 11 }}
+              tick={{ fill: axisTick, fontFamily: "Plus Jakarta Sans", fontSize: 11 }}
               tickLine={false}
               // Fixed height on mobile so the plot area matches the pinned axis.
               height={isMobile ? 28 : undefined}
             />
             <YAxis
-              stroke="#4a4437"
-              tick={{ fontFamily: "JetBrains Mono", fontSize: 11 }}
+              stroke={gridStroke}
+              tick={{ fill: axisTick, fontFamily: "JetBrains Mono", fontSize: 11 }}
               tickFormatter={(v) => (showAmounts ? fmtShort(v, reportCurrency) : "•••")}
               tickLine={false}
               width={72}
@@ -395,7 +402,7 @@ export default function MonthlyPage() {
               {!isMobile && (
                 <Tooltip
                   content={<TotalsTooltip showAmounts={showAmounts} currency={reportCurrency} />}
-                  cursor={{ fill: "rgba(120,110,90,0.12)" }}
+                  cursor={{ fill: dark ? "rgba(154,163,178,0.12)" : "rgba(106,115,133,0.10)" }}
                 />
               )}
             {byCategory ? (
@@ -414,7 +421,7 @@ export default function MonthlyPage() {
                   dataKey="inc_other"
                   stackId="income"
                   name="Other"
-                  fill={OTHER_COLOR}
+                  fill={otherColor}
                   fillOpacity={1}
                   legendType="none"
                 />
@@ -433,30 +440,30 @@ export default function MonthlyPage() {
                   dataKey="exp_other"
                   stackId="expense"
                   name="Other"
-                  fill={OTHER_COLOR}
+                  fill={otherColor}
                   fillOpacity={1}
                   legendType="none"
                 />
               </>
             ) : (
               <>
-                <Bar dataKey="Income">
+                <Bar dataKey="Income" radius={[6, 6, 0, 0]}>
                   {chartData.map((row) => (
                     <Cell
                       key={`inc-${row.month}`}
-                      fill={isFuture(Number(row.month)) ? "transparent" : "#3f5d2e"}
-                      stroke={isFuture(Number(row.month)) ? "#3f5d2e" : "none"}
+                      fill={isFuture(Number(row.month)) ? "transparent" : incomeColor}
+                      stroke={isFuture(Number(row.month)) ? incomeColor : "none"}
                       strokeDasharray={isFuture(Number(row.month)) ? "2 2" : undefined}
                       strokeOpacity={isFuture(Number(row.month)) ? 0.35 : 1}
                     />
                   ))}
                 </Bar>
-                <Bar dataKey="Expense">
+                <Bar dataKey="Expense" radius={[6, 6, 0, 0]}>
                   {chartData.map((row) => (
                     <Cell
                       key={`exp-${row.month}`}
-                      fill={isFuture(Number(row.month)) ? "transparent" : "#a02a1a"}
-                      stroke={isFuture(Number(row.month)) ? "#a02a1a" : "none"}
+                      fill={isFuture(Number(row.month)) ? "transparent" : expenseColor}
+                      stroke={isFuture(Number(row.month)) ? expenseColor : "none"}
                       strokeDasharray={isFuture(Number(row.month)) ? "2 2" : undefined}
                       strokeOpacity={isFuture(Number(row.month)) ? 0.35 : 1}
                     />
@@ -476,7 +483,7 @@ export default function MonthlyPage() {
             edge, so the mask starts at -left-2 (marginLeft puts the axis chart
             back at wrapper x=0). */}
         {isMobile && (
-          <div className="absolute top-0 -left-2 h-[240px] w-[80px] overflow-hidden bg-paper pointer-events-none">
+          <div className="absolute top-3 left-1 h-[240px] w-[80px] overflow-hidden bg-surface pointer-events-none">
             <div style={{ width: 680, height: "100%", marginLeft: 8 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
@@ -488,8 +495,8 @@ export default function MonthlyPage() {
                     tickLine={false}
                   />
                   <YAxis
-                    stroke="#4a4437"
-                    tick={{ fontFamily: "JetBrains Mono", fontSize: 11 }}
+                    stroke={gridStroke}
+                    tick={{ fill: axisTick, fontFamily: "JetBrains Mono", fontSize: 11 }}
                     tickFormatter={(v) => (showAmounts ? fmtShort(v, reportCurrency) : "•••")}
                     tickLine={false}
                     width={72}
@@ -546,7 +553,7 @@ export default function MonthlyPage() {
 
       {isMobile && pressBox && chartData[pressBox.index] && (
         <div
-          className="fixed z-50 pointer-events-none -translate-x-1/2 -translate-y-full bg-paper border border-ink px-3 py-2 shadow-sm"
+          className="fixed z-50 pointer-events-none -translate-x-1/2 -translate-y-full rounded-2xl border border-paper-rule bg-surface px-3 py-2 shadow-card"
           style={{
             left: Math.min(
               Math.max(pressBox.x, 92),

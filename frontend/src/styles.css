@@ -25,17 +25,19 @@
   --color-warn: #b7791f;         /* warnings / behind pace */
   --color-highlight: #fbf3d6;    /* soft highlight strip */
 
-  /* book-tab section hues — wash (soft surface) + edge (saturated accent) */
+  /* book-tab section hues — wash (soft surface) + edge (saturated accent).
+     Edges sit ~4.5:1 on their wash so edge-on-wash nav labels stay legible,
+     and carry white text well when used as primary-button fills. */
   --color-tab-overview: #dde9f8;
-  --color-tab-overview-edge: #2f6fae;
+  --color-tab-overview-edge: #275f97;
   --color-tab-activity: #dcecd6;
-  --color-tab-activity-edge: #3f8f57;
+  --color-tab-activity-edge: #347a49;
   --color-tab-ledger: #f1ecca;
-  --color-tab-ledger-edge: #997818;
+  --color-tab-ledger-edge: #7c6212;
   --color-tab-manage: #f7dade;
-  --color-tab-manage-edge: #bd4f5e;
+  --color-tab-manage-edge: #a83f4e;
   --color-tab-chat: #e9d8f5;
-  --color-tab-chat-edge: #7d51b3;
+  --color-tab-chat-edge: #6e44a1;
 
   /* sidebar rail — now a clean elevated surface, not a dark slab */
   --color-rail: #ffffff;

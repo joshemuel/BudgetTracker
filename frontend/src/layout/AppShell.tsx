@@ -449,7 +449,7 @@ function Sidebar() {
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-expanded={!collapsed}
           title={collapsed ? "Expand" : "Collapse"}
-          className="self-end mb-2 w-7 h-7 rounded-sm border border-rail-ink/25 text-rail-ink/70 hover:text-rail-ink hover:border-rail-ink/50 transition-colors flex items-center justify-center"
+          className="self-end mb-2 w-7 h-7 rounded-lg border border-paper-rule text-rail-ink/60 hover:text-rail-ink hover:bg-paper-deep transition-all duration-150 active:scale-95 flex items-center justify-center"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             {collapsed ? <path d="M9 6l6 6-6 6" /> : <path d="M15 6l-6 6 6 6" />}

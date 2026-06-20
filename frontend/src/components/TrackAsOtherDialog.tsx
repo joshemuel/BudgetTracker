@@ -36,18 +36,18 @@ export default function TrackAsOtherDialog({
   return (
     <div className="modal-backdrop fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="modal-card w-full max-w-md p-6">
-        <h3 className="font-semibold mb-2">Track this change?</h3>
-        <p className="text-sm text-ink-soft mb-5">
+        <h3 className="display text-2xl text-ink mb-3">Track this change?</h3>
+        <p className="text-sm text-ink-soft leading-relaxed mb-6">
           You changed the balance directly. Record the difference under{" "}
-          <strong>Others</strong> so it appears in your income, expenditure, and category
+          <strong className="text-ink">Others</strong> so it appears in your income, expenditure, and category
           summaries? Choose &ldquo;Keep untracked&rdquo; to leave it out of summaries (the
           previous behavior).
         </p>
-        <div className="flex flex-wrap gap-2 justify-end">
+        <div className="flex flex-wrap gap-3 justify-end">
           <button
             type="button"
             onClick={onCancel}
-            className="smallcaps px-3 py-1 border border-ink/30 rounded"
+            className="smallcaps px-5 py-2 rounded-full border border-paper-rule bg-surface text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95 disabled:opacity-50"
             disabled={busy}
           >
             Cancel
@@ -55,7 +55,7 @@ export default function TrackAsOtherDialog({
           <button
             type="button"
             onClick={onKeepUntracked}
-            className="smallcaps px-3 py-1 border border-ink/30 rounded disabled:opacity-60"
+            className="smallcaps px-5 py-2 rounded-full border border-paper-rule bg-surface text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95 disabled:opacity-50"
             disabled={busy}
           >
             Keep untracked
@@ -63,7 +63,8 @@ export default function TrackAsOtherDialog({
           <button
             type="button"
             onClick={onTrack}
-            className="smallcaps px-3 py-1 bg-ink text-paper rounded disabled:opacity-60"
+            className="smallcaps px-5 py-2 rounded-full text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95 disabled:opacity-60"
+            style={{ backgroundColor: "var(--section-edge)" }}
             disabled={busy}
           >
             {busy ? "Working..." : "Track as Others"}

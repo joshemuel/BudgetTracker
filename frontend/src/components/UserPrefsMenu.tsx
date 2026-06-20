@@ -17,7 +17,7 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-8 h-8 rounded-sm border border-ink text-ink hover:bg-ink hover:text-paper transition-colors flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="w-9 h-9 rounded-full border border-paper-rule bg-surface text-ink-soft hover:text-ink hover:bg-paper-deep transition-all duration-150 active:scale-95 flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         title="Preferences"
         aria-label="Preferences"
       >
@@ -51,7 +51,7 @@ export default function UserPrefsMenu({ me }: { me: Me | undefined }) {
             className="fixed inset-0 z-40 bg-ink/25 sm:hidden"
             onClick={() => setOpen(false)}
           />
-          <div className="fixed top-14 left-3 right-3 max-h-[calc(100dvh-4rem)] overflow-y-auto bg-paper border border-paper-rule p-3 shadow-lg z-50 sm:absolute sm:top-full sm:left-auto sm:right-0 sm:mt-2 sm:w-72 sm:max-h-none">
+          <div className="fixed top-14 left-3 right-3 max-h-[calc(100dvh-4rem)] overflow-y-auto bg-surface border border-paper-rule rounded-2xl p-4 shadow-pop z-50 sm:absolute sm:top-full sm:left-auto sm:right-0 sm:mt-2 sm:w-72 sm:max-h-none">
             <PreferencesForm me={me} onClose={() => setOpen(false)} />
           </div>
         </>

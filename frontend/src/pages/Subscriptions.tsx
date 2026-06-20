@@ -110,39 +110,39 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
 
   return (
     <form
-      className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-4 sm:p-5 border border-paper-rule bg-paper-deep/30"
+      className="card grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-4 sm:p-5"
       onSubmit={(e) => {
         e.preventDefault();
         if (name && amount && categoryId && (sourcesEnabled ? sourceId : currency)) create.mutate();
       }}
     >
       <label className="sm:col-span-2">
-        <span className="smallcaps text-ink-mute block">Name</span>
+        <span className="smallcaps text-ink-mute block mb-1">Name</span>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Wanikani, Claude, Netflix…"
-          className="bg-transparent border-b border-ink py-1 w-full"
+          className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full focus-visible:outline-none"
         />
       </label>
       <label>
-        <span className="smallcaps text-ink-mute block">Amount</span>
+        <span className="smallcaps text-ink-mute block mb-1">Amount</span>
         <input
           type="number"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          className="bg-transparent border-b border-ink py-1 w-full num"
+          className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full num focus-visible:outline-none"
         />
       </label>
       <label>
-        <span className="smallcaps text-ink-mute block">Currency</span>
+        <span className="smallcaps text-ink-mute block mb-1">Currency</span>
         <select
           value={currency}
           onChange={(e) => {
             setCustomCurrency(true);
             setCurrency(e.target.value as CurrencyCode);
           }}
-          className="bg-transparent border-b border-ink py-1 w-full"
+          className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full focus-visible:outline-none"
         >
           {CURRENCIES.map((c) => (
             <option key={c} value={c}>
@@ -155,22 +155,22 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
         </p>
       </label>
       <label>
-        <span className="smallcaps text-ink-mute block">Billing day</span>
+        <span className="smallcaps text-ink-mute block mb-1">Billing day</span>
         <input
           type="number"
           min={1}
           max={31}
           value={billingDay}
           onChange={(e) => setBillingDay(Number(e.target.value))}
-          className="bg-transparent border-b border-ink py-1 w-full num"
+          className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full num focus-visible:outline-none"
         />
       </label>
       <label>
-        <span className="smallcaps text-ink-mute block">Frequency</span>
+        <span className="smallcaps text-ink-mute block mb-1">Frequency</span>
         <select
           value={frequency}
           onChange={(e) => setFrequency(e.target.value as Frequency)}
-          className="bg-transparent border-b border-ink py-1 w-full"
+          className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full focus-visible:outline-none"
         >
           <option value="monthly">Monthly</option>
           <option value="yearly">Yearly</option>
@@ -178,11 +178,11 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
       </label>
       {sourcesEnabled && (
         <label>
-          <span className="smallcaps text-ink-mute block">Source</span>
+          <span className="smallcaps text-ink-mute block mb-1">Source</span>
           <select
             value={sourceId}
             onChange={(e) => setSourceId(e.target.value ? Number(e.target.value) : "")}
-            className="bg-transparent border-b border-ink py-1 w-full"
+            className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full focus-visible:outline-none"
           >
             <option value="">—</option>
             {srcs?.map((s) => (
@@ -194,11 +194,11 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
         </label>
       )}
       <label>
-        <span className="smallcaps text-ink-mute block">Category</span>
+        <span className="smallcaps text-ink-mute block mb-1">Category</span>
         <select
           value={categoryId}
           onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : "")}
-          className="bg-transparent border-b border-ink py-1 w-full"
+          className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full focus-visible:outline-none"
         >
           <option value="">—</option>
           {cats?.map((c) => (
@@ -209,22 +209,27 @@ function NewSubscriptionForm({ onDone }: { onDone: () => void }) {
         </select>
       </label>
       <label>
-        <span className="smallcaps text-ink-mute block">Start date</span>
+        <span className="smallcaps text-ink-mute block mb-1">Start date</span>
         <input
           type="date"
           value={startDate}
           onChange={(e) => setStartDate(e.target.value)}
-          className="bg-transparent border-b border-ink py-1 w-full"
+          className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full focus-visible:outline-none"
         />
       </label>
       <div className="sm:col-span-2 md:col-span-3 flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-2">
-        <button type="button" onClick={onDone} className="smallcaps text-ink-mute">
+        <button
+          type="button"
+          onClick={onDone}
+          className="smallcaps rounded-full border border-paper-rule bg-surface px-4 py-2 text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95"
+        >
           Cancel
         </button>
         <button
           type="submit"
           disabled={create.isPending}
-          className="smallcaps px-4 py-2 bg-ink text-paper disabled:opacity-60"
+          className="smallcaps rounded-full px-4 py-2 text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95 disabled:opacity-60"
+          style={{ backgroundColor: "var(--section-edge)" }}
         >
           {create.isPending ? "Saving…" : "Add subscription"}
         </button>
@@ -312,10 +317,10 @@ export default function SubscriptionsPage() {
 
       {(pending ?? []).length > 0 && (
         <section>
-          <p className="smallcaps text-accent">Awaiting your nod</p>
-          <ul className="mt-3 divide-y divide-paper-rule border-t border-b border-paper-rule">
+          <p className="smallcaps text-accent mb-3">Awaiting your nod</p>
+          <ul className="card divide-y divide-paper-rule overflow-hidden">
             {pending!.map((c) => (
-              <li key={c.id} className="py-3 flex items-center justify-between flex-wrap gap-3">
+              <li key={c.id} className="px-4 py-3 flex items-center justify-between flex-wrap gap-3">
                 <div>
                   <p className="font-[550]">{c.subscription_name}</p>
                   <p className="text-ink-soft text-sm">Due {c.due_date}</p>
@@ -323,13 +328,14 @@ export default function SubscriptionsPage() {
                 <div className="flex gap-3">
                   <button
                     onClick={() => skip.mutate(c.id)}
-                    className="smallcaps px-3 py-1 border border-ink-mute hover:border-accent hover:text-accent"
+                    className="smallcaps rounded-full border border-paper-rule bg-surface px-4 py-2 text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95"
                   >
                     Skip
                   </button>
                   <button
                     onClick={() => confirmCharge.mutate(c.id)}
-                    className="smallcaps px-3 py-1 bg-ink text-paper"
+                    className="smallcaps rounded-full px-4 py-2 text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95"
+                    style={{ backgroundColor: "var(--section-edge)" }}
                   >
                     Confirm
                   </button>
@@ -346,7 +352,8 @@ export default function SubscriptionsPage() {
           {!adding && (
             <button
               onClick={() => setAdding(true)}
-              className="smallcaps px-3 py-1 bg-ink text-paper"
+              className="smallcaps rounded-full px-4 py-2 text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95"
+              style={{ backgroundColor: "var(--section-edge)" }}
             >
               + New subscription
             </button>
@@ -365,7 +372,7 @@ export default function SubscriptionsPage() {
         )}
 
         {isMobile ? (
-          <ul className="border-t border-paper-rule divide-y divide-paper-rule">
+          <ul className="card divide-y divide-paper-rule overflow-hidden">
             {(subs ?? []).map((s) => {
               const expanded = expandedId === s.id;
               return (
@@ -374,7 +381,7 @@ export default function SubscriptionsPage() {
                     type="button"
                     onClick={() => setExpandedId(expanded ? null : s.id)}
                     aria-expanded={expanded}
-                    className="w-full text-left flex items-start gap-3 py-3 min-h-[44px]"
+                    className="w-full text-left flex items-start gap-3 px-4 py-3 min-h-[44px]"
                   >
                     <span className="flex-1 min-w-0">
                       <span className="font-[550] block truncate">{s.name}</span>
@@ -407,7 +414,7 @@ export default function SubscriptionsPage() {
                     </span>
                   </button>
                   {expanded && (
-                    <div className="pb-3">
+                    <div className="px-4 pb-3">
                       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px] border-t border-paper-rule pt-2">
                         <dt className="smallcaps text-ink-mute self-center">Source</dt>
                         <dd className="text-right">
@@ -432,14 +439,14 @@ export default function SubscriptionsPage() {
                         <button
                           type="button"
                           onClick={() => setEditing(s)}
-                          className="smallcaps flex-1 min-h-[44px] border border-ink/30 rounded-sm"
+                          className="smallcaps flex-1 min-h-[44px] rounded-full border border-paper-rule bg-surface text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95"
                         >
                           Edit
                         </button>
                         <button
                           type="button"
                           onClick={() => setPendingDelete(s)}
-                          className="smallcaps flex-1 min-h-[44px] border border-accent/40 text-accent rounded-sm"
+                          className="smallcaps flex-1 min-h-[44px] rounded-full border border-accent/40 text-accent hover:bg-accent/10 transition-all duration-150 active:scale-95"
                         >
                           Delete
                         </button>
@@ -454,7 +461,7 @@ export default function SubscriptionsPage() {
             )}
           </ul>
         ) : (
-        <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
+        <div className="card overflow-hidden">
           <table className="ledger-table w-full text-[11px] sm:text-[13px]">
             <thead>
               <tr>
@@ -489,13 +496,13 @@ export default function SubscriptionsPage() {
                   <td className="text-right whitespace-nowrap">
                     <button
                       onClick={() => setEditing(s)}
-                      className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2 mr-1"
+                      className="smallcaps text-ink-mute hover:text-ink inline-block p-2 -m-2 mr-1 transition-colors duration-150"
                     >
                       edit
                     </button>
                     <button
                       onClick={() => setPendingDelete(s)}
-                      className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
+                      className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2 transition-colors duration-150"
                     >
                       delete
                     </button>
@@ -607,7 +614,7 @@ function EditSubscriptionModal({
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+              className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full focus-visible:outline-none"
             />
           </label>
           <label>
@@ -616,7 +623,7 @@ function EditSubscriptionModal({
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full num"
+              className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full num focus-visible:outline-none"
             />
           </label>
           <label>
@@ -627,7 +634,7 @@ function EditSubscriptionModal({
                 setCustomCurrency(true);
                 setCurrency(e.target.value as CurrencyCode);
               }}
-              className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+              className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full focus-visible:outline-none"
             >
               {CURRENCIES.map((c) => (
                 <option key={c} value={c}>
@@ -645,7 +652,7 @@ function EditSubscriptionModal({
               max={31}
               value={billingDay}
               onChange={(e) => setBillingDay(Number(e.target.value))}
-              className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full num"
+              className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full num focus-visible:outline-none"
             />
           </label>
           <label>
@@ -653,7 +660,7 @@ function EditSubscriptionModal({
             <select
               value={frequency}
               onChange={(e) => setFrequency(e.target.value as Frequency)}
-              className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+              className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full focus-visible:outline-none"
             >
               <option value="monthly">Monthly</option>
               <option value="yearly">Yearly</option>
@@ -672,7 +679,7 @@ function EditSubscriptionModal({
                     setCurrency(sourceCurrency);
                   }
                 }}
-                className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full focus-visible:outline-none"
               >
                 {srcs?.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -684,7 +691,7 @@ function EditSubscriptionModal({
           ) : (
             <div>
               <p className="smallcaps text-ink-mute block mb-1">Source</p>
-              <p className="bg-paper-deep border border-ink/15 rounded px-2 py-1 text-ink-soft">
+              <p className="rounded-xl border border-paper-rule bg-paper-deep px-3 py-2 text-ink-soft">
                 N/A
               </p>
             </div>
@@ -694,7 +701,7 @@ function EditSubscriptionModal({
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(Number(e.target.value))}
-              className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+              className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full focus-visible:outline-none"
             >
               {cats?.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -731,13 +738,14 @@ function EditSubscriptionModal({
               patch.mutate(body);
             }}
             disabled={patch.isPending}
-            className="smallcaps px-3 py-1 bg-ink text-paper rounded disabled:opacity-60"
+            className="smallcaps rounded-full px-4 py-2 text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95 disabled:opacity-60"
+            style={{ backgroundColor: "var(--section-edge)" }}
           >
             {patch.isPending ? "Saving…" : "Save"}
           </button>
           <button
             onClick={onClose}
-            className="smallcaps px-3 py-1 border border-ink/30 rounded"
+            className="smallcaps rounded-full border border-paper-rule bg-surface px-4 py-2 text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95"
           >
             Cancel
           </button>

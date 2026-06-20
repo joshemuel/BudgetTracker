@@ -303,16 +303,17 @@ export function ChatLog() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [items.length]);
   return (
-    <div ref={scrollRef} className="chat-log flex-1 overflow-y-auto px-3 py-3 space-y-2 bg-paper/85">
+    <div ref={scrollRef} className="chat-log flex-1 overflow-y-auto px-3 py-3 space-y-2.5">
       {items.map((it) => (
         <div
           key={it.id}
           data-tutorial={it.id === lastLeoId ? "chat-reply" : undefined}
+          style={it.role === "user" ? { backgroundColor: "var(--section-edge)" } : undefined}
           className={
-            "max-w-[90%] px-3 py-2 rounded-sm border text-sm whitespace-pre-wrap " +
+            "max-w-[90%] px-3.5 py-2 text-sm whitespace-pre-wrap shadow-sm " +
             (it.role === "user"
-              ? "ml-auto bg-ink text-paper border-ink"
-              : "mr-auto bg-paper border-paper-rule text-ink")
+              ? "ml-auto rounded-2xl rounded-br-md text-white"
+              : "mr-auto rounded-2xl rounded-bl-md bg-surface border border-paper-rule text-ink")
           }
         >
           {it.text}
@@ -347,7 +348,7 @@ export function ChatComposer({ autoFocus }: { autoFocus?: boolean }) {
   };
 
   return (
-    <div className="p-3 border-t border-paper-rule bg-paper space-y-2" data-tutorial="chat-footer">
+    <div className="p-3 border-t border-paper-rule bg-surface space-y-2" data-tutorial="chat-footer">
       {recordErr && <p className="text-xs text-accent">{recordErr}</p>}
       <div className="flex gap-2">
         <input
@@ -361,13 +362,14 @@ export function ChatComposer({ autoFocus }: { autoFocus?: boolean }) {
             }
           }}
           placeholder="Ask Leo…"
-          className="flex-1 bg-transparent border border-ink/25 rounded px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+          className="flex-1 bg-surface border border-paper-rule rounded-full px-4 py-2 text-sm"
         />
         <button
           type="button"
           onClick={submit}
           disabled={busy || !text.trim()}
-          className="px-3 py-2 bg-ink text-paper rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-ink-soft transition-colors flex items-center"
+          style={{ backgroundColor: "var(--section-edge)" }}
+          className="w-10 h-10 shrink-0 rounded-full text-white disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110 transition-all duration-150 active:scale-95 flex items-center justify-center"
           title="Send"
           aria-label="Send"
         >
@@ -378,10 +380,10 @@ export function ChatComposer({ autoFocus }: { autoFocus?: boolean }) {
           disabled={busy && !recording}
           onClick={toggleRecording}
           className={
-            "px-2.5 py-2 rounded border transition-colors flex items-center gap-1.5 smallcaps text-[10px] " +
+            "w-10 h-10 shrink-0 rounded-full border transition-all duration-150 active:scale-95 flex items-center justify-center " +
             (recording
-              ? "bg-accent text-paper border-accent"
-              : "border-ink/25 text-ink-soft hover:border-accent hover:text-accent")
+              ? "bg-accent text-white border-accent"
+              : "border-paper-rule bg-surface text-ink-soft hover:border-accent hover:text-accent")
           }
           title={recordLabel}
           aria-label={recordLabel}

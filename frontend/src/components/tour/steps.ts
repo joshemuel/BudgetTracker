@@ -22,7 +22,7 @@ export type TourStep = {
   /** data-tutorial attribute value. Omit → centered card, no spotlight.
    *  A missing/never-appearing target also falls back to the centered card. */
   target?: string;
-  /** Title in Fraunces display; *word* renders italic in accent. */
+  /** Title in the display font; *word* renders italic in accent. */
   title: string;
   /** Static copy, or a function when the wording depends on the device. */
   body: string | ((ctx: TourControls) => string);

@@ -38,7 +38,10 @@ export function SectionTitle({ children, kicker }: { children: ReactNode; kicker
     <div className="mb-4">
       {kicker && <p className="smallcaps text-ink-mute">{kicker}</p>}
       <h2 className="display text-xl sm:text-2xl md:text-3xl text-ink">{children}</h2>
-      <div className="mt-3 h-[1px] bg-ink w-10" />
+      <div
+        className="mt-3 h-[3px] w-10 rounded-full"
+        style={{ backgroundColor: "var(--section-edge)" }}
+      />
     </div>
   );
 }

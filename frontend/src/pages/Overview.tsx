@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "@/api";
@@ -18,12 +18,16 @@ const STATUS_LABEL: Record<string, string> = {
   over: "Over",
 };
 
+// Status pills: rounded-full chips with a soft tinted background per state.
 const STATUS_STYLE: Record<string, string> = {
-  ahead: "text-gain",
-  on_track: "text-ink-soft",
-  behind: "text-warn",
-  over: "text-accent",
+  ahead: "bg-gain/15 text-gain",
+  on_track: "bg-paper-deep text-ink-soft",
+  behind: "bg-warn/15 text-warn",
+  over: "bg-accent/15 text-accent",
 };
+
+const STATUS_PILL =
+  "inline-flex items-center rounded-full px-2.5 py-0.5 smallcaps shrink-0";
 
 function Bar({ pct, status }: { pct: number; status: string }) {
   const capped = Math.min(1, Math.max(0, pct));
@@ -34,10 +38,17 @@ function Bar({ pct, status }: { pct: number; status: string }) {
       ? "bg-warn"
       : status === "ahead"
       ? "bg-gain"
-      : "bg-ink";
+      : "";
+  const fillStyle: CSSProperties = {
+    width: `${capped * 100}%`,
+    ...(color ? {} : { backgroundColor: "var(--section-edge)" }),
+  };
   return (
-    <div className="w-full h-[3px] bg-paper-deep relative overflow-hidden">
-      <div className={`absolute inset-y-0 left-0 ${color}`} style={{ width: `${capped * 100}%` }} />
+    <div className="w-full h-2 rounded-full bg-paper-deep relative overflow-hidden">
+      <div
+        className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-300 ${color}`}
+        style={fillStyle}
+      />
       {pct > 1 && <div className="absolute inset-y-0 right-0 w-[2px] bg-accent" />}
     </div>
   );
@@ -189,25 +200,25 @@ export default function OverviewPage() {
       </section>
 
       {isMobile ? (
-        <section className="col-span-12 space-y-6">
-          <div className="border-t-2 border-ink pt-3">
+        <section className="col-span-12 space-y-4">
+          <div className="card p-4">
             <p className="smallcaps text-ink-mute">Net this month</p>
-            <p className={`num ${netColor} text-5xl leading-[0.95] mt-1 break-words`}>
+            <p className={`num ${netColor} text-5xl leading-[0.95] mt-1.5 break-words`}>
               {fmtAmount(ov.totals.net)}
             </p>
-            <p className="smallcaps text-ink-mute mt-1.5">Pace · {fmtPct(paceRatio)}</p>
+            <p className="smallcaps text-ink-mute mt-2">Pace · {fmtPct(paceRatio)}</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 border-t border-ink pt-3">
-            <div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="card p-4">
               <p className="smallcaps text-ink-mute">Income</p>
-              <p className="num text-gain text-3xl leading-[0.95] mt-1 break-words">
+              <p className="num text-gain text-3xl leading-[0.95] mt-1.5 break-words">
                 {fmtAmount(ov.totals.income)}
               </p>
             </div>
-            <div>
+            <div className="card p-4">
               <p className="smallcaps text-ink-mute">Expenditure</p>
-              <p className="num text-accent text-3xl leading-[0.95] mt-1 break-words">
+              <p className="num text-accent text-3xl leading-[0.95] mt-1.5 break-words">
                 {fmtAmount(ov.totals.expense)}
               </p>
             </div>
@@ -215,33 +226,39 @@ export default function OverviewPage() {
         </section>
       ) : (
         <>
-          <section className="col-span-12 md:col-span-4 border-t border-ink pt-2">
-            <Figure label="Income" value={fmtAmount(ov.totals.income)} tone="gain" emphasize />
+          <section className="col-span-12 md:col-span-4">
+            <div className="card p-5 h-full">
+              <Figure label="Income" value={fmtAmount(ov.totals.income)} tone="gain" emphasize />
+            </div>
           </section>
-          <section className="col-span-12 md:col-span-4 border-t border-ink pt-2">
-            <Figure
-              label="Expenditure"
-              value={fmtAmount(ov.totals.expense)}
-              tone="accent"
-              emphasize
-            />
+          <section className="col-span-12 md:col-span-4">
+            <div className="card p-5 h-full">
+              <Figure
+                label="Expenditure"
+                value={fmtAmount(ov.totals.expense)}
+                tone="accent"
+                emphasize
+              />
+            </div>
           </section>
-          <section className="col-span-12 md:col-span-4 border-t border-ink pt-2">
-            <Figure
-              label="Net"
-              value={fmtAmount(ov.totals.net)}
-              tone={netTone}
-              sub={`Pace · ${fmtPct(paceRatio)}`}
-            />
+          <section className="col-span-12 md:col-span-4">
+            <div className="card p-5 h-full">
+              <Figure
+                label="Net"
+                value={fmtAmount(ov.totals.net)}
+                tone={netTone}
+                sub={`Pace · ${fmtPct(paceRatio)}`}
+              />
+            </div>
           </section>
         </>
       )}
 
       {summary?.text && (
         <section className="col-span-12">
-          <div className="border-t border-ink pt-3">
+          <div className="card p-4 sm:p-5">
             <p className="smallcaps text-ink-mute">This week</p>
-            <p className="mt-1 text-ink-soft text-[13px] sm:text-sm leading-snug">
+            <p className="mt-1.5 text-ink-soft text-[13px] sm:text-sm leading-snug">
               {showAmounts ? summary.text : <span className="masked-amount">••••••</span>}
             </p>
           </div>
@@ -268,12 +285,12 @@ export default function OverviewPage() {
           </p>
         ) : (
           isMobile ? (
-          <ul className="border-t border-ink divide-y divide-paper-rule">
+          <ul className="card px-4 divide-y divide-paper-rule">
             {ov.budgets.map((b) => (
               <li key={b.category_id} className="py-3">
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="font-[550]">{b.category_name}</span>
-                  <span className={`smallcaps shrink-0 ${STATUS_STYLE[b.status]}`}>
+                  <span className={`${STATUS_PILL} ${STATUS_STYLE[b.status]}`}>
                     {STATUS_LABEL[b.status]}
                   </span>
                 </div>
@@ -293,7 +310,7 @@ export default function OverviewPage() {
             ))}
           </ul>
           ) : (
-          <div>
+          <div className="card px-2 py-1 overflow-hidden">
             <table className="ledger-table w-full text-xs">
               <thead>
                 <tr>
@@ -321,8 +338,10 @@ export default function OverviewPage() {
                     <td>
                       <Bar pct={b.pct_used} status={b.status} />
                     </td>
-                    <td className={`text-right smallcaps ${STATUS_STYLE[b.status]}`}>
-                      {STATUS_LABEL[b.status]}
+                    <td className="text-right">
+                      <span className={`${STATUS_PILL} ${STATUS_STYLE[b.status]}`}>
+                        {STATUS_LABEL[b.status]}
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -338,14 +357,14 @@ export default function OverviewPage() {
         style={!isMobile && !creditOpen && radarH ? { height: radarH } : undefined}
         data-tutorial="credit-panel"
       >
-        <div className="border-t-2 border-ink pt-4 shrink-0">
+        <div className="card p-4 sm:p-5 shrink-0">
           <p className="smallcaps text-ink-mute">Credit Card</p>
-          <p className="num text-2xl sm:text-3xl mt-1 text-accent break-words">
+          <p className="num text-2xl sm:text-3xl mt-1.5 text-accent break-words">
             {masked(fmtAmount(ov.credit.outstanding))}
           </p>
           <p className="text-xs text-ink-soft mt-1">Outstanding balance (negative means payable)</p>
 
-          <div className="mt-4 flex items-baseline justify-between text-xs border-t border-paper-rule pt-2">
+          <div className="mt-4 flex items-baseline justify-between text-xs border-t border-paper-rule pt-3">
             <span className="smallcaps text-ink-mute">Carried over</span>
             <span className={`num ${toNumber(ov.credit.carried) < 0 ? "text-accent" : "text-gain"}`}>
               {masked(fmtAmount(ov.credit.carried))}
@@ -353,21 +372,21 @@ export default function OverviewPage() {
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-            <div>
+            <div className="rounded-xl bg-paper-deep px-3 py-2.5">
               <p className="smallcaps text-ink-mute">This Month</p>
-              <p className="num text-accent">{masked(fmtAmount(ov.credit.month_charges))}</p>
+              <p className="num text-accent mt-0.5">{masked(fmtAmount(ov.credit.month_charges))}</p>
               <p className="text-ink-mute text-xs">charges</p>
             </div>
-            <div>
+            <div className="rounded-xl bg-paper-deep px-3 py-2.5">
               <p className="smallcaps text-ink-mute">Paid</p>
-              <p className="num text-gain">{masked(fmtAmount(ov.credit.month_payments))}</p>
+              <p className="num text-gain mt-0.5">{masked(fmtAmount(ov.credit.month_payments))}</p>
               <p className="text-ink-mute text-xs">payments</p>
             </div>
           </div>
           <p className="text-ink-mute text-[10px] mt-2">carried + paid − charges = outstanding</p>
         </div>
 
-        <div className="flex flex-col min-h-0 lg:flex-1">
+        <div className="card p-4 sm:p-5 flex flex-col min-h-0 lg:flex-1">
           <p className="smallcaps text-ink-mute shrink-0">{me?.sources_enabled === false ? "Currencies" : "Accounts"}</p>
           <ul
             ref={accountsRef}

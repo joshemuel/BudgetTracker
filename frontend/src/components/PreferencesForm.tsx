@@ -159,25 +159,25 @@ export default function PreferencesForm({
   return (
     <>
       <div data-tutorial="prefs-defaults">
-      <label className="block mb-2">
+      <label className="block mb-3">
         <span className="smallcaps text-ink-mute block mb-1">Default Currency</span>
         <select
           value={currency}
           onChange={(e) => setCurrency(e.target.value as Me["default_currency"])}
-          className="w-full bg-transparent border-b border-ink py-1"
+          className="w-full rounded-xl border border-paper-rule bg-surface px-3 py-2 focus-visible:outline-none"
         >
           {CURRENCIES.map((c) => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
       </label>
-      <label className="block mb-3">
+      <label className="block mb-4">
         <span className="smallcaps text-ink-mute block mb-1">Default Source</span>
         <select
           value={sourceId}
           disabled={!sourcesEnabled || currencySources.length === 0}
           onChange={(e) => setSourceId(e.target.value ? Number(e.target.value) : "")}
-          className="w-full bg-transparent border-b border-ink py-1 disabled:opacity-45"
+          className="w-full rounded-xl border border-paper-rule bg-surface px-3 py-2 disabled:opacity-45 focus-visible:outline-none"
         >
           {currencySources.map((s) => (
             <option key={s.id} value={s.id}>
@@ -187,16 +187,17 @@ export default function PreferencesForm({
         </select>
       </label>
       </div>
-      <div className="mb-3 border-t border-paper-rule pt-3" data-tutorial="tracking-mode">
-        <span className="smallcaps text-ink-mute block mb-1">Tracking mode</span>
-        <div className="grid grid-cols-2 border border-ink">
+      <div className="mb-4 border-t border-paper-rule pt-4" data-tutorial="tracking-mode">
+        <span className="smallcaps text-ink-mute block mb-2">Tracking mode</span>
+        <div className="grid grid-cols-2 gap-1 rounded-full bg-paper-deep p-1">
           <button
             type="button"
             onClick={() => setSourcesEnabled(true)}
             aria-pressed={sourcesEnabled}
-            className={`min-h-[28px] sm:min-h-[40px] py-1 sm:py-1.5 smallcaps border-r border-ink ${
-              sourcesEnabled ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
+            className={`min-h-[28px] sm:min-h-[40px] py-1 sm:py-1.5 smallcaps rounded-full transition-all duration-150 active:scale-95 ${
+              sourcesEnabled ? "text-white shadow-sm" : "text-ink-soft hover:text-ink"
             }`}
+            style={sourcesEnabled ? { backgroundColor: "var(--section-edge)" } : undefined}
           >
             Wallets &amp; cards
           </button>
@@ -204,14 +205,15 @@ export default function PreferencesForm({
             type="button"
             onClick={() => setSourcesEnabled(false)}
             aria-pressed={!sourcesEnabled}
-            className={`min-h-[28px] sm:min-h-[40px] py-1 sm:py-1.5 smallcaps ${
-              !sourcesEnabled ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
+            className={`min-h-[28px] sm:min-h-[40px] py-1 sm:py-1.5 smallcaps rounded-full transition-all duration-150 active:scale-95 ${
+              !sourcesEnabled ? "text-white shadow-sm" : "text-ink-soft hover:text-ink"
             }`}
+            style={!sourcesEnabled ? { backgroundColor: "var(--section-edge)" } : undefined}
           >
             By currency
           </button>
         </div>
-        <span className="text-xs text-ink-soft block mt-1">
+        <span className="text-xs text-ink-soft block mt-2">
           {sourcesEnabled
             ? "Track named wallets and cards."
             : "Aggregate everything by currency."}
@@ -219,21 +221,25 @@ export default function PreferencesForm({
       </div>
       <div className="flex justify-end gap-2">
         {onClose && (
-          <button className="smallcaps text-ink-mute" onClick={onClose}>
+          <button
+            className="smallcaps rounded-full border border-paper-rule bg-surface px-4 py-2 text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95"
+            onClick={onClose}
+          >
             Cancel
           </button>
         )}
         <button
-          className="smallcaps px-3 py-1 bg-ink text-paper"
+          className="smallcaps rounded-full px-4 py-2 text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95 disabled:opacity-60"
+          style={{ backgroundColor: "var(--section-edge)" }}
           onClick={() => save.mutate()}
           disabled={save.isPending}
         >
           {save.isPending ? "Saving…" : "Save"}
         </button>
       </div>
-      <div className="mt-3 pt-3 border-t border-paper-rule flex flex-col items-start gap-2">
+      <div className="mt-4 pt-4 border-t border-paper-rule flex flex-col items-start gap-2">
         <button
-          className="smallcaps text-ink-mute hover:text-accent"
+          className="smallcaps text-ink-mute hover:text-accent transition-colors duration-150"
           onClick={() => {
             setUname(me?.username ?? "");
             setUnameError(null);
@@ -243,7 +249,7 @@ export default function PreferencesForm({
           Change username →
         </button>
         <button
-          className="smallcaps text-ink-mute hover:text-accent"
+          className="smallcaps text-ink-mute hover:text-accent transition-colors duration-150"
           onClick={() => {
             resetPwForm();
             setPwOpen(true);
@@ -270,7 +276,7 @@ export default function PreferencesForm({
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                  className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full focus-visible:outline-none"
                   autoFocus
                 />
               </label>
@@ -283,14 +289,15 @@ export default function PreferencesForm({
             <div className="flex gap-2 mt-5 justify-end">
               <button
                 onClick={() => setUnameOpen(false)}
-                className="smallcaps px-3 py-1 border border-ink/30 rounded"
+                className="smallcaps rounded-full border border-paper-rule bg-surface px-4 py-2 text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95 disabled:opacity-60"
                 disabled={changeUsername.isPending}
               >
                 Cancel
               </button>
               <button
                 onClick={submitUsername}
-                className="smallcaps px-3 py-1 bg-ink text-paper rounded disabled:opacity-60"
+                className="smallcaps rounded-full px-4 py-2 text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95 disabled:opacity-60"
+                style={{ backgroundColor: "var(--section-edge)" }}
                 disabled={changeUsername.isPending || !uname.trim()}
               >
                 {changeUsername.isPending ? "Saving..." : "Save"}
@@ -311,7 +318,7 @@ export default function PreferencesForm({
                   type="password"
                   value={currentPw}
                   onChange={(e) => setCurrentPw(e.target.value)}
-                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                  className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full focus-visible:outline-none"
                   autoFocus
                 />
               </label>
@@ -321,7 +328,7 @@ export default function PreferencesForm({
                   type="password"
                   value={newPw}
                   onChange={(e) => setNewPw(e.target.value)}
-                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                  className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full focus-visible:outline-none"
                 />
               </label>
               <label className="block">
@@ -330,7 +337,7 @@ export default function PreferencesForm({
                   type="password"
                   value={confirmPw}
                   onChange={(e) => setConfirmPw(e.target.value)}
-                  className="bg-transparent border border-ink/30 rounded px-2 py-1 w-full"
+                  className="rounded-xl border border-paper-rule bg-surface px-3 py-2 w-full focus-visible:outline-none"
                 />
               </label>
               {pwError && <p className="text-accent text-sm">{pwError}</p>}
@@ -344,14 +351,15 @@ export default function PreferencesForm({
                   setPwOpen(false);
                   resetPwForm();
                 }}
-                className="smallcaps px-3 py-1 border border-ink/30 rounded"
+                className="smallcaps rounded-full border border-paper-rule bg-surface px-4 py-2 text-ink-soft hover:bg-paper-deep hover:text-ink transition-all duration-150 active:scale-95 disabled:opacity-60"
                 disabled={changePw.isPending}
               >
                 Cancel
               </button>
               <button
                 onClick={submitPw}
-                className="smallcaps px-3 py-1 bg-ink text-paper rounded disabled:opacity-60"
+                className="smallcaps rounded-full px-4 py-2 text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95 disabled:opacity-60"
+                style={{ backgroundColor: "var(--section-edge)" }}
                 disabled={changePw.isPending || !currentPw || !newPw || !confirmPw}
               >
                 {changePw.isPending ? "Saving..." : "Save"}

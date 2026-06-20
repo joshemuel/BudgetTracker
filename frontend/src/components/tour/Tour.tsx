@@ -329,7 +329,10 @@ export default function Tour({
       {/* Leo perches on the card's top-left corner, stamped on a paper seal.
           Inline on mobile spotlight sheets where there's no room above. */}
       {showBadge && (
-        <div className="absolute -top-9 left-4 w-[72px] h-[72px] rounded-full bg-paper border border-ink flex items-center justify-center text-ink">
+        <div
+          className="absolute -top-9 left-4 w-[72px] h-[72px] rounded-full bg-surface border border-paper-rule shadow-pop flex items-center justify-center text-ink"
+          style={{ backgroundColor: "var(--section-wash)" }}
+        >
           <Lion pose={step.pose ?? "point"} size={56} />
         </div>
       )}
@@ -347,7 +350,10 @@ export default function Tour({
 
           <div className={!showBadge ? "mt-2 flex items-start gap-3" : "mt-2"}>
             {!showBadge && (
-              <span className="shrink-0 w-12 h-12 rounded-full bg-paper border border-ink flex items-center justify-center text-ink">
+              <span
+                className="shrink-0 w-12 h-12 rounded-full bg-surface border border-paper-rule shadow-sm flex items-center justify-center text-ink"
+                style={{ backgroundColor: "var(--section-wash)" }}
+              >
                 <Lion pose={step.pose ?? "point"} size={40} />
               </span>
             )}
@@ -360,10 +366,13 @@ export default function Tour({
           </div>
         </div>
 
-        <div className="mt-4 h-[3px] bg-paper-deep">
+        <div className="mt-4 h-[3px] rounded-full bg-paper-deep overflow-hidden">
           <div
-            className="h-full bg-accent transition-[width] duration-300"
-            style={{ width: `${((idx + 1) / steps.length) * 100}%` }}
+            className="h-full rounded-full transition-[width] duration-300"
+            style={{
+              width: `${((idx + 1) / steps.length) * 100}%`,
+              backgroundColor: "var(--section-edge)",
+            }}
           />
         </div>
 
@@ -382,7 +391,8 @@ export default function Tour({
           ) : (
             <button
               onClick={() => go(1)}
-              className="smallcaps px-5 py-2 bg-ink text-paper hover:bg-accent transition-colors"
+              className="smallcaps px-5 py-2 rounded-full text-white shadow-sm hover:brightness-110 transition-all duration-150 active:scale-95"
+              style={{ backgroundColor: "var(--section-edge)" }}
             >
               {idx === steps.length - 1 ? "Finish" : "Next →"}
             </button>

@@ -55,7 +55,7 @@ function labelColor(hex: string): string {
   const g = parseInt(h.slice(2, 4), 16);
   const b = parseInt(h.slice(4, 6), 16);
   const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return lum > 0.6 ? "#19170f" : "#f7f1e3";
+  return lum > 0.6 ? "#1b2130" : "#ffffff";
 }
 
 function firstOfMonthISO(): string {
@@ -78,10 +78,10 @@ export function CategoriesBreakdown({
   const { theme } = useTheme();
   const dark = theme === "dark";
   const palette = dark ? PALETTE_DARK : PALETTE;
-  const sliceGap = dark ? "#1b1813" : "#f5efe3";
-  const tipBg = dark ? "#242019" : "#f5efe3";
-  const tipBorder = dark ? "#4a4130" : "#19170f";
-  const tipText = dark ? "#f4ecdb" : "#19170f";
+  const sliceGap = dark ? "#1a1f29" : "#ffffff";
+  const tipBg = dark ? "#1a1f29" : "#ffffff";
+  const tipBorder = dark ? "#2c313d" : "#e2e5ef";
+  const tipText = dark ? "#eef1f7" : "#1b2130";
   const isMobile = useIsMobile();
   const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
 
@@ -137,7 +137,7 @@ export function CategoriesBreakdown({
         fill={labelColor(palette[index % palette.length])}
         textAnchor="middle"
         dominantBaseline="central"
-        fontFamily="Instrument Sans"
+        fontFamily="Plus Jakarta Sans"
         fontWeight={600}
         fontSize={compact && isMobile ? 9 : 11}
       >
@@ -171,7 +171,7 @@ export function CategoriesBreakdown({
           outerRadius={outerRadius + 9}
           startAngle={startAngle}
           endAngle={endAngle}
-          fill={dark ? "#f4ecdb" : "#19170f"}
+          fill={dark ? "#eef1f7" : "#1b2130"}
         />
       </g>
     );
@@ -217,8 +217,8 @@ export function CategoriesBreakdown({
                 contentStyle={{
                   background: tipBg,
                   border: `1px solid ${tipBorder}`,
-                  borderRadius: 0,
-                  fontFamily: "Instrument Sans",
+                  borderRadius: 12,
+                  fontFamily: "Plus Jakarta Sans",
                   color: tipText,
                 }}
                 itemStyle={{ color: tipText }}
@@ -245,7 +245,7 @@ export function CategoriesBreakdown({
                   className="flex items-center gap-2.5 py-1 sm:py-1.5 border-b border-paper-rule last:border-0"
                 >
                   <span
-                    className="inline-block w-2.5 h-2.5 rounded-[2px] shrink-0"
+                    className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
                     style={{ background: palette[i % palette.length] }}
                   />
                   <span className="font-[550] flex-1 truncate">{r.category_name}</span>
@@ -286,7 +286,7 @@ export function CategoriesBreakdown({
                     <tr key={r.category_id}>
                       <td className="font-[550] flex items-center gap-2">
                         <span
-                          className="inline-block w-2 h-2"
+                          className="inline-block w-2 h-2 rounded-full"
                           style={{ background: palette[i % palette.length] }}
                         />
                         {r.category_name}
@@ -332,14 +332,14 @@ export default function CategoriesPage() {
     <div>
       <SectionTitle>By Category</SectionTitle>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
+      <div className="card p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
         <label className="block">
           <span className="smallcaps text-ink-mute">From</span>
           <input
             type="date"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
-            className="mt-1 w-full bg-transparent border-b border-ink py-1 font-[var(--font-mono)]"
+            className="mt-1.5 w-full rounded-xl border border-paper-rule bg-surface-2 px-3 py-2 font-[var(--font-mono)]"
           />
         </label>
         <label className="block">
@@ -348,12 +348,12 @@ export default function CategoriesPage() {
             type="date"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            className="mt-1 w-full bg-transparent border-b border-ink py-1 font-[var(--font-mono)]"
+            className="mt-1.5 w-full rounded-xl border border-paper-rule bg-surface-2 px-3 py-2 font-[var(--font-mono)]"
           />
         </label>
       </div>
 
-      <div className="mt-8">
+      <div className="card p-4 sm:p-6 mt-8">
         <CategoriesBreakdown from={from} to={to} currency={currency} />
       </div>
     </div>

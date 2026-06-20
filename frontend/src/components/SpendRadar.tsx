@@ -20,24 +20,24 @@ import { useTheme } from "@/lib/theme";
 // attributes), so mirror the editorial palette per theme here.
 const COLORS = {
   light: {
-    grid: "#d9cdb4",
-    angle: "#4a4437",
-    radius: "#877e6a",
-    current: "#a02a1a",
-    previous: "#877e6a",
-    tip: "#f5efe3",
-    tipBorder: "#19170f",
-    tipText: "#19170f",
+    grid: "#e2e5ef",
+    angle: "#6a7385",
+    radius: "#9aa3b2",
+    current: "#2f6fae",
+    previous: "#9aa3b2",
+    tip: "#ffffff",
+    tipBorder: "#e2e5ef",
+    tipText: "#1b2130",
   },
   dark: {
-    grid: "#4a4130",
-    angle: "#d2c9b2",
-    radius: "#a59a80",
-    current: "#f08a66",
-    previous: "#a59a80",
-    tip: "#242019",
-    tipBorder: "#4a4130",
-    tipText: "#f4ecdb",
+    grid: "#2c313d",
+    angle: "#9aa3b2",
+    radius: "#6a7385",
+    current: "#82b7df",
+    previous: "#6a7385",
+    tip: "#1a1f29",
+    tipBorder: "#2c313d",
+    tipText: "#eef1f7",
   },
 } as const;
 
@@ -176,13 +176,13 @@ export default function SpendRadar({
   const enough = chartData.length >= 3; // a radar needs ≥3 axes to read as a shape
 
   return (
-    <div className="border-t-2 border-ink pt-3">
+    <div className="border-t border-paper-rule pt-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="smallcaps text-ink-mute">{r.heading}</p>
         <select
           value={granularity}
           onChange={(e) => setGranularity(e.target.value as Granularity)}
-          className="bg-transparent border-b border-ink py-1 smallcaps text-ink-mute"
+          className="rounded-full border border-paper-rule bg-surface px-3 py-1.5 smallcaps text-ink-soft"
           aria-label="Comparison period"
         >
           <option value="monthly">Monthly</option>
@@ -221,7 +221,7 @@ export default function SpendRadar({
                         dominantBaseline="central"
                         fill={c.angle}
                         fontSize={10}
-                        fontFamily="Instrument Sans"
+                        fontFamily="Plus Jakarta Sans"
                       >
                         {label}
                       </text>
@@ -263,8 +263,8 @@ export default function SpendRadar({
                     contentStyle={{
                       background: c.tip,
                       border: `1px solid ${c.tipBorder}`,
-                      borderRadius: 0,
-                      fontFamily: "Instrument Sans",
+                      borderRadius: 12,
+                      fontFamily: "Plus Jakarta Sans",
                       fontSize: 12,
                       color: c.tipText,
                     }}
@@ -278,7 +278,7 @@ export default function SpendRadar({
           </div>
           <div className="mt-1 flex items-center gap-4 smallcaps text-ink-mute">
             <span className="inline-flex items-center gap-1.5">
-              <span className="inline-block w-2.5 h-2.5" style={{ background: c.current }} />
+              <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: c.current }} />
               {r.curLabel}
             </span>
             <span className="inline-flex items-center gap-1.5">

@@ -32,7 +32,10 @@ export default function Lion({
   size?: number;
   className?: string;
 }) {
+  // Rust nose/muzzle keeps Leo warm and friendly; celebratory sparkles pick up
+  // the active section hue so he sits naturally on the pastel seal.
   const accent = "var(--color-accent)";
+  const spark = "var(--section-edge)";
   return (
     <svg
       width={size}
@@ -78,8 +81,8 @@ export default function Lion({
         <>
           <path d="M 40 46 C 46.5 43.5 49.5 37 49.5 31.5" />
           <circle cx="49.5" cy="29.3" r="2.1" />
-          <path d="M 54 25.5 l 2.6 -1.6" stroke={accent} />
-          <path d="M 55 30.5 l 3 -0.2" stroke={accent} />
+          <path d="M 54 25.5 l 2.6 -1.6" stroke={spark} />
+          <path d="M 55 30.5 l 3 -0.2" stroke={spark} />
         </>
       )}
       {pose === "cheer" && (
@@ -88,9 +91,9 @@ export default function Lion({
           <circle cx="18.6" cy="28.4" r="2.1" />
           <path d="M 38 45.5 C 44 42 46.2 36 45.2 30.5" />
           <circle cx="45.4" cy="28.4" r="2.1" />
-          <path d="M 21.5 9 l 2 -2.8" stroke={accent} />
-          <path d="M 32 5.5 v -3.2" stroke={accent} />
-          <path d="M 42.5 9 l -2 -2.8" stroke={accent} />
+          <path d="M 21.5 9 l 2 -2.8" stroke={spark} />
+          <path d="M 32 5.5 v -3.2" stroke={spark} />
+          <path d="M 42.5 9 l -2 -2.8" stroke={spark} />
         </>
       )}
       {pose === "listen" && (

@@ -49,7 +49,7 @@ export default function CategoryBreakdownModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-ink-mute hover:text-accent text-2xl leading-none -mt-1"
+            className="w-9 h-9 rounded-full border border-paper-rule bg-surface text-ink-mute hover:text-ink hover:bg-paper-deep transition-all duration-150 active:scale-95 flex items-center justify-center text-xl leading-none shrink-0"
             aria-label="Close"
           >
             ×
