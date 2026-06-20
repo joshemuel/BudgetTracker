@@ -788,11 +788,20 @@ type LinkTokenOut = { deep_link: string; bot_username: string; expires_in: numbe
 function ConnectedAppsBlock() {
   const qc = useQueryClient();
   const { data: me } = useMe();
-  const connected = !!me?.telegram_chat_id;
+  const tgConnected = !!me?.telegram_chat_id;
   const [pendingLink, setPendingLink] = useState<LinkTokenOut | null>(null);
   const [copied, setCopied] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [tgConfirmOpen, setTgConfirmOpen] = useState(false);
   const pollRef = useRef<number | null>(null);
+
+  // Google Sheets
+  const { data: sheets } = useQuery<SheetsStatus>({
+    queryKey: ["sheets-status"],
+    queryFn: () => api.get<SheetsStatus>("/sheets/status"),
+  });
+  const sheetsConnected = !!sheets?.connected;
+  const [gsConfirmOpen, setGsConfirmOpen] = useState(false);
+  const [justConnected, setJustConnected] = useState(false);
 
   const issueLink = useMutation({
     mutationFn: () => api.post<LinkTokenOut>("/telegram/link_token"),
@@ -804,21 +813,38 @@ function ConnectedAppsBlock() {
     },
   });
 
-  const disconnect = useMutation({
+  const disconnectTg = useMutation({
     mutationFn: () => api.post("/telegram/unlink"),
     onSuccess: () => {
-      setConfirmOpen(false);
+      setTgConfirmOpen(false);
       qc.invalidateQueries({ queryKey: ["me"] });
+    },
+  });
+
+  const syncNow = useMutation({
+    mutationFn: () => api.post<SheetsStatus>("/sheets/sync"),
+    onSuccess: (r) => qc.setQueryData(["sheets-status"], r),
+  });
+  const toggleAuto = useMutation({
+    mutationFn: (auto_sync: boolean) => api.patch<SheetsStatus>("/sheets", { auto_sync }),
+    onSuccess: (r) => qc.setQueryData(["sheets-status"], r),
+  });
+  const disconnectSheets = useMutation({
+    mutationFn: () => api.post("/sheets/disconnect"),
+    onSuccess: () => {
+      setGsConfirmOpen(false);
+      setJustConnected(false);
+      qc.invalidateQueries({ queryKey: ["sheets-status"] });
     },
   });
 
   // Window-focus refetch is globally off, so while a link is outstanding poll
   // ["me"] until the binding lands (the user confirms inside Telegram, not here).
   useEffect(() => {
-    if (!pendingLink || connected) {
+    if (!pendingLink || tgConnected) {
       if (pollRef.current !== null) window.clearInterval(pollRef.current);
       pollRef.current = null;
-      if (connected) setPendingLink(null);
+      if (tgConnected) setPendingLink(null);
       return;
     }
     const refresh = () => qc.invalidateQueries({ queryKey: ["me"] });
@@ -831,13 +857,30 @@ function ConnectedAppsBlock() {
       window.removeEventListener("focus", refresh);
       window.clearTimeout(expiry);
     };
-  }, [pendingLink, connected, qc]);
+  }, [pendingLink, tgConnected, qc]);
+
+  // Returning from the Google OAuth redirect lands here with ?sheets=connected.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("sheets") === "connected") {
+      setJustConnected(true);
+      qc.invalidateQueries({ queryKey: ["sheets-status"] });
+      params.delete("sheets");
+      const qs = params.toString();
+      window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    }
+  }, [qc]);
+
+  const lastSynced = sheets?.last_synced_at
+    ? new Date(sheets.last_synced_at).toLocaleString()
+    : null;
 
   return (
     <section className="mt-12" data-tutorial="connect-telegram">
       <SectionTitle>Connected apps</SectionTitle>
       <p className="text-ink-mute text-sm mb-4">
-        Link other apps to log entries and ask about your finances from anywhere.
+        Link other apps to log entries, ask about your finances, or mirror your ledger — from
+        anywhere.
       </p>
       <table className="ledger-table w-full text-[11px] sm:text-[13px]">
         <thead>
@@ -850,13 +893,13 @@ function ConnectedAppsBlock() {
         <tbody>
           <tr>
             <td className="font-[550]">Telegram</td>
-            <td className={`smallcaps ${connected ? "text-gain" : "text-ink-mute"}`}>
-              {connected ? "Connected" : "Not connected"}
+            <td className={`smallcaps ${tgConnected ? "text-gain" : "text-ink-mute"}`}>
+              {tgConnected ? "Connected" : "Not connected"}
             </td>
             <td className="text-right whitespace-nowrap">
-              {connected ? (
+              {tgConnected ? (
                 <button
-                  onClick={() => setConfirmOpen(true)}
+                  onClick={() => setTgConfirmOpen(true)}
                   className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
                 >
                   disconnect
@@ -872,6 +915,36 @@ function ConnectedAppsBlock() {
               )}
             </td>
           </tr>
+          <tr>
+            <td className="font-[550]">
+              Google Sheets
+              {sheetsConnected && sheets?.google_email && (
+                <span className="text-ink-mute font-normal"> · {sheets.google_email}</span>
+              )}
+            </td>
+            <td className={`smallcaps ${sheetsConnected ? "text-gain" : "text-ink-mute"}`}>
+              {sheetsConnected ? "Connected" : "Not connected"}
+            </td>
+            <td className="text-right whitespace-nowrap">
+              {sheetsConnected ? (
+                <button
+                  onClick={() => setGsConfirmOpen(true)}
+                  className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
+                >
+                  disconnect
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    window.location.href = "/api/sheets/connect";
+                  }}
+                  className="smallcaps text-ink-mute hover:text-gain inline-block p-2 -m-2"
+                >
+                  connect
+                </button>
+              )}
+            </td>
+          </tr>
         </tbody>
       </table>
       {issueLink.isError && (
@@ -879,7 +952,7 @@ function ConnectedAppsBlock() {
           {(issueLink.error as Error).message || "Couldn't reach Telegram. Try again later."}
         </p>
       )}
-      {pendingLink && !connected && (
+      {pendingLink && !tgConnected && (
         <div className="mt-3 text-sm text-ink-soft">
           <p>
             Telegram should have opened — tap <span className="font-[550]">Start</span> in the bot
@@ -904,107 +977,7 @@ function ConnectedAppsBlock() {
           <p className="text-ink-mute mt-1">The link expires in 10 minutes.</p>
         </div>
       )}
-      <ConfirmDialog
-        open={confirmOpen}
-        title="Disconnect Telegram?"
-        message="The bot will stop responding to that chat until you connect again."
-        confirmLabel="Disconnect"
-        busy={disconnect.isPending}
-        error={disconnect.isError ? (disconnect.error as Error).message : null}
-        onConfirm={() => disconnect.mutate()}
-        onClose={() => setConfirmOpen(false)}
-      />
-    </section>
-  );
-}
-
-function GoogleSheetsBlock() {
-  const qc = useQueryClient();
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [justConnected, setJustConnected] = useState(false);
-
-  const { data: status } = useQuery<SheetsStatus>({
-    queryKey: ["sheets-status"],
-    queryFn: () => api.get<SheetsStatus>("/sheets/status"),
-  });
-  const connected = !!status?.connected;
-
-  // Returning from the Google OAuth redirect lands here with ?sheets=connected.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("sheets") === "connected") {
-      setJustConnected(true);
-      qc.invalidateQueries({ queryKey: ["sheets-status"] });
-      params.delete("sheets");
-      const qs = params.toString();
-      window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
-    }
-  }, [qc]);
-
-  const syncNow = useMutation({
-    mutationFn: () => api.post<SheetsStatus>("/sheets/sync"),
-    onSuccess: (r) => qc.setQueryData(["sheets-status"], r),
-  });
-  const toggleAuto = useMutation({
-    mutationFn: (auto_sync: boolean) => api.patch<SheetsStatus>("/sheets", { auto_sync }),
-    onSuccess: (r) => qc.setQueryData(["sheets-status"], r),
-  });
-  const disconnect = useMutation({
-    mutationFn: () => api.post("/sheets/disconnect"),
-    onSuccess: () => {
-      setConfirmOpen(false);
-      setJustConnected(false);
-      qc.invalidateQueries({ queryKey: ["sheets-status"] });
-    },
-  });
-
-  const lastSynced = status?.last_synced_at ? new Date(status.last_synced_at).toLocaleString() : null;
-
-  return (
-    <section className="mt-12" data-tutorial="connect-sheets">
-      <SectionTitle>Google Sheets</SectionTitle>
-      <p className="text-ink-mute text-sm mb-4">
-        Connect a Google account to mirror your ledger into a private spreadsheet. Once connected it
-        stays in sync automatically (refreshed hourly); you can also sync on demand.
-      </p>
-      <table className="ledger-table w-full text-[11px] sm:text-[13px]">
-        <thead>
-          <tr>
-            <th>Account</th>
-            <th>Status</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td className="font-[550]">{connected ? status?.google_email || "Google" : "Google Sheets"}</td>
-            <td className={`smallcaps ${connected ? "text-gain" : "text-ink-mute"}`}>
-              {connected ? "Connected" : "Not connected"}
-            </td>
-            <td className="text-right whitespace-nowrap">
-              {connected ? (
-                <button
-                  onClick={() => setConfirmOpen(true)}
-                  className="smallcaps text-ink-mute hover:text-accent inline-block p-2 -m-2"
-                >
-                  disconnect
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    window.location.href = "/api/sheets/connect";
-                  }}
-                  className="smallcaps text-ink-mute hover:text-gain inline-block p-2 -m-2"
-                >
-                  connect
-                </button>
-              )}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      {connected && (
+      {sheetsConnected && (
         <div className="mt-4 text-sm text-ink-soft space-y-3">
           {justConnected && (
             <p className="text-gain">Connected — your spreadsheet has been created and filled.</p>
@@ -1012,16 +985,16 @@ function GoogleSheetsBlock() {
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
-              checked={!!status?.auto_sync}
+              checked={!!sheets?.auto_sync}
               disabled={toggleAuto.isPending}
               onChange={(e) => toggleAuto.mutate(e.target.checked)}
             />
-            <span>Automatic sync (hourly)</span>
+            <span>Google Sheets: automatic sync (hourly)</span>
           </label>
           <div className="flex flex-wrap items-center gap-3">
-            {status?.spreadsheet_url && (
+            {sheets?.spreadsheet_url && (
               <a
-                href={status.spreadsheet_url}
+                href={sheets.spreadsheet_url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline underline-offset-2 hover:text-accent"
@@ -1041,21 +1014,30 @@ function GoogleSheetsBlock() {
           {syncNow.isError && (
             <p className="text-accent">{(syncNow.error as Error).message || "Sync failed."}</p>
           )}
-          {status?.last_sync_error && !syncNow.isError && (
-            <p className="text-accent">Last sync error: {status.last_sync_error}</p>
+          {sheets?.last_sync_error && !syncNow.isError && (
+            <p className="text-accent">Last sync error: {sheets.last_sync_error}</p>
           )}
         </div>
       )}
-
       <ConfirmDialog
-        open={confirmOpen}
+        open={tgConfirmOpen}
+        title="Disconnect Telegram?"
+        message="The bot will stop responding to that chat until you connect again."
+        confirmLabel="Disconnect"
+        busy={disconnectTg.isPending}
+        error={disconnectTg.isError ? (disconnectTg.error as Error).message : null}
+        onConfirm={() => disconnectTg.mutate()}
+        onClose={() => setTgConfirmOpen(false)}
+      />
+      <ConfirmDialog
+        open={gsConfirmOpen}
         title="Disconnect Google Sheets?"
         message="Automatic syncing will stop and we'll revoke access. Your existing spreadsheet stays in your Drive."
         confirmLabel="Disconnect"
-        busy={disconnect.isPending}
-        error={disconnect.isError ? (disconnect.error as Error).message : null}
-        onConfirm={() => disconnect.mutate()}
-        onClose={() => setConfirmOpen(false)}
+        busy={disconnectSheets.isPending}
+        error={disconnectSheets.isError ? (disconnectSheets.error as Error).message : null}
+        onConfirm={() => disconnectSheets.mutate()}
+        onClose={() => setGsConfirmOpen(false)}
       />
     </section>
   );
@@ -1098,7 +1080,6 @@ export function AccountSettingsPage() {
         <PreferencesForm me={me} />
       </section>
       <ConnectedAppsBlock />
-      <GoogleSheetsBlock />
       {me?.is_admin && <AdminBlock />}
     </div>
   );
