@@ -15,7 +15,7 @@ from app.api.deps import get_current_admin, get_current_user, get_db
 from app.config import get_settings
 from app.db.models import AppState, Category, Source, Subscription, Transaction, User
 from app.db.session import SessionLocal
-from app.services import financial, intent, query, telegram
+from app.services import financial, intent, query, rate_limit, telegram
 from app.services.auth import verify_password
 from app.services.currency_mode import default_source_for_currency
 from app.schemas.telegram import LinkTokenOut
@@ -1538,16 +1538,31 @@ async def web_chat(
         messages.append(text)
 
     text = str(payload.get("text") or "").strip()
+    audio_b64 = payload.get("audio_b64")
+    is_media = isinstance(audio_b64, str) and bool(audio_b64.strip())
+
+    if not text and not is_media:
+        return {"ok": False, "error": "missing text or audio"}
+
+    # Throttle by estimated input tokens before doing any LLM work, so a spammer
+    # can't drain the API budget. detail= (not error=) so the frontend api client,
+    # which reads `j.detail`, surfaces the message in the chat bubble.
+    est = rate_limit.estimate_tokens(text=text or None, media=is_media)
+    try:
+        rate_limit.check_and_consume(db, user.id, est)
+    except rate_limit.RateLimited as rl:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Leo's catching his breath — try again in ~{rl.retry_after}s.",
+            headers={"Retry-After": str(rl.retry_after)},
+        )
+
     if text:
         logged = bool(_handle_text(db, user, f"web:{user.id}", text, send_fn=_capture))
         return {"ok": True, "messages": messages, "logged": logged}
 
-    audio_b64 = payload.get("audio_b64")
     mime = str(payload.get("audio_mime") or "audio/webm").strip() or "audio/webm"
-    if isinstance(audio_b64, str) and audio_b64.strip():
-        logged = bool(
-            _handle_media_b64(db, user, f"web:{user.id}", audio_b64.strip(), mime, send_fn=_capture)
-        )
-        return {"ok": True, "messages": messages, "logged": logged}
-
-    return {"ok": False, "error": "missing text or audio"}
+    logged = bool(
+        _handle_media_b64(db, user, f"web:{user.id}", audio_b64.strip(), mime, send_fn=_capture)
+    )
+    return {"ok": True, "messages": messages, "logged": logged}

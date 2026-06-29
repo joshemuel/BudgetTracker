@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     # OpenRouter ranking headers (https://openrouter.ai/docs/api-reference/overview).
     llm_referer: str = Field(default="https://budgettracker.ddns.net", alias="LLM_REFERER")
     llm_app_title: str = Field(default="BudgetTracker", alias="LLM_APP_TITLE")
+    # Per-user input-token budget for the web "Ask Leo" chat, enforced as a 60s
+    # sliding window so one account can't spam the LLM and run up the bill. Counts
+    # estimated *input* tokens only (~len/4 for text, a flat cost per audio/image).
+    llm_input_tokens_per_minute: int = Field(
+        default=8000, alias="LLM_INPUT_TOKENS_PER_MINUTE"
+    )
 
     tz: str = Field(default="Asia/Jakarta", alias="TZ")
 
