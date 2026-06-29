@@ -29,7 +29,10 @@ log = logging.getLogger(__name__)
 
 SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets"
 # Overview leads so a Sheets-first user lands on the dashboard, not raw rows.
-TAB_TITLES = ["Overview", "Transactions", "Budgets", "Wallets"]
+# "ChartData" is a hidden helper tab holding the series the Overview charts plot —
+# native Sheets charts bind to cell ranges, not inline data, so we stage them here.
+CHART_DATA_TAB = "ChartData"
+TAB_TITLES = ["Overview", "Transactions", "Budgets", "Wallets", CHART_DATA_TAB]
 
 
 class SheetsError(Exception):
@@ -130,6 +133,35 @@ def write_workbook(access_token: str, spreadsheet_id: str, tabs: dict[str, list[
             raise SpreadsheetGone(spreadsheet_id)
         if upd.status_code != 200:
             raise SheetsError(f"update failed: {upd.status_code} {upd.text[:200]}")
+
+
+def ensure_tabs(access_token: str, spreadsheet_id: str, titles: list[str]) -> None:
+    """Add any of ``titles`` missing from the workbook.
+
+    Workbooks created before a tab existed (e.g. ChartData) would otherwise 400 on
+    the first write to that range. New spreadsheets already have every tab, so this
+    is a cheap no-op metadata check in the common case.
+    """
+    headers = _auth_headers(access_token)
+    base = f"{SHEETS_API}/{spreadsheet_id}"
+    with httpx.Client(timeout=30.0) as c:
+        meta = c.get(base, headers=headers, params={"fields": "sheets.properties.title"})
+        if meta.status_code == 404:
+            raise SpreadsheetGone(spreadsheet_id)
+        if meta.status_code != 200:
+            raise SheetsError(f"meta failed: {meta.status_code} {meta.text[:200]}")
+        existing = {
+            sh["properties"]["title"] for sh in meta.json().get("sheets", []) if "properties" in sh
+        }
+        missing = [t for t in titles if t not in existing]
+        if not missing:
+            return
+        reqs = [{"addSheet": {"properties": {"title": t}}} for t in missing]
+        r = c.post(f"{base}:batchUpdate", headers=headers, json={"requests": reqs})
+        if r.status_code == 404:
+            raise SpreadsheetGone(spreadsheet_id)
+        if r.status_code != 200:
+            raise SheetsError(f"add tabs failed: {r.status_code} {r.text[:200]}")
 
 
 # --- Row builders (generalize services/query.py: all rows, decimals kept) ----
@@ -311,6 +343,96 @@ def overview_rows(db: Session, user_id: int) -> tuple[list[list], dict]:
     return rows, layout
 
 
+# --- ChartData tab (hidden series for the Overview charts) --------------------
+# Chart series palette — the same hues the web charts use, so the Sheets charts
+# feel like the app. Income = gain green, expense = accent rust, etc.
+_CHART_INCOME = "#2e7d4f"
+_CHART_EXPENSE = "#c43d24"
+_CHART_DAILY = "#3f8f57"
+_CHART_BUDGET_LIMIT = "#9aa3b2"
+_CHART_BUDGET_SPENT = "#a4512c"
+
+# Cap categories like the web donut (top 10 by expense).
+_CHART_TOP_CATEGORIES = 10
+
+
+def chartdata_rows(db: Session, user_id: int) -> tuple[list[list], dict]:
+    """Build the hidden 'ChartData' tab plus a layout the chart builder targets.
+
+    Lays each chart's series in its own column block so their (variable) row
+    counts never collide:  A:B category | D:F monthly | H:I daily | K:N budget.
+    Reuses the same stats aggregations the web charts consume — no new math here.
+    """
+    from app.api.stats import categories_stats, compute_overview, daily, monthly
+
+    user = db.get(User, user_id)
+    if user is None:
+        raise SheetsError(f"user {user_id} not found")
+
+    now = datetime.now(timezone.utc).astimezone(tz())
+    ov = compute_overview(db, user)
+    cur = ov["currency"]
+
+    # Category donut: top categories by expense this month.
+    cats = categories_stats(
+        user=user, db=db, from_=date(now.year, now.month, 1), to=now.date(), currency=cur
+    )["categories"]
+    cat_rows = [
+        (c["category_name"], float(c["expense"]))
+        for c in cats
+        if float(c["expense"]) > 0
+    ][:_CHART_TOP_CATEGORIES]
+
+    # Monthly income vs expense: 12 rows, Jan..Dec.
+    months = monthly(user=user, db=db, year=now.year, currency=cur)["months"]
+    month_rows = [
+        (date(now.year, r["month"], 1).strftime("%b"), float(r["income"]), float(r["expense"]))
+        for r in months
+    ]
+
+    # Daily cumulative spend this month (running sum of expense, matches Daily.tsx).
+    days = daily(user=user, db=db, year=now.year, month=now.month, currency=cur)["days"]
+    cum = 0.0
+    day_rows: list[tuple] = []
+    for r in days:
+        cum += float(r["expense"])
+        day_rows.append((r["day"], round(cum, 2)))
+
+    # Budget progress: limit vs spent per category (already computed in overview).
+    budget_rows = [
+        (b["category_name"], float(b["limit"]), float(b["spent"]), float(b["pct_used"]))
+        for b in ov["budgets"]
+    ]
+
+    # Column blocks: (start_col, header_tuple, list_of_value_tuples).
+    blocks = [
+        (0, ("Category", "Spent"), cat_rows),
+        (3, ("Month", "Income", "Expense"), month_rows),
+        (7, ("Day", "Cumulative"), day_rows),
+        (10, ("Category", "Limit", "Spent", "% Used"), budget_rows),
+    ]
+
+    width = 14  # A..N
+    height = 1 + max((len(block[2]) for block in blocks), default=0)
+    grid: list[list] = [["" for _ in range(width)] for _ in range(height)]
+    for start_col, header, values in blocks:
+        for j, head in enumerate(header):
+            grid[0][start_col + j] = head
+        for i, row in enumerate(values, start=1):
+            for j, val in enumerate(row):
+                grid[i][start_col + j] = val
+
+    # r1 is the exclusive end-row (== endRowIndex). r1 == r0 → empty → chart skipped.
+    chart_layout = {
+        "currency": cur,
+        "category": {"col0": 0, "header_row": 0, "r0": 1, "r1": 1 + len(cat_rows)},
+        "monthly": {"col0": 3, "header_row": 0, "r0": 1, "r1": 1 + len(month_rows)},
+        "daily": {"col0": 7, "header_row": 0, "r0": 1, "r1": 1 + len(day_rows)},
+        "budget": {"col0": 10, "header_row": 0, "r0": 1, "r1": 1 + len(budget_rows)},
+    }
+    return grid, chart_layout
+
+
 # --- Formatting (a second, non-values batchUpdate) ---------------------------
 
 _DATA_TABS = {
@@ -484,10 +606,165 @@ def _overview_requests(sid: int, lay: dict) -> list[dict]:
     return reqs
 
 
+# --- Native Overview charts (bound to the hidden ChartData ranges) -----------
+
+
+def _chart_position(ov_sid: int, anchor_row: int, anchor_col: int = 8) -> dict:
+    """Float a chart over the Overview tab to the right of the dashboard tables."""
+    return {
+        "overlayPosition": {
+            "anchorCell": {"sheetId": ov_sid, "rowIndex": anchor_row, "columnIndex": anchor_col},
+            "offsetXPixels": 8,
+            "offsetYPixels": 8,
+            "widthPixels": 600,
+            "heightPixels": 360,
+        }
+    }
+
+
+def _src(data_sid: int, block: dict, c0: int, c1: int) -> dict:
+    """A source range over ChartData spanning the header row through the data."""
+    return {"sourceRange": {"sources": [_grid(data_sid, block["header_row"], block["r1"], c0, c1)]}}
+
+
+def _basic_series(data_sid: int, block: dict, col: int, color: str, axis: str = "LEFT_AXIS") -> dict:
+    return {
+        "series": _src(data_sid, block, col, col + 1),
+        "targetAxis": axis,
+        "colorStyle": {"rgbColor": _rgb(color)},
+    }
+
+
+def build_chart_requests(data_sid: int, ov_sid: int, chart_layout: dict) -> list[dict]:
+    """addChart requests for the four Overview charts, skipping empty series.
+
+    Mirrors the web app: category donut, monthly income/expense columns, daily
+    cumulative-spend line, budget limit-vs-spent bars. Each binds to a column
+    block in the hidden ChartData tab (header row included as the series title).
+    """
+    if not chart_layout:
+        return []
+    cur = chart_layout.get("currency", "")
+    reqs: list[dict] = []
+
+    cat = chart_layout["category"]
+    if cat["r1"] > cat["r0"]:
+        c0 = cat["col0"]
+        reqs.append(
+            {
+                "addChart": {
+                    "chart": {
+                        "spec": {
+                            "title": "Spending by category",
+                            "pieChart": {
+                                "legendPosition": "RIGHT_LEGEND",
+                                "threeDimensional": False,
+                                "pieHole": 0.5,
+                                "domain": _src(data_sid, cat, c0, c0 + 1),
+                                "series": _src(data_sid, cat, c0 + 1, c0 + 2),
+                            },
+                        },
+                        "position": _chart_position(ov_sid, 1),
+                    }
+                }
+            }
+        )
+
+    mon = chart_layout["monthly"]
+    if mon["r1"] > mon["r0"]:
+        c0 = mon["col0"]
+        reqs.append(
+            {
+                "addChart": {
+                    "chart": {
+                        "spec": {
+                            "title": "Income vs expense by month",
+                            "basicChart": {
+                                "chartType": "COLUMN",
+                                "legendPosition": "BOTTOM_LEGEND",
+                                "headerCount": 1,
+                                "axis": [
+                                    {"position": "BOTTOM_AXIS", "title": "Month"},
+                                    {"position": "LEFT_AXIS", "title": cur},
+                                ],
+                                "domains": [{"domain": _src(data_sid, mon, c0, c0 + 1)}],
+                                "series": [
+                                    _basic_series(data_sid, mon, c0 + 1, _CHART_INCOME),
+                                    _basic_series(data_sid, mon, c0 + 2, _CHART_EXPENSE),
+                                ],
+                            },
+                        },
+                        "position": _chart_position(ov_sid, 20),
+                    }
+                }
+            }
+        )
+
+    day = chart_layout["daily"]
+    if day["r1"] > day["r0"]:
+        c0 = day["col0"]
+        reqs.append(
+            {
+                "addChart": {
+                    "chart": {
+                        "spec": {
+                            "title": "Cumulative spend this month",
+                            "basicChart": {
+                                "chartType": "LINE",
+                                "legendPosition": "NO_LEGEND",
+                                "headerCount": 1,
+                                "axis": [
+                                    {"position": "BOTTOM_AXIS", "title": "Day"},
+                                    {"position": "LEFT_AXIS", "title": cur},
+                                ],
+                                "domains": [{"domain": _src(data_sid, day, c0, c0 + 1)}],
+                                "series": [_basic_series(data_sid, day, c0 + 1, _CHART_DAILY)],
+                            },
+                        },
+                        "position": _chart_position(ov_sid, 39),
+                    }
+                }
+            }
+        )
+
+    bud = chart_layout["budget"]
+    if bud["r1"] > bud["r0"]:
+        c0 = bud["col0"]
+        reqs.append(
+            {
+                "addChart": {
+                    "chart": {
+                        "spec": {
+                            "title": "Budget progress",
+                            "basicChart": {
+                                "chartType": "BAR",
+                                "legendPosition": "BOTTOM_LEGEND",
+                                "headerCount": 1,
+                                "axis": [
+                                    {"position": "LEFT_AXIS", "title": "Category"},
+                                    {"position": "BOTTOM_AXIS", "title": cur},
+                                ],
+                                "domains": [{"domain": _src(data_sid, bud, c0, c0 + 1)}],
+                                "series": [
+                                    _basic_series(data_sid, bud, c0 + 1, _CHART_BUDGET_LIMIT),
+                                    _basic_series(data_sid, bud, c0 + 2, _CHART_BUDGET_SPENT),
+                                ],
+                            },
+                        },
+                        "position": _chart_position(ov_sid, 58),
+                    }
+                }
+            }
+        )
+
+    return reqs
+
+
 def build_format_requests(
     sheets: list[dict],
     tabs: dict[str, list[list]],
     overview_layout: dict,
+    chart_layout: dict | None = None,
 ) -> list[dict]:
     """Pure builder: turn the spreadsheet's current sheet metadata into the
     ordered ``:batchUpdate`` request list. Deletes of prior banding/conditional
@@ -495,7 +772,9 @@ def build_format_requests(
     against mocked metadata."""
     sid_by_title: dict[str, int] = {}
     reqs: list[dict] = []
-    # 1) clear prior banding + conditional rules (conditionals by reverse index)
+    # 1) clear prior banding, conditional rules, and embedded charts. Conditionals
+    #    go by reverse index; charts/bandings by id. All deletes precede every add
+    #    so hourly re-runs never accumulate styling or duplicate charts.
     for sh in sheets:
         props = sh["properties"]
         sid_by_title[props["title"]] = props["sheetId"]
@@ -506,6 +785,9 @@ def build_format_requests(
             reqs.append(
                 {"deleteConditionalFormatRule": {"sheetId": props["sheetId"], "index": idx}}
             )
+        for ch in sh.get("charts", []) or []:
+            if "chartId" in ch:
+                reqs.append({"deleteEmbeddedObject": {"objectId": ch["chartId"]}})
     # 2) data tabs
     for title, spec in _DATA_TABS.items():
         sid = sid_by_title.get(title)
@@ -525,6 +807,19 @@ def build_format_requests(
     ov_sid = sid_by_title.get("Overview")
     if ov_sid is not None and overview_layout:
         reqs.extend(_overview_requests(ov_sid, overview_layout))
+    # 4) Overview charts, bound to the hidden ChartData ranges
+    data_sid = sid_by_title.get(CHART_DATA_TAB)
+    if data_sid is not None and ov_sid is not None and chart_layout:
+        reqs.extend(build_chart_requests(data_sid, ov_sid, chart_layout))
+        # Keep the helper tab out of the way (idempotent — safe to reissue).
+        reqs.append(
+            {
+                "updateSheetProperties": {
+                    "properties": {"sheetId": data_sid, "hidden": True},
+                    "fields": "hidden",
+                }
+            }
+        )
     return reqs
 
 
@@ -533,24 +828,30 @@ def format_workbook(
     spreadsheet_id: str,
     tabs: dict[str, list[list]],
     overview_layout: dict,
+    chart_layout: dict | None = None,
 ) -> None:
     """Style the workbook with a second, non-values ``:batchUpdate``.
 
-    Idempotent across the hourly full re-write: existing bandings and
-    conditional-format rules are deleted before fresh ones are added, so they
+    Idempotent across the hourly full re-write: existing bandings, conditional
+    rules and embedded charts are deleted before fresh ones are added, so they
     never accumulate. Best-effort — the caller keeps the sync green even if
     styling fails, since the data itself is already written.
     """
     headers = _auth_headers(access_token)
     base = f"{SHEETS_API}/{spreadsheet_id}"
-    fields = "sheets(properties(sheetId,title),bandedRanges(bandedRangeId),conditionalFormats)"
+    fields = (
+        "sheets(properties(sheetId,title,hidden),"
+        "bandedRanges(bandedRangeId),conditionalFormats,charts(chartId))"
+    )
     with httpx.Client(timeout=30.0) as c:
         meta = c.get(base, headers=headers, params={"fields": fields})
         if meta.status_code == 404:
             raise SpreadsheetGone(spreadsheet_id)
         if meta.status_code != 200:
             raise SheetsError(f"meta failed: {meta.status_code} {meta.text[:200]}")
-        reqs = build_format_requests(meta.json().get("sheets", []), tabs, overview_layout)
+        reqs = build_format_requests(
+            meta.json().get("sheets", []), tabs, overview_layout, chart_layout
+        )
         if reqs:
             r = c.post(f"{base}:batchUpdate", headers=headers, json={"requests": reqs})
             if r.status_code == 404:
@@ -568,27 +869,31 @@ def sync_user(db: Session, cred: GoogleCredential) -> None:
     user = db.get(User, cred.user_id)
     title = f"BudgetTracker — {user.username}" if user else "BudgetTracker"
     ov_rows, ov_layout = overview_rows(db, cred.user_id)
+    cd_rows, chart_layout = chartdata_rows(db, cred.user_id)
     tabs = {
         "Overview": ov_rows,
         "Transactions": transactions_rows(db, cred.user_id),
         "Budgets": budgets_rows(db, cred.user_id),
         "Wallets": wallets_rows(db, cred.user_id),
+        CHART_DATA_TAB: cd_rows,
     }
     sid = cred.spreadsheet_id
     if not sid:
         sid, cred.spreadsheet_url = create_spreadsheet(access, title)
         cred.spreadsheet_id = sid
     try:
+        # Legacy workbooks predate the ChartData tab — add it before writing it.
+        ensure_tabs(access, sid, TAB_TITLES)
         write_workbook(access, sid, tabs)
     except SpreadsheetGone:
         # User deleted the sheet — recreate and write afresh.
         sid, cred.spreadsheet_url = create_spreadsheet(access, title)
         cred.spreadsheet_id = sid
         write_workbook(access, sid, tabs)
-    # Styling is best-effort: the data is already written, so a formatting
-    # hiccup must not fail the sync or trip the dashboard's error banner.
+    # Styling + charts are best-effort: the data is already written, so a
+    # formatting hiccup must not fail the sync or trip the dashboard's banner.
     try:
-        format_workbook(access, sid, tabs, ov_layout)
+        format_workbook(access, sid, tabs, ov_layout, chart_layout)
     except Exception as e:  # noqa: BLE001
         log.warning("sheets formatting skipped for user %s: %s", cred.user_id, e)
     cred.last_synced_at = datetime.now(timezone.utc)
