@@ -241,6 +241,11 @@ def update_me(
     if "sources_enabled" in payload.model_fields_set and payload.sources_enabled is not None:
         user.sources_enabled = payload.sources_enabled
 
+    if "theme_skin" in payload.model_fields_set and payload.theme_skin is not None:
+        if payload.theme_skin not in {"editorial", "pastel"}:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown theme skin")
+        user.theme_skin = payload.theme_skin
+
     db.commit()
     db.refresh(user)
     return user

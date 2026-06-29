@@ -16,6 +16,7 @@ class UserOut(BaseModel):
     default_currency: str = "IDR"
     default_expense_source_id: int | None = None
     sources_enabled: bool = True
+    theme_skin: str = "editorial"
 
     model_config = {"from_attributes": True}
 
@@ -24,6 +25,7 @@ class UserPreferencesUpdate(BaseModel):
     default_currency: str | None = None
     default_expense_source_id: int | None = None
     sources_enabled: bool | None = None
+    theme_skin: str | None = None
 
 
 class ChangePasswordRequest(BaseModel):

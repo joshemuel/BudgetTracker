@@ -60,6 +60,10 @@ class User(Base):
     default_currency: Mapped[str] = mapped_column(String(3), nullable=False, default="IDR")
     default_expense_source_id: Mapped[int | None] = mapped_column(Integer)
     sources_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # UI theme "skin": "editorial" (original look, default) | "pastel" (new look).
+    # Orthogonal to light/dark mode, which stays a client-only preference. Persisted
+    # so the owner can see which theme users prefer during the A/B rollout.
+    theme_skin: Mapped[str] = mapped_column(String(16), nullable=False, default="editorial")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
