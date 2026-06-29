@@ -7,7 +7,7 @@ import { monthName } from "@/lib/format";
 import { useIsMobile } from "@/lib/mediaQuery";
 import { useAmountVisibility } from "@/lib/privacy";
 import { usePwaInstall, type InstallPlatform } from "@/lib/pwaInstall";
-import { useTheme } from "@/lib/theme";
+import { readStoredSkin, setSkin, useSkin, useTheme } from "@/lib/theme";
 import { startSyncPolling } from "@/lib/sync";
 import { startTutorial } from "@/lib/tutorial";
 import QuickLog from "@/components/QuickLog";
@@ -15,6 +15,7 @@ import Tour from "@/components/tour/Tour";
 import UserPrefsMenu from "@/components/UserPrefsMenu";
 import WebChat from "@/components/WebChat";
 import { ChatProvider } from "@/components/chat/ChatProvider";
+import { ChatWidgetProvider, useChatWidgetState } from "@/lib/chatWidget";
 
 // Single source of truth for navigation. Desktop renders these as a collapsible
 // left sidebar (top-level) plus a sub-tab strip (group.sub); mobile renders the
@@ -434,7 +435,22 @@ function useSidebarCollapsed(): [boolean, () => void] {
 function Sidebar() {
   const { pathname } = useLocation();
   const [collapsed, toggle] = useSidebarCollapsed();
+  const { skin } = useSkin();
   const chatActive = pathname === "/chat";
+  // The editorial rail is a dark slab, so its active/hover states use
+  // translucent ink overlays + a left accent border (legible on dark). Pastel's
+  // rail is a light surface, so it uses the section wash + a solid light hover.
+  const editorial = skin !== "pastel";
+  const navItemClass = (active: boolean, fill: string) =>
+    "flex items-center gap-3 py-2 transition-all duration-150 " +
+    (collapsed ? "justify-center px-0 " : "px-2.5 ") +
+    (editorial
+      ? "border-l-2 " +
+        (active
+          ? "border-accent text-rail-ink bg-rail-ink/10 font-semibold"
+          : "border-transparent text-rail-ink/65 hover:text-rail-ink hover:bg-rail-ink/5")
+      : "rounded-xl " +
+        (active ? `${fill} font-semibold` : "text-rail-ink/60 hover:text-rail-ink hover:bg-paper-deep"));
   return (
     <aside
       className={
@@ -449,7 +465,12 @@ function Sidebar() {
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-expanded={!collapsed}
           title={collapsed ? "Expand" : "Collapse"}
-          className="self-end mb-2 w-7 h-7 rounded-lg border border-paper-rule text-rail-ink/60 hover:text-rail-ink hover:bg-paper-deep transition-all duration-150 active:scale-95 flex items-center justify-center"
+          className={
+            "self-end mb-2 w-7 h-7 rounded-lg border transition-all duration-150 active:scale-95 flex items-center justify-center " +
+            (editorial
+              ? "border-rail-ink/25 text-rail-ink/70 hover:text-rail-ink hover:border-rail-ink/50 hover:bg-rail-ink/5"
+              : "border-paper-rule text-rail-ink/60 hover:text-rail-ink hover:bg-paper-deep")
+          }
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             {collapsed ? <path d="M9 6l6 6-6 6" /> : <path d="M15 6l-6 6 6 6" />}
@@ -466,14 +487,7 @@ function Sidebar() {
                     aria-current={active ? "page" : undefined}
                     title={collapsed ? g.label : undefined}
                     data-tutorial={`nav-${g.key}`}
-                    className={
-                      "flex items-center gap-3 rounded-xl py-2 transition-all duration-150 " +
-                      (collapsed ? "justify-center px-0" : "px-2.5") +
-                      " " +
-                      (active
-                        ? `${sectionActiveFill[g.key]} font-semibold`
-                        : "text-rail-ink/60 hover:text-rail-ink hover:bg-paper-deep")
-                    }
+                    className={navItemClass(active, sectionActiveFill[g.key])}
                   >
                     <span className="shrink-0">
                       <NavIcon name={g.key} />
@@ -493,14 +507,7 @@ function Sidebar() {
                 aria-current={chatActive ? "page" : undefined}
                 title={collapsed ? "Chat" : undefined}
                 data-tutorial="chat-launcher"
-                className={
-                  "w-full flex items-center gap-3 rounded-xl py-2 transition-all duration-150 " +
-                  (collapsed ? "justify-center px-0" : "px-2.5") +
-                  " " +
-                  (chatActive
-                    ? `${sectionActiveFill.chat} font-semibold`
-                    : "text-rail-ink/60 hover:text-rail-ink hover:bg-paper-deep")
-                }
+                className={"w-full " + navItemClass(chatActive, sectionActiveFill.chat)}
               >
                 <span className="shrink-0">
                   <svg
@@ -569,9 +576,9 @@ export default function AppShell() {
     retry: false,
   });
   const [logOpen, setLogOpen] = useState(false);
-  // The docked corner chat's open/closed state. The full-page conversation is
-  // a route (/chat), so it isn't tracked here.
-  const [chatOpen, setChatOpen] = useState(false);
+  // The floating chat widget's state: removed / collapsed / expanded. Persisted
+  // so the choice survives reloads. The full-page conversation is a route (/chat).
+  const [chatWidget, setChatWidget] = useChatWidgetState();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -590,6 +597,14 @@ export default function AppShell() {
     if (!me) return;
     return startSyncPolling(qc);
   }, [qc, me?.id]);
+
+  // Reconcile the skin to the server profile (cross-device source of truth);
+  // localStorage remains the pre-paint cache. setSkin updates the DOM + cache.
+  useEffect(() => {
+    if (me?.theme_skin && me.theme_skin !== readStoredSkin()) {
+      setSkin(me.theme_skin);
+    }
+  }, [me?.theme_skin]);
 
   if (isLoading) {
     return (
@@ -618,6 +633,7 @@ export default function AppShell() {
   const onChatPage = pathname === "/chat";
   return (
     <ChatProvider>
+      <ChatWidgetProvider value={{ state: chatWidget, setState: setChatWidget }}>
       <div className="pb-24 sm:pb-0" data-section={sectionFor(pathname)}>
         <div className="sm:flex sm:min-h-screen sm:flex-col">
           <div className={pad}>
@@ -638,13 +654,13 @@ export default function AppShell() {
           </div>
         </div>
         <QuickLog open={logOpen} onClose={() => setLogOpen(false)} />
-        {!onChatPage && <WebChat open={chatOpen} onOpenChange={setChatOpen} />}
+        {!onChatPage && <WebChat state={chatWidget} onState={setChatWidget} />}
         <Tour
           me={me}
           openQuickLog={() => setLogOpen(true)}
           closeQuickLog={() => setLogOpen(false)}
-          openChat={() => setChatOpen(true)}
-          closeChat={() => setChatOpen(false)}
+          openChat={() => setChatWidget("expanded")}
+          closeChat={() => setChatWidget("collapsed")}
         />
         <BottomNav />
         <InstallHelp
@@ -653,6 +669,7 @@ export default function AppShell() {
           onClose={pwaInstall.closeInstructions}
         />
       </div>
+      </ChatWidgetProvider>
     </ChatProvider>
   );
 }

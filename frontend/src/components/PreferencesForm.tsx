@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/api";
+import { useSkin } from "@/lib/theme";
 import type { Me, Source } from "@/types";
 
 const CURRENCIES = ["IDR", "SGD", "JPY", "AUD", "TWD", "USD"] as const;
@@ -21,6 +22,7 @@ export default function PreferencesForm({
 }) {
   const qc = useQueryClient();
   const nav = useNavigate();
+  const { skin, setSkin: applySkinLive } = useSkin();
   const [pwOpen, setPwOpen] = useState(false);
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
@@ -85,6 +87,18 @@ export default function PreferencesForm({
       onClose?.();
     },
   });
+
+  // Theme skin applies instantly and persists on its own (independent of Save),
+  // so every A/B choice is captured server-side even if the user doesn't Save.
+  const saveSkin = useMutation({
+    mutationFn: (next: "editorial" | "pastel") =>
+      api.patch<Me>("/auth/me", { theme_skin: next }),
+    onSuccess: (updated) => qc.setQueryData(["me"], updated),
+  });
+  const chooseSkin = (next: "editorial" | "pastel") => {
+    applySkinLive(next);
+    saveSkin.mutate(next);
+  };
 
   const changePw = useMutation({
     mutationFn: (body: { current_password: string; new_password: string }) =>
@@ -217,6 +231,39 @@ export default function PreferencesForm({
           {sourcesEnabled
             ? "Track named wallets and cards."
             : "Aggregate everything by currency."}
+        </span>
+      </div>
+      <div className="mb-4 border-t border-paper-rule pt-4">
+        <span className="smallcaps text-ink-mute block mb-2">Theme</span>
+        <div className="grid grid-cols-2 gap-1 rounded-full bg-paper-deep p-1">
+          <button
+            type="button"
+            onClick={() => chooseSkin("editorial")}
+            aria-pressed={skin !== "pastel"}
+            className={`min-h-[28px] sm:min-h-[40px] py-1 sm:py-1.5 smallcaps rounded-full transition-all duration-150 active:scale-95 ${
+              skin !== "pastel" ? "text-white shadow-sm" : "text-ink-soft hover:text-ink"
+            }`}
+            style={skin !== "pastel" ? { backgroundColor: "var(--section-edge)" } : undefined}
+          >
+            Editorial
+          </button>
+          <button
+            type="button"
+            onClick={() => chooseSkin("pastel")}
+            aria-pressed={skin === "pastel"}
+            className={`min-h-[28px] sm:min-h-[40px] py-1 sm:py-1.5 smallcaps rounded-full transition-all duration-150 active:scale-95 ${
+              skin === "pastel" ? "text-white shadow-sm" : "text-ink-soft hover:text-ink"
+            }`}
+            style={skin === "pastel" ? { backgroundColor: "var(--section-edge)" } : undefined}
+          >
+            Pastel
+          </button>
+        </div>
+        <span className="text-xs text-ink-soft block mt-2">
+          {skin === "pastel"
+            ? "Soft, rounded, modern look."
+            : "Warm, editorial classic look."}{" "}
+          Switches instantly — we're testing which works best.
         </span>
       </div>
       <div className="flex justify-end gap-2">

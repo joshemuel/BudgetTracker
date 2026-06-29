@@ -292,16 +292,49 @@ export function ChatBubbleIcon() {
   );
 }
 
+export function ChevronDownIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+/** Animated "Leo is typing" dots — shown while a message is in flight. */
+export function TypingDots() {
+  return (
+    <span className="inline-flex items-center gap-1" aria-label="Leo is typing" role="status">
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className="w-1.5 h-1.5 rounded-full bg-ink-mute animate-bounce"
+          style={{ animationDelay: `${i * 0.15}s` }}
+        />
+      ))}
+    </span>
+  );
+}
+
+function Spinner() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" className="animate-spin" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+      <path d="M21 12a9 9 0 1 1-6.2-8.5" />
+    </svg>
+  );
+}
+
 export { SendIcon };
 
 /** The scrolling message history. Each instance scrolls itself to the newest
  *  line; the latest Leo reply carries the tour's `chat-reply` anchor. */
 export function ChatLog() {
-  const { items, lastLeoId } = useChat();
+  const { items, lastLeoId, busy } = useChat();
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  // Re-scroll when a message arrives *and* when the typing bubble toggles, so the
+  // "Leo is typing" indicator is always in view.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [items.length]);
+  }, [items.length, busy]);
   return (
     <div ref={scrollRef} className="chat-log flex-1 overflow-y-auto px-3 py-3 space-y-2.5">
       {items.map((it) => (
@@ -319,6 +352,11 @@ export function ChatLog() {
           {it.text}
         </div>
       ))}
+      {busy && (
+        <div className="mr-auto rounded-2xl rounded-bl-md bg-surface border border-paper-rule px-3.5 py-3 shadow-sm">
+          <TypingDots />
+        </div>
+      )}
     </div>
   );
 }
@@ -354,6 +392,7 @@ export function ChatComposer({ autoFocus }: { autoFocus?: boolean }) {
         <input
           ref={inputRef}
           value={text}
+          disabled={busy}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -361,8 +400,8 @@ export function ChatComposer({ autoFocus }: { autoFocus?: boolean }) {
               submit();
             }
           }}
-          placeholder="Ask Leo…"
-          className="flex-1 bg-surface border border-paper-rule rounded-full px-4 py-2 text-sm"
+          placeholder={busy ? "Leo is thinking…" : "Ask Leo…"}
+          className="flex-1 bg-surface border border-paper-rule rounded-full px-4 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
         />
         <button
           type="button"
@@ -370,10 +409,10 @@ export function ChatComposer({ autoFocus }: { autoFocus?: boolean }) {
           disabled={busy || !text.trim()}
           style={{ backgroundColor: "var(--section-edge)" }}
           className="w-10 h-10 shrink-0 rounded-full text-white disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110 transition-all duration-150 active:scale-95 flex items-center justify-center"
-          title="Send"
-          aria-label="Send"
+          title={busy ? "Leo is thinking…" : "Send"}
+          aria-label={busy ? "Leo is thinking…" : "Send"}
         >
-          <SendIcon />
+          {busy ? <Spinner /> : <SendIcon />}
         </button>
         <button
           type="button"

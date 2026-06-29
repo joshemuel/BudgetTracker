@@ -14,30 +14,54 @@ import type { CategoryStats, CurrencyCode } from "@/types";
 import { fmtCompactMoney, fmtShort, todayISO, toNumber } from "@/lib/format";
 import { useAmountVisibility } from "@/lib/privacy";
 import { withCurrency } from "@/lib/preferences";
-import { useTheme } from "@/lib/theme";
+import { useSkin, useTheme } from "@/lib/theme";
 
 // Chart colours can't ride CSS variables (Recharts writes SVG presentation
-// attributes), so mirror the editorial palette per theme here.
+// attributes), so mirror each skin's palette per theme here.
 const COLORS = {
-  light: {
-    grid: "#e2e5ef",
-    angle: "#6a7385",
-    radius: "#9aa3b2",
-    current: "#2f6fae",
-    previous: "#9aa3b2",
-    tip: "#ffffff",
-    tipBorder: "#e2e5ef",
-    tipText: "#1b2130",
+  pastel: {
+    light: {
+      grid: "#e2e5ef",
+      angle: "#6a7385",
+      radius: "#9aa3b2",
+      current: "#2f6fae",
+      previous: "#9aa3b2",
+      tip: "#ffffff",
+      tipBorder: "#e2e5ef",
+      tipText: "#1b2130",
+    },
+    dark: {
+      grid: "#2c313d",
+      angle: "#9aa3b2",
+      radius: "#6a7385",
+      current: "#82b7df",
+      previous: "#6a7385",
+      tip: "#1a1f29",
+      tipBorder: "#2c313d",
+      tipText: "#eef1f7",
+    },
   },
-  dark: {
-    grid: "#2c313d",
-    angle: "#9aa3b2",
-    radius: "#6a7385",
-    current: "#82b7df",
-    previous: "#6a7385",
-    tip: "#1a1f29",
-    tipBorder: "#2c313d",
-    tipText: "#eef1f7",
+  editorial: {
+    light: {
+      grid: "#d9cdb4",
+      angle: "#4a4437",
+      radius: "#877e6a",
+      current: "#a02a1a",
+      previous: "#877e6a",
+      tip: "#f5efe3",
+      tipBorder: "#19170f",
+      tipText: "#19170f",
+    },
+    dark: {
+      grid: "#4a4130",
+      angle: "#d2c9b2",
+      radius: "#a59a80",
+      current: "#f08a66",
+      previous: "#a59a80",
+      tip: "#242019",
+      tipBorder: "#4a4130",
+      tipText: "#f4ecdb",
+    },
   },
 } as const;
 
@@ -137,7 +161,8 @@ export default function SpendRadar({
 }) {
   const { showAmounts } = useAmountVisibility();
   const { theme } = useTheme();
-  const c = COLORS[theme === "dark" ? "dark" : "light"];
+  const { skin } = useSkin();
+  const c = COLORS[skin === "pastel" ? "pastel" : "editorial"][theme === "dark" ? "dark" : "light"];
   const [granularity, setGranularity] = useState<Granularity>("monthly");
   const r = buildRanges(granularity, year, month);
 

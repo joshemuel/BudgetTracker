@@ -9,6 +9,7 @@ export type Me = {
   default_currency: CurrencyCode;
   default_expense_source_id: number | null;
   sources_enabled: boolean;
+  theme_skin: "editorial" | "pastel";
   telegram_chat_id: string | null;
 };
 

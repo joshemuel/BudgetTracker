@@ -17,8 +17,8 @@ import { SectionTitle } from "@/components/Figure";
 import { useAmountVisibility } from "@/lib/privacy";
 import { useIsMobile } from "@/lib/mediaQuery";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
-import { useTheme } from "@/lib/theme";
-import { PALETTE, PALETTE_DARK } from "@/pages/Categories";
+import { useSkin, useTheme } from "@/lib/theme";
+import { paletteFor } from "@/pages/Categories";
 import CategoryBreakdownModal from "@/components/CategoryBreakdownModal";
 
 // How many top categories to draw individually before bundling the rest into
@@ -98,15 +98,17 @@ export default function MonthlyPage() {
   const movedRef = useRef(false);
   const [pressBox, setPressBox] = useState<{ index: number; x: number; y: number } | null>(null);
   const { theme } = useTheme();
+  const { skin } = useSkin();
   const dark = theme === "dark";
-  const palette = dark ? PALETTE_DARK : PALETTE;
-  // Chart chrome colours, branched on theme. Bars use the section GREEN edge;
-  // the "Other" bundle is a neutral gray so it never competes with a category.
-  const gridStroke = dark ? "#2c313d" : "#e2e5ef";
-  const axisTick = dark ? "#9aa3b2" : "#6a7385";
-  const incomeColor = dark ? "#7fd6a0" : "#2e7d4f";
-  const expenseColor = dark ? "#f0876a" : "#c43d24";
-  const otherColor = dark ? "#6a7385" : "#9aa3b2";
+  const editorial = skin !== "pastel";
+  const palette = paletteFor(skin, dark);
+  // Chart chrome colours, branched on skin × theme. Income is the gain green,
+  // expense the accent rust; "Other" is a neutral gray that never competes.
+  const gridStroke = editorial ? (dark ? "#4a4130" : "#d9cdb4") : dark ? "#2c313d" : "#e2e5ef";
+  const axisTick = editorial ? (dark ? "#d2c9b2" : "#4a4437") : dark ? "#9aa3b2" : "#6a7385";
+  const incomeColor = editorial ? (dark ? "#abcb80" : "#3f5d2e") : dark ? "#7fd6a0" : "#2e7d4f";
+  const expenseColor = editorial ? (dark ? "#f08a66" : "#a02a1a") : dark ? "#f0876a" : "#c43d24";
+  const otherColor = editorial ? (dark ? "#a59a80" : "#877e6a") : dark ? "#6a7385" : "#9aa3b2";
   const { data: me } = useQuery<Me>({
     queryKey: ["me"],
     queryFn: () => api.get<Me>("/auth/me"),

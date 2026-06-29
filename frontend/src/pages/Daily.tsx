@@ -16,7 +16,7 @@ import { fmtMoney, fmtShort, monthName, toNumber } from "@/lib/format";
 import { SectionTitle } from "@/components/Figure";
 import { useAmountVisibility } from "@/lib/privacy";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
-import { useTheme } from "@/lib/theme";
+import { useSkin, useTheme } from "@/lib/theme";
 import CategoryBreakdownModal from "@/components/CategoryBreakdownModal";
 
 function toISO(y: number, m: number, d: number): string {
@@ -27,17 +27,19 @@ function toISO(y: number, m: number, d: number): string {
 export default function DailyPage() {
   const { showAmounts } = useAmountVisibility();
   const { theme } = useTheme();
+  const { skin } = useSkin();
   const dark = theme === "dark";
-  // Chart chrome, branched on theme. The cumulative spend area is the Activity
-  // GREEN; the projection stays a muted dashed gray so it reads as "estimate".
-  const gridStroke = dark ? "#2c313d" : "#e2e5ef";
-  const axisTick = dark ? "#9aa3b2" : "#6a7385";
-  const spendColor = dark ? "#84c993" : "#3f8f57";
-  const projColor = "#9aa3b2";
-  const todayLine = dark ? "#9aa3b2" : "#6a7385";
-  const tipBg = dark ? "#1a1f29" : "#ffffff";
-  const tipBorder = dark ? "#2c313d" : "#e2e5ef";
-  const tipText = dark ? "#eef1f7" : "#1b2130";
+  const editorial = skin !== "pastel";
+  // Chart chrome, branched on skin × theme. Pastel's cumulative area is Activity
+  // green; editorial's is rust. The projection stays a muted dashed gray.
+  const gridStroke = editorial ? (dark ? "#4a4130" : "#d9cdb4") : dark ? "#2c313d" : "#e2e5ef";
+  const axisTick = editorial ? (dark ? "#d2c9b2" : "#4a4437") : dark ? "#9aa3b2" : "#6a7385";
+  const spendColor = editorial ? (dark ? "#f08a66" : "#a02a1a") : dark ? "#84c993" : "#3f8f57";
+  const projColor = editorial ? (dark ? "#a59a80" : "#877e6a") : "#9aa3b2";
+  const todayLine = editorial ? (dark ? "#d2c9b2" : "#4a4437") : dark ? "#9aa3b2" : "#6a7385";
+  const tipBg = editorial ? (dark ? "#242019" : "#f5efe3") : dark ? "#1a1f29" : "#ffffff";
+  const tipBorder = editorial ? (dark ? "#4a4130" : "#19170f") : dark ? "#2c313d" : "#e2e5ef";
+  const tipText = editorial ? (dark ? "#f4ecdb" : "#19170f") : dark ? "#eef1f7" : "#1b2130";
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);

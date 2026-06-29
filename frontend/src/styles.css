@@ -2,32 +2,125 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /* =========================================================================
-   BudgetTracker — modern pastel design system
-   Soft, rounded, snappy dashboard. Clean near-white base, white cards, soft
-   shadows. Five book-tab section hues (overview/activity/ledger/manage/chat),
-   each a soft surface "wash" + a saturated "edge" accent. Rust stays for
-   expenses/destructive. Light + dark in lockstep, every pair ≥4.5:1 on text.
+   BudgetTracker — dual-skin design system.
+
+   TWO axes, independent:
+     • data-skin  = "editorial" (default) | "pastel"   ← this A/B test
+     • data-theme = light (default) | "dark"
+
+   Tailwind utilities reference tokens at use-site (e.g. bg-surface →
+   var(--color-surface)), so overriding a token VALUE under a skin/theme
+   selector re-skins every utility with no regeneration. @theme holds the
+   EDITORIAL LIGHT defaults (editorial is the product default); pastel and dark
+   are value overrides layered on top.
+
+   editorial — warm paper, sharp 2px corners, Fraunces serif, dark rail, paper
+               noise. Recovered from the original (master) design.
+   pastel    — cool near-white, rounded, Plus Jakarta sans, white rail, soft
+               glow, five saturated section hues.
    ========================================================================= */
 @theme {
-  /* surfaces & ink */
-  --color-paper: #f5f6fb;        /* app background (cool near-white) */
-  --color-paper-deep: #eceef6;   /* recessed wells / track fills */
-  --color-paper-rule: #e2e5ef;   /* hairline borders & dividers */
-  --color-surface: #ffffff;      /* cards / sheets sit above paper */
-  --color-surface-2: #f8f9fd;    /* nested surface */
-  --color-ink: #1b2130;          /* primary text (deep slate, not black) */
-  --color-ink-soft: #424a5c;     /* secondary text */
-  --color-ink-mute: #6a7385;     /* tertiary text / labels (≥4.5:1 on white) */
+  /* --- EDITORIAL LIGHT (defaults) --- */
+  --color-paper: #f5efe3;
+  --color-paper-deep: #eadfcb;
+  --color-paper-rule: #d9cdb4;
+  /* Editorial has no separate "surface" — cards are flat ruled boxes on paper.
+     Alias surface→paper so the pastel components' bg-surface reads editorially. */
+  --color-surface: #f5efe3;
+  --color-surface-2: #eadfcb;
+  --color-ink: #19170f;
+  --color-ink-soft: #3f3a2e;
+  --color-ink-mute: #746b57;
 
-  /* semantic accents */
-  --color-accent: #c43d24;       /* rust — expenses, destructive, focus */
-  --color-gain: #2e7d4f;         /* income / positive */
-  --color-warn: #b7791f;         /* warnings / behind pace */
-  --color-highlight: #fbf3d6;    /* soft highlight strip */
+  --color-accent: #a02a1a;      /* rust-red — expenses / destructive / focus */
+  --color-gain: #3f5d2e;        /* deep olive — income / positive */
+  --color-warn: #b4721f;        /* amber — warnings / behind */
+  --color-highlight: #f1e6cc;
 
-  /* book-tab section hues — wash (soft surface) + edge (saturated accent).
-     Edges sit ~4.5:1 on their wash so edge-on-wash nav labels stay legible,
-     and carry white text well when used as primary-button fills. */
+  /* Section hues. Editorial keeps it near-monochrome: washes are soft editorial
+     tints, edges are DARK tones (white text on an edge stays legible in BOTH
+     light and dark, since the pastel components hard-code text-white on
+     section-edge fills). */
+  --color-tab-overview: #e7eadf;
+  --color-tab-overview-edge: #29303a;
+  --color-tab-activity: #dde3c9;
+  --color-tab-activity-edge: #34401f;
+  --color-tab-ledger: #f1e6cc;
+  --color-tab-ledger-edge: #4a3a16;
+  --color-tab-manage: #f0d9c4;
+  --color-tab-manage-edge: #6e2a1a;
+  --color-tab-chat: #e7ddd0;
+  --color-tab-chat-edge: #3a2e22;
+
+  --color-rail: #1c1910;        /* dark left-sidebar slab */
+  --color-rail-ink: #f4ecdb;
+
+  --font-display: "Fraunces", "Playfair Display", ui-serif, Georgia, serif;
+  --font-sans: "Instrument Sans", "Helvetica Neue", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --radius-card: 2px;
+  /* Shape knobs the skins differ on (editorial = sharp, pastel = round). */
+  --radius-pill: 2px;
+  --radius-control: 2px;
+  --radius-icon: 2px;
+
+  /* Editorial is flat — no card/button shadows (modals keep a shadow below). */
+  --shadow-card: none;
+  --shadow-pop: 0 20px 44px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 color-mix(in srgb, var(--color-ink) 6%, transparent);
+}
+
+/* --- EDITORIAL DARK (warm espresso) --- */
+:root[data-theme="dark"] {
+  --color-paper: #1b1813;
+  --color-paper-deep: #242019;
+  --color-paper-rule: #4a4130;
+  --color-surface: #1b1813;
+  --color-surface-2: #242019;
+  --color-ink: #f4ecdb;
+  --color-ink-soft: #d8d0bc;
+  --color-ink-mute: #b0a68c;
+
+  --color-accent: #f08a66;
+  --color-gain: #abcb80;
+  --color-warn: #e6ad5f;
+  --color-highlight: #2c2618;
+
+  --color-tab-overview: #2a2c24;
+  --color-tab-overview-edge: #5a6472;
+  --color-tab-activity: #333a26;
+  --color-tab-activity-edge: #5e6e3e;
+  --color-tab-ledger: #322c16;
+  --color-tab-ledger-edge: #7c6a3a;
+  --color-tab-manage: #46291f;
+  --color-tab-manage-edge: #a8503a;
+  --color-tab-chat: #2e2820;
+  --color-tab-chat-edge: #6e5e48;
+
+  --color-rail: #100d08;
+  --color-rail-ink: #f4ecdb;
+
+  --shadow-pop: 0 20px 44px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 color-mix(in srgb, var(--color-ink) 6%, transparent);
+}
+
+/* --- PASTEL LIGHT --- */
+[data-skin="pastel"] {
+  --color-paper: #f5f6fb;
+  --color-paper-deep: #eceef6;
+  --color-paper-rule: #e2e5ef;
+  --color-surface: #ffffff;
+  --color-surface-2: #f8f9fd;
+  --color-ink: #1b2130;
+  --color-ink-soft: #424a5c;
+  --color-ink-mute: #6a7385;
+
+  --color-accent: #c43d24;
+  --color-gain: #2e7d4f;
+  --color-warn: #b7791f;
+  --color-highlight: #fbf3d6;
+
   --color-tab-overview: #dde9f8;
   --color-tab-overview-edge: #275f97;
   --color-tab-activity: #dcecd6;
@@ -39,22 +132,23 @@
   --color-tab-chat: #e9d8f5;
   --color-tab-chat-edge: #6e44a1;
 
-  /* sidebar rail — now a clean elevated surface, not a dark slab */
   --color-rail: #ffffff;
   --color-rail-ink: #1b2130;
 
   --font-display: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
   --font-sans: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
   --radius-card: 18px;
+  --radius-pill: 9999px;
+  --radius-control: 12px;
+  --radius-icon: 9999px;
 
   --shadow-card: 0 1px 2px rgba(20, 28, 46, 0.05), 0 8px 24px -12px rgba(20, 28, 46, 0.14);
   --shadow-pop: 0 18px 48px -16px rgba(20, 28, 46, 0.32);
 }
 
-/* === Night mode: deep slate, lifted cards, brightened pastel edges === */
-:root[data-theme="dark"] {
+/* --- PASTEL DARK (deep slate) — most specific, wins over editorial-dark --- */
+:root[data-skin="pastel"][data-theme="dark"] {
   --color-paper: #11141b;
   --color-paper-deep: #181c25;
   --color-paper-rule: #2c313d;
@@ -95,9 +189,9 @@
 }
 
 /* === Per-section identity ===
-   AppShell stamps data-section on the shell wrapper; --section-wash / -edge
-   then cascade so nav, dividers, charts and page accents inherit the active
-   group's hue with no per-page wiring. Defaults to overview. */
+   AppShell stamps data-section; --section-wash / -edge cascade so nav, dividers,
+   charts and page accents inherit the active group's hue. Skin-agnostic — reads
+   whichever --color-tab-* the active skin defined. Defaults to overview. */
 :root,
 [data-section] {
   --section-wash: var(--color-tab-overview);
@@ -114,9 +208,16 @@ html, body, #root {
   background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
-  font-weight: 450;
-  -webkit-font-smoothing: antialiased;
+  /* Editorial default: Instrument Sans reads a touch heavier (470) with its
+     stylistic sets; no antialiasing (it thins glyphs). Pastel overrides below. */
+  font-weight: 470;
+  font-feature-settings: "ss01", "cv11";
   text-rendering: optimizeLegibility;
+}
+[data-skin="pastel"] {
+  font-weight: 450;
+  font-feature-settings: normal;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* Never let a stray wide element open a horizontal scrollbar on phones.
@@ -128,7 +229,9 @@ html, body {
   max-width: 100%;
 }
 
-/* === Ambient backdrop: a single faint cool glow, no paper noise === */
+/* === Ambient backdrop ===
+   Editorial (default): warm gradients + a fine paper-noise turbulence overlay.
+   Pastel: a single faint cool glow, no noise. */
 body::before {
   content: "";
   position: fixed;
@@ -136,10 +239,37 @@ body::before {
   pointer-events: none;
   z-index: 0;
   background-image:
+    radial-gradient(ellipse at 10% 0%, rgba(255, 240, 200, 0.25) 0%, transparent 55%),
+    radial-gradient(ellipse at 90% 100%, rgba(160, 42, 26, 0.06) 0%, transparent 45%);
+}
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.35;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0.10  0 0 0 0 0.09  0 0 0 0 0.06  0 0 0 0.055 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+:root[data-theme="dark"] body::before {
+  background-image:
+    radial-gradient(ellipse at 10% 0%, rgba(226, 115, 85, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 90% 100%, rgba(239, 231, 211, 0.04) 0%, transparent 45%);
+}
+:root[data-theme="dark"] body::after {
+  opacity: 0.22;
+  mix-blend-mode: screen;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0.65  0 0 0 0 0.60  0 0 0 0 0.48  0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+/* Pastel: drop the noise overlay, swap to a cool glow. */
+[data-skin="pastel"] body::after { content: none; background-image: none; }
+[data-skin="pastel"] body::before {
+  background-image:
     radial-gradient(ellipse 80% 50% at 50% -10%, rgba(47, 111, 174, 0.06) 0%, transparent 60%),
     radial-gradient(ellipse 70% 50% at 100% 0%, rgba(189, 79, 94, 0.04) 0%, transparent 55%);
 }
-:root[data-theme="dark"] body::before {
+:root[data-skin="pastel"][data-theme="dark"] body::before {
   background-image:
     radial-gradient(ellipse 80% 50% at 50% -10%, rgba(130, 183, 223, 0.07) 0%, transparent 60%),
     radial-gradient(ellipse 70% 50% at 100% 0%, rgba(232, 150, 162, 0.05) 0%, transparent 55%);
@@ -147,25 +277,39 @@ body::before {
 
 #root { position: relative; z-index: 1; isolation: isolate; }
 
-/* === Typography primitives === */
+/* === Typography primitives ===
+   Editorial display = Fraunces with optical-size/softness variation. Pastel =
+   Plus Jakarta Sans, heavier, tighter. */
 .display {
   font-family: var(--font-display);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.04;
+  font-weight: 500;
+  font-variation-settings: "opsz" 144, "SOFT" 25, "WONK" 0;
+  letter-spacing: 0;
+  line-height: 1.02;
 }
 .display-italic {
   font-family: var(--font-display);
   font-style: italic;
+  font-variation-settings: "opsz" 144, "SOFT" 100;
+}
+[data-skin="pastel"] .display {
+  font-weight: 700;
+  font-variation-settings: normal;
+  letter-spacing: -0.02em;
+  line-height: 1.04;
+}
+[data-skin="pastel"] .display-italic {
   font-weight: 600;
+  font-variation-settings: normal;
 }
 .smallcaps {
   font-family: var(--font-sans);
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
   font-size: 11px;
   font-weight: 600;
 }
+[data-skin="pastel"] .smallcaps { letter-spacing: 0.14em; }
 .num {
   font-family: var(--font-mono);
   font-feature-settings: "tnum", "zero";
@@ -210,13 +354,32 @@ select:focus-visible {
   outline-offset: -2px;
 }
 
+/* === Skin compatibility layer ===
+   The pastel component markup hard-codes rounded/shadowed utilities. Under the
+   editorial skin (default; everything that isn't pastel) flatten the roundness
+   to ~2px and drop the soft elevation so those same components read sharp and
+   flat — the editorial aesthetic — with no per-component edits. (Pastel is
+   untouched.) Specificity (:root:not(...) → 0,2,0 + utility) beats the plain
+   utility, and scopes only away from pastel. */
+:root:not([data-skin="pastel"]) :is(
+  .rounded, .rounded-sm, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl,
+  .rounded-3xl, .rounded-full, .rounded-t-2xl, .rounded-t-xl, .rounded-br-md,
+  .rounded-bl-md, .rounded-tr-md, .rounded-tl-md
+) {
+  border-radius: 2px;
+}
+:root:not([data-skin="pastel"]) :is(.shadow-sm, .shadow, .shadow-md) {
+  box-shadow: none;
+}
+
 /* Scrollbar treatment */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--color-paper-rule); border-radius: 999px; }
+::-webkit-scrollbar-thumb { background: var(--color-paper-rule); border-radius: 0; }
+[data-skin="pastel"] ::-webkit-scrollbar-thumb { border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-ink-mute); }
 
-/* === Entrance animations (snappy) === */
+/* === Entrance animations === */
 @keyframes ledger-in {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
@@ -258,6 +421,11 @@ select:focus-visible {
   color: var(--color-ink-mute);
   border-bottom: 1.5px solid var(--color-paper-rule);
 }
+/* Editorial: a heavier ink baseline under the header row. */
+:root:not([data-skin="pastel"]) .ledger-table th {
+  font-weight: 600;
+  border-bottom: 1px solid var(--color-ink);
+}
 .ledger-table tbody tr {
   transition: background-color 0.12s ease;
 }
@@ -275,8 +443,11 @@ select:focus-visible {
   background: var(--color-paper);
   box-shadow: inset 0 -1.5px 0 var(--color-paper-rule);
 }
+:root:not([data-skin="pastel"]) .tx-scroll thead th {
+  box-shadow: inset 0 -1px 0 var(--color-ink);
+}
 
-/* Decorative cross (kept for any residual use) */
+/* Decorative cross (editorial corner marks; used on the Login card). */
 .deco-cross {
   position: absolute;
   width: 10px;
@@ -295,6 +466,10 @@ select:focus-visible {
 
 /* === Modals === */
 .modal-backdrop {
+  background: rgba(25, 23, 15, 0.52);
+  backdrop-filter: blur(2px);
+}
+[data-skin="pastel"] .modal-backdrop {
   background: rgba(15, 19, 30, 0.5);
   backdrop-filter: blur(4px);
 }
@@ -303,52 +478,72 @@ select:focus-visible {
   position: relative;
   background: var(--color-surface);
   border: 1px solid var(--color-paper-rule);
-  border-radius: 20px;
+  border-radius: 4px;
   max-height: calc(100dvh - 2rem);
   overflow-y: auto;
   box-shadow: var(--shadow-pop);
 }
+[data-skin="pastel"] .modal-card { border-radius: 20px; }
 
 :root[data-theme="dark"] .modal-backdrop {
+  background: rgba(0, 0, 0, 0.64);
+}
+:root[data-skin="pastel"][data-theme="dark"] .modal-backdrop {
   background: rgba(0, 0, 0, 0.62);
 }
 
 /* === Leo's tour: spotlight scrim === */
 .tour-hole {
   position: fixed;
+  border-radius: 4px;
+  box-shadow: 0 0 0 200vmax rgba(25, 23, 15, 0.52);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+[data-skin="pastel"] .tour-hole {
   border-radius: 16px;
   box-shadow: 0 0 0 200vmax rgba(15, 19, 30, 0.5);
-  outline: 2px solid var(--color-accent);
   outline-offset: 3px;
 }
 :root[data-theme="dark"] .tour-hole {
+  box-shadow: 0 0 0 200vmax rgba(0, 0, 0, 0.64);
+}
+:root[data-skin="pastel"][data-theme="dark"] .tour-hole {
   box-shadow: 0 0 0 200vmax rgba(0, 0, 0, 0.62);
 }
 .tour-full {
   position: fixed;
   inset: 0;
-  background: rgba(15, 19, 30, 0.5);
+  background: rgba(25, 23, 15, 0.52);
 }
-:root[data-theme="dark"] .tour-full {
-  background: rgba(0, 0, 0, 0.62);
-}
+[data-skin="pastel"] .tour-full { background: rgba(15, 19, 30, 0.5); }
+:root[data-theme="dark"] .tour-full { background: rgba(0, 0, 0, 0.64); }
+:root[data-skin="pastel"][data-theme="dark"] .tour-full { background: rgba(0, 0, 0, 0.62); }
 .tour-scrim-strip {
   position: fixed;
-  background: rgba(15, 19, 30, 0.5);
+  background: rgba(25, 23, 15, 0.52);
 }
-:root[data-theme="dark"] .tour-scrim-strip {
-  background: rgba(0, 0, 0, 0.62);
-}
+[data-skin="pastel"] .tour-scrim-strip { background: rgba(15, 19, 30, 0.5); }
+:root[data-theme="dark"] .tour-scrim-strip { background: rgba(0, 0, 0, 0.64); }
+:root[data-skin="pastel"][data-theme="dark"] .tour-scrim-strip { background: rgba(0, 0, 0, 0.62); }
+
 .safe-chat-right {
   right: max(0.75rem, env(safe-area-inset-right));
   bottom: env(safe-area-inset-bottom);
 }
 
+/* Docked chat: editorial gets a crisp drop shadow, pastel the soft pop. */
 .chat-docked {
-  box-shadow: var(--shadow-pop);
+  box-shadow:
+    0 14px 28px rgba(25, 23, 15, 0.22),
+    0 1px 0 rgba(255, 255, 255, 0.45) inset;
 }
+[data-skin="pastel"] .chat-docked { box-shadow: var(--shadow-pop); }
 
 .chat-fab {
+  box-shadow: 0 10px 30px -8px rgba(25, 23, 15, 0.45);
+}
+[data-skin="pastel"] .chat-fab {
   box-shadow: 0 12px 30px -8px color-mix(in srgb, var(--section-edge) 55%, transparent);
 }
 
@@ -398,8 +593,8 @@ select:focus-visible {
   }
 
   .display {
-    letter-spacing: -0.015em;
-    line-height: 1.02;
+    letter-spacing: 0;
+    line-height: 1;
   }
 
   .ledger-table th,
@@ -414,9 +609,10 @@ select:focus-visible {
   }
 
   .modal-card {
-    border-radius: 18px;
+    border-radius: 6px;
     max-height: calc(100dvh - 1rem);
   }
+  [data-skin="pastel"] .modal-card { border-radius: 18px; }
 
   /* Keep the chat launcher + docked panel clear of the fixed bottom tab bar. */
   .chat-fab {
@@ -445,13 +641,17 @@ select:focus-visible {
 @media (min-width: 641px) {
   .sub-tabs.smallcaps {
     font-size: clamp(11px, 1vw, 13px);
-    letter-spacing: 0.1em;
+    letter-spacing: 0.12em;
   }
 
   .rail-tabs.smallcaps {
+    font-size: 14px;
+    letter-spacing: 0.12em;
+    font-weight: 600;
+  }
+  [data-skin="pastel"] .rail-tabs.smallcaps {
     font-size: 13.5px;
     letter-spacing: 0.04em;
-    font-weight: 600;
     text-transform: none;
   }
 }

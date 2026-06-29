@@ -15,7 +15,8 @@ import { SectionTitle } from "@/components/Figure";
 import { useAmountVisibility } from "@/lib/privacy";
 import { useIsMobile } from "@/lib/mediaQuery";
 import { preferredCurrency, withCurrency } from "@/lib/preferences";
-import { useTheme } from "@/lib/theme";
+import { useSkin, useTheme } from "@/lib/theme";
+import type { Skin } from "@/lib/theme";
 
 // Book-tab chart family: the five section edges (blue/green/rose/gold/purple)
 // lead, then five extension hues — all readable on the light ground.
@@ -47,6 +48,38 @@ export const PALETTE_DARK = [
   "#cf9ec0",
 ];
 
+// Editorial skin: warm rust/olive/amber family on the paper ground.
+export const PALETTE_EDITORIAL = [
+  "#a02a1a",
+  "#3f5d2e",
+  "#b4721f",
+  "#19170f",
+  "#4a4437",
+  "#877e6a",
+  "#c26a1f",
+  "#6b4e2e",
+  "#7d2a2a",
+  "#2a5d4e",
+];
+export const PALETTE_EDITORIAL_DARK = [
+  "#e2674f",
+  "#7fa64f",
+  "#d99a3f",
+  "#cdbf9e",
+  "#9a8f76",
+  "#b6ab90",
+  "#e08a3f",
+  "#bb8a55",
+  "#cf6a5e",
+  "#5fa48c",
+];
+
+/** Slice palette for the active skin × mode. */
+export function paletteFor(skin: Skin, dark: boolean): string[] {
+  if (skin === "pastel") return dark ? PALETTE_DARK : PALETTE;
+  return dark ? PALETTE_EDITORIAL_DARK : PALETTE_EDITORIAL;
+}
+
 // Pick black or near-white text so an in-slice % label stays legible on any
 // palette colour (relative-luminance threshold).
 function labelColor(hex: string): string {
@@ -76,12 +109,14 @@ export function CategoriesBreakdown({
 }) {
   const { showAmounts } = useAmountVisibility();
   const { theme } = useTheme();
+  const { skin } = useSkin();
   const dark = theme === "dark";
-  const palette = dark ? PALETTE_DARK : PALETTE;
-  const sliceGap = dark ? "#1a1f29" : "#ffffff";
-  const tipBg = dark ? "#1a1f29" : "#ffffff";
-  const tipBorder = dark ? "#2c313d" : "#e2e5ef";
-  const tipText = dark ? "#eef1f7" : "#1b2130";
+  const editorial = skin !== "pastel";
+  const palette = paletteFor(skin, dark);
+  const sliceGap = editorial ? (dark ? "#1b1813" : "#f5efe3") : dark ? "#1a1f29" : "#ffffff";
+  const tipBg = editorial ? (dark ? "#242019" : "#f5efe3") : dark ? "#1a1f29" : "#ffffff";
+  const tipBorder = editorial ? (dark ? "#4a4130" : "#19170f") : dark ? "#2c313d" : "#e2e5ef";
+  const tipText = editorial ? (dark ? "#f4ecdb" : "#19170f") : dark ? "#eef1f7" : "#1b2130";
   const isMobile = useIsMobile();
   const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
 
@@ -171,7 +206,7 @@ export function CategoriesBreakdown({
           outerRadius={outerRadius + 9}
           startAngle={startAngle}
           endAngle={endAngle}
-          fill={dark ? "#eef1f7" : "#1b2130"}
+          fill={tipText}
         />
       </g>
     );

@@ -178,6 +178,8 @@ export const tourSteps: TourStep[] = [
           "on its own full page — just like Overview or the ledger, only it's " +
           "me.",
     desktopPlacement: "right",
+    // The mobile launcher is the FAB, which only exists when not removed.
+    before: (ctx) => ctx.closeChat(),
   },
   {
     id: "chat-dock",
@@ -188,6 +190,8 @@ export const tourSteps: TourStep[] = [
       "and hit enter, or click it open for the compact panel — same " +
       "conversation as the full page, smaller window.",
     when: (isMobile) => !isMobile,
+    // Ensure the dock is present (collapsed) even if it was previously removed.
+    before: (ctx) => ctx.closeChat(),
   },
   {
     id: "chat-log",
